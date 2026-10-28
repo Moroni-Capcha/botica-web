@@ -1,8 +1,9 @@
 /** Implementación del contrato contra la API REST del backend. Endpoints: docs/API.md */
 import type { ApiClient, BranchStock, NewCustomer, PublicConfig } from "./contract";
 import { ApiError } from "./errors";
-import type { AccountInput, Branch, BranchCreateInput, BranchCreated, BranchInput, BranchSeries, Pharmacy, RulesInput, StaffAccount, SalesReportLine, ContactRequest, CustomerInput, CustomerPurchase, CustomerSummary, RefillInfo, Dashboard, AttendanceMark, ClockRequest, KioskWorker, ManualMarkRequest, Worker, WorkerInput } from "./types";
+import type { Account, AccountInput, BoticaPublic, Branch, BranchCreateInput, BranchCreated, BranchInput, BranchSeries, Pharmacy, RulesInput, StaffAccount, SalesReportLine, ContactRequest, CustomerInput, CustomerPurchase, CustomerSummary, RefillInfo, Dashboard, AttendanceMark, ClockRequest, KioskWorker, ManualMarkRequest, Worker, WorkerInput } from "./types";
 import type { ApiErrorBody, BranchId, CashCloseRequest, CashClosing, CashMovement, CashMovementRequest, CashSession, CashSummary, Customer, Kardex, Lot, Product, ProductInput, ProductVelocity, Purchase, PurchaseRequest, Supplier, SupplierInput, Transfer, TransferAskRequest, TransferSendRequest, Sale, SaleRequest, Session, StaffSummary, User, WriteOffRequest } from "./types";
+import { tenantStore } from "./tenant";
 import { tokenStore } from "./token";
 
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -13,6 +14,8 @@ export function createHttpClient(baseUrl: string): ApiClient {
   async function request<T>(method: Method, path: string, body?: unknown): Promise<T> {
     const headers: Record<string, string> = { Accept: "application/json" };
     if (body !== undefined) headers["Content-Type"] = "application/json";
+    const botica = tenantStore.get();
+    if (botica) headers["X-Botica"] = botica;
     const token = tokenStore.get();
     if (token) headers.Authorization = `Bearer ${token}`;
 
@@ -40,13 +43,16 @@ export function createHttpClient(baseUrl: string): ApiClient {
   const q = (params: Record<string, string>) => `?${new URLSearchParams(params).toString()}`;
 
   return {
+    resolveBotica: (code: string) => request<BoticaPublic>("GET", `/public/botica/${encodeURIComponent(code)}`),
     getPublicConfig: () => request<PublicConfig>("GET", "/public/config"),
     listStaff: () => request<StaffSummary[]>("GET", "/auth/staff"),
     login: (userId, pin) => request<Session>("POST", "/auth/login", { userId, pin }),
+    loginOwner: (email, password) => request<Session>("POST", "/auth/owner-login", { email, password }),
     listKioskWorkers: (branchId: BranchId) => request<KioskWorker[]>("GET", `/public/attendance/workers${q({ branchId })}`),
     clock: (input: ClockRequest) => request<AttendanceMark>("POST", "/public/attendance/clock", input),
     me: () => request<User>("GET", "/auth/me"),
     logout: () => request<void>("POST", "/auth/logout"),
+    getAccount: () => request<Account>("GET", "/account"),
 
     updatePharmacy: (input: Pharmacy) => request<Pharmacy>("PUT", "/settings/pharmacy", input),
     createBranch: (input: BranchCreateInput) => request<BranchCreated>("POST", "/settings/branches", input),

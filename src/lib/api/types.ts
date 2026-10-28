@@ -48,6 +48,30 @@ export interface Session {
   expiresAt: string;
 }
 
+/** Estado de la cuenta del cliente. `suspended` = solo lectura. */
+export type AccountStatus = "trial" | "active" | "overdue" | "suspended";
+
+/** Cuenta y facturación de la botica. Fechas como día local YYYY-MM-DD (America/Lima). */
+export interface Account {
+  status: AccountStatus;
+  /** Último día de la prueba (solo en `trial`). */
+  trialEndsAt?: string;
+  /** Próxima renovación (solo en `active`). */
+  renewsAt?: string;
+  /** Ids de módulo (los de `src/lib/nav.ts`) que incluye el plan. */
+  modules: string[];
+}
+
+/** Lo que se puede mostrar de una botica antes de ingresar (sin datos sensibles). */
+export interface BoticaPublic {
+  /** Código de la botica: "botica-huanuco". */
+  code: string;
+  name: string;
+  tagline: string;
+  brand: string;
+  accent: string;
+}
+
 export interface Pharmacy {
   name: string;
   tagline: string;

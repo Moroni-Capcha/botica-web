@@ -5,7 +5,7 @@
  * Las pantallas solo conocen esta interfaz.
  */
 import type {
-  Branch, CashCloseRequest, CashClosing, CashMovement, CashMovementRequest, CashSession, CashSummary, Customer, ExpiryThresholds, Kardex, Lot, Pharmacy, Product, ProductInput, ProductVelocity, Purchase, PurchaseRequest, PurchasingSettings, Sale, SaleRequest, Session,
+  Account, BoticaPublic, Branch, CashCloseRequest, CashClosing, CashMovement, CashMovementRequest, CashSession, CashSummary, Customer, ExpiryThresholds, Kardex, Lot, Pharmacy, Product, ProductInput, ProductVelocity, Purchase, PurchaseRequest, PurchasingSettings, Sale, SaleRequest, Session,
   Dashboard, SalesReportLine, AttendanceMark, ContactRequest, CustomerInput, CustomerPurchase, CustomerSummary, RefillInfo, AttendanceSettings, ClockRequest, KioskWorker, ManualMarkRequest, Worker, WorkerInput,
   AccountInput, BranchCreateInput, BranchCreated, Plan, BranchInput, BranchSeries, RulesInput, StaffAccount,
   StaffSummary, Supplier, SupplierInput, Transfer, TransferAskRequest, TransferSendRequest, User, BranchId, WriteOffRequest,
@@ -38,10 +38,14 @@ export interface NewCustomer {
 }
 
 export interface ApiClient {
-  /* Público (antes del login) */
+  /* Público (antes del login). Cada llamada lleva la botica elegida en el header X-Botica (ver tenant.ts). */
+  /** Datos públicos de una botica por su código. Error BOTICA_NO_ENCONTRADA (404) si no existe. */
+  resolveBotica(code: string): Promise<BoticaPublic>;
   getPublicConfig(): Promise<PublicConfig>;
   listStaff(): Promise<StaffSummary[]>;
   login(userId: string, pin: string): Promise<Session>;
+  /** Ingreso del dueño (administrador) con correo y contraseña. CREDENCIALES_INVALIDAS (401) si no coinciden. */
+  loginOwner(email: string, password: string): Promise<Session>;
 
   /* Marcación de asistencia (sin sesión: el equipo del local, con el PIN personal del trabajador) */
   listKioskWorkers(branchId: BranchId): Promise<KioskWorker[]>;
@@ -50,6 +54,8 @@ export interface ApiClient {
   /* Sesión */
   me(): Promise<User>;
   logout(): Promise<void>;
+  /** Estado de la cuenta y módulos del plan. Lo puede leer cualquier sesión (el aviso se muestra a todos). */
+  getAccount(): Promise<Account>;
 
   /* Panel */
   /** Venta de hoy y de los `days` días anteriores. El encargado recibe solo su local. */

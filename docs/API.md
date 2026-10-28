@@ -11,7 +11,8 @@ Los tipos exactos están en `src/lib/api/types.ts`. Si algo cambia, se actualiza
 - Dinero en soles con IGV incluido, número con 2 decimales. Costos sin IGV.
 - Fechas de vencimiento como `YYYY-MM-DD`. Fechas y horas como ISO 8601 con zona (`2026-10-27T15:20:00-05:00`).
 - Autenticación: `Authorization: Bearer <token>`. Un 401 hace que el front cierre la sesión.
-- CORS: permitir el dominio del front y el header `Authorization`.
+- Botica (multi-cliente): el front envía `X-Botica: <código>` (p. ej. `botica-huanuco`) en cada petición, una vez elegida la botica. El backend resuelve a qué cliente pertenecen los datos con ese header (o por subdominio).
+- CORS: permitir el dominio del front y los headers `Authorization` y `X-Botica`.
 
 ### Errores
 
@@ -24,6 +25,9 @@ Cualquier respuesta 4xx o 5xx trae este cuerpo. El front muestra `message` tal c
 | HTTP | `code` | Cuándo |
 | --- | --- | --- |
 | 401 | `PIN_INVALIDO` | Usuario o PIN incorrectos |
+| 401 | `CREDENCIALES_INVALIDAS` | Correo o contraseña del dueño incorrectos |
+| 404 | `BOTICA_NO_ENCONTRADA` | El código de botica no existe |
+| 403 | `CUENTA_SUSPENDIDA` | La cuenta está suspendida (solo lectura): se rechaza toda escritura, salvo ingreso y salida |
 | 401 | `NO_AUTORIZADO` | Token vencido o inválido |
 | 403 | `SIN_PERMISO` | Una cuenta de local intenta operar en otro local |
 | 400 | `CAJA_CERRADA` | Venta con la caja del local cerrada |
@@ -69,11 +73,33 @@ El backend valida el local en cada endpoint que recibe `branchId`; el front tamb
 
 `POST /auth/login` con `{ "userId": "u2", "pin": "1111" }` → `Session` (`{ token, user, expiresAt }`). Recomendado: bloquear 5 minutos tras 5 intentos fallidos por usuario.
 
+`GET /public/botica/:code` → `BoticaPublic` (`{ code, name, tagline, brand, accent }`: lo mínimo para mostrar la marca antes de ingresar, sin logo). `404 BOTICA_NO_ENCONTRADA` si el código no existe. El código se escribe en minúsculas, números y guiones (3 a 40 caracteres).
+
+`POST /auth/owner-login` con `{ "email": "dueno@botica-huanuco.pe", "password": "Clave2026!" }` → `Session` de un `admin`. `401 CREDENCIALES_INVALIDAS` si no coinciden (mismo mensaje para correo y contraseña, para no revelar cuál falló). Contraseña de mínimo 8 caracteres (`passwordError` en `src/lib/domain/auth.ts`). Guárdala con hash y bloquea tras varios intentos fallidos. El PIN (`/auth/login`) sigue siendo para el mostrador. Solo cuentas `admin` pueden ingresar por aquí.
+
+En el mock, el dueño de ejemplo es `dueno@botica-huanuco.pe` con contraseña `Clave2026!` y el código de botica es `botica-huanuco`.
+
 ### Sesión
 
 `GET /auth/me` → `User`
 
 `POST /auth/logout` → `204`
+
+### Cuenta y plan
+
+`GET /account` (cualquier sesión, para que el aviso lo vea todo el personal) → `Account`:
+
+```json
+{ "status": "trial", "trialEndsAt": "2026-11-10", "renewsAt": null, "modules": ["panel", "pos", "caja"] }
+```
+
+- `status`: `trial` (prueba), `active`, `overdue` (vencida: avisa, pero se puede operar) o `suspended` (solo lectura).
+- `trialEndsAt` (solo `trial`) y `renewsAt` (solo `active`): días locales `YYYY-MM-DD` (America/Lima).
+- `modules`: ids de módulo del plan (los de `src/lib/nav.ts`). El front muestra solo los que están aquí y además en `user.permissions` (`allowedModules`). El backend debe rechazar también los endpoints de un módulo que el plan no incluye.
+- El backend devuelve el estado ya calculado: una prueba cuyo `trialEndsAt` quedó atrás llega como `overdue` (`effectiveStatus` en `src/lib/domain/account.ts`). El front aplica la misma regla por si el dato llega viejo.
+- Vive en un endpoint propio y no dentro de `PublicConfig.plan`, porque cambia con la facturación (no con la configuración) y no debe ser público.
+- **Solo lectura:** con `suspended`, todo `POST`, `PUT`, `PATCH` y `DELETE` responde `403 CUENTA_SUSPENDIDA`, excepto `/auth/login`, `/auth/owner-login` y `/auth/logout`. Los `GET` siguen funcionando.
+- Para probar en el mock: `setMockAccount({ status: "suspended" })` (exportada desde `src/lib/api/mock/client.ts`) o editar `account` dentro de `bh.mock.v1` en localStorage.
 
 ### Panel del día (octava entrega)
 

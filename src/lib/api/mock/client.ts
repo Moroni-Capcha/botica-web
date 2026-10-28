@@ -7,7 +7,7 @@ import { ApiError } from "../errors";
 import type {
   SalesReportLine, AttendanceMark, AttendanceSettings, KioskWorker, Worker, CustomerPurchase, CustomerInput,
   Branch, CashClosing, CashMovement, CashSession, Customer, ExpiryThresholds, KardexEntry, Lot, MoveType, Product, ProductInput, ProductVelocity, Purchase, PurchasingSettings, Sale, SaleRequest, Session,
-  StaffSummary, Supplier, SupplierInput, Transfer, TransferItem, User, Role, StaffAccount, AccountInput, BranchInput, RulesInput, Pharmacy, Plan,
+  StaffSummary, Supplier, SupplierInput, Transfer, TransferItem, User, Role, StaffAccount, AccountInput, BranchInput, RulesInput, Pharmacy, Plan, Account, AccountStatus, BoticaPublic,
 } from "../types";
 import { tokenStore } from "../token";
 import { allocateFefo, daysUntil, findPresentation, isValidCmp, documentIsValid, parseDay, round2, IGV, weightedDiscount } from "@/lib/domain/pharmacy";
@@ -17,14 +17,22 @@ import { transferActions, transferCode } from "@/lib/domain/transfers";
 import { allowedMarks, scheduleError, MARK_LABEL } from "@/lib/domain/attendance";
 import { pointsFor, validateCustomer } from "@/lib/domain/customers";
 import { closeDifference, countDenominations, expectedCash, movementError, movementTotals, paymentTotals } from "@/lib/domain/cash";
+import { ALL_MODULES, effectiveStatus, isReadOnly, limaDay } from "@/lib/domain/account";
+import { isValidEmail, normalizeBoticaCode, normalizeEmail, passwordError } from "@/lib/domain/auth";
 import { accountErrors, accountGuard, branchErrors, branchSlug, deactivateBlockers, planUsage, hasErrors, normalizePharmacy, pharmacyErrors, rulesErrors } from "@/lib/domain/settings";
 import { SEED_DAILY_UNITS, SEED_LOT_PLAN, SEED_PRODUCTS, SEED_SUC_MISSING } from "./seed-data";
 
 const KEY = "bh.mock.v1";
-const VERSION = 11; // subir cuando cambie la forma de los datos: se regeneran
+const VERSION = 12; // subir cuando cambie la forma de los datos: se regeneran
 const DAY = 86_400_000;
 
+/** Código de la botica de los datos de ejemplo. El mock es de una sola botica: solo acepta este código. */
+export const MOCK_BOTICA_CODE = "botica-huanuco";
+
 interface StaffRecord extends StaffSummary {
+  /** Solo el administrador (dueño): ingresa con correo y contraseña. En el mock va en texto plano; el backend la guarda con hash. */
+  email?: string;
+  password?: string;
   pin: string;
   active: boolean;
 }
@@ -50,6 +58,8 @@ interface MockDb {
   pharmacy: PublicConfig["pharmacy"];
   branches: Branch[];
   plan: Plan;
+  boticaCode: string;
+  account: Account;
   staff: StaffRecord[];
   products: Product[];
   lots: Lot[];
@@ -153,8 +163,10 @@ function seed(now: number): MockDb {
       { id: "sucursal", name: "Sucursal", address: "Av. Canto Grande 3150", series: "002", active: true },
     ],
     plan: { name: "Plan Crece", maxBranches: 3 },
+    boticaCode: MOCK_BOTICA_CODE,
+    account: { status: "active", renewsAt: limaDay(t0 + 30 * DAY), modules: [...ALL_MODULES] },
     staff: [
-      { id: "u1", name: "Carmen Salazar", role: "admin", branchId: null, pin: "1234", active: true },
+      { id: "u1", name: "Carmen Salazar", role: "admin", branchId: null, email: "dueno@botica-huanuco.pe", password: "Clave2026!", pin: "1234", active: true },
       { id: "u2", name: "Q.F. Daniel Rojas", role: "encargado", branchId: "principal", pin: "1111", active: true },
       { id: "u3", name: "Q.F. Lucía Ramos", role: "encargado", branchId: "sucursal", pin: "2222", active: true },
     ],
@@ -656,10 +668,39 @@ function checkWorker(d: MockDb, input: Omit<Worker, "id">, selfId?: string): Omi
   return w;
 }
 
+/** Lecturas y acceso: siguen funcionando con la cuenta suspendida. Todo lo demás es escritura y se bloquea. */
+const READ_OR_AUTH = /^(get|list|search|resolve|login|me$|logout$)/;
+
+/** Con la cuenta suspendida (solo lectura) rechaza cada escritura con CUENTA_SUSPENDIDA, salvo ingreso y salida. */
+function guardWrites(client: ApiClient, account: () => Account): ApiClient {
+  const guarded = {} as Record<string, unknown>;
+  for (const [name, fn] of Object.entries(client) as [string, (...a: unknown[]) => Promise<unknown>][]) {
+    guarded[name] = READ_OR_AUTH.test(name)
+      ? fn
+      : async (...args: unknown[]) => {
+          if (isReadOnly(effectiveStatus(account(), limaDay(Date.now())))) fail("CUENTA_SUSPENDIDA", "Tu cuenta está suspendida: solo puedes consultar. Comunícate con Digi!HME para reactivarla.", 403);
+          return fn(...args);
+        };
+  }
+  return guarded as unknown as ApiClient;
+}
+
+let active: { get: () => MockDb; commit: () => void } | null = null;
+
+/** Solo pruebas: cambia el estado de la cuenta simulada (p. ej. "suspended" para ver el modo solo lectura). Se ve al volver a leer getAccount. */
+export function setMockAccount(patch: Partial<Account> & { status?: AccountStatus }) {
+  const ctl = active ?? { get: load, commit: () => undefined };
+  const d = ctl.get();
+  d.account = { ...d.account, ...patch };
+  if (active) active.commit();
+  else save(d);
+}
+
 export function createMockClient(): ApiClient {
   let db: MockDb | null = null;
   const get = () => (db ??= load());
   const commit = () => db && save(db);
+  active = { get, commit };
 
   const currentUser = (): StaffRecord => {
     const token = tokenStore.get();
@@ -677,7 +718,14 @@ export function createMockClient(): ApiClient {
     if (u.role !== "admin" && u.branchId !== branchId) fail("SIN_PERMISO", "Tu cuenta solo puede operar en tu local.", 403);
   };
 
-  return {
+  const client: ApiClient = {
+    async resolveBotica(code) {
+      await wait(120);
+      const d = get();
+      if (normalizeBoticaCode(code) !== d.boticaCode) fail("BOTICA_NO_ENCONTRADA", "No encontramos una botica con ese código. Revísalo e intenta de nuevo.", 404);
+      const b: BoticaPublic = { code: d.boticaCode, name: d.pharmacy.name, tagline: d.pharmacy.tagline, brand: d.pharmacy.brand, accent: d.pharmacy.accent };
+      return b;
+    },
     async getPublicConfig() {
       await wait(80);
       const d = get();
@@ -796,7 +844,7 @@ export function createMockClient(): ApiClient {
     async listAccounts() {
       await wait(120);
       requireAdmin(currentUser(), "las cuentas");
-      return get().staff.map(({ pin: _pin, ...s }): StaffAccount => s);
+      return get().staff.map(({ id, name, role, branchId, active }): StaffAccount => ({ id, name, role, branchId, active }));
     },
     async createAccount(input) {
       await wait(220);
@@ -828,7 +876,7 @@ export function createMockClient(): ApiClient {
     },
     async listStaff() {
       await wait(80);
-      return get().staff.filter((s) => s.active).map(({ pin: _pin, active: _a, ...s }) => s);
+      return get().staff.filter((s) => s.active).map(({ id, name, role, branchId }): StaffSummary => ({ id, name, role, branchId }));
     },
     async login(userId, pin) {
       await wait(260);
@@ -836,6 +884,17 @@ export function createMockClient(): ApiClient {
       if (!s || !s.active || s.pin !== pin) return fail("PIN_INVALIDO", "PIN incorrecto. Intenta de nuevo.", 401);
       const token = `mock.${userId}.${Date.now().toString(36)}`;
       get().sessions[token] = userId;
+      commit();
+      const session: Session = { token, user: toUser(s), expiresAt: new Date(Date.now() + 12 * 3600_000).toISOString() };
+      return session;
+    },
+    async loginOwner(email, password) {
+      await wait(260);
+      const e = normalizeEmail(email);
+      const s = get().staff.find((x) => x.role === "admin" && x.active && x.email === e);
+      if (!isValidEmail(e) || passwordError(password) || !s || s.password !== password) return fail("CREDENCIALES_INVALIDAS", "Correo o contraseña incorrectos. Intenta de nuevo.", 401);
+      const token = `mock.${s.id}.${Date.now().toString(36)}`;
+      get().sessions[token] = s.id;
       commit();
       const session: Session = { token, user: toUser(s), expiresAt: new Date(Date.now() + 12 * 3600_000).toISOString() };
       return session;
@@ -867,6 +926,12 @@ export function createMockClient(): ApiClient {
     async me() {
       await wait(60);
       return toUser(currentUser());
+    },
+    async getAccount() {
+      await wait(60);
+      currentUser();
+      const a = get().account;
+      return { ...a, status: effectiveStatus(a, limaDay(Date.now())), modules: [...a.modules] };
     },
     async logout() {
       const token = tokenStore.get();
@@ -1547,6 +1612,7 @@ export function createMockClient(): ApiClient {
       return sale;
     },
   };
+  return guardWrites(client, () => get().account);
 }
 
 /** Para la pantalla de ajustes o pruebas: borra los datos simulados. */
