@@ -31,3 +31,22 @@ export function effectiveStatus(account: Pick<Account, "status" | "trialEndsAt">
 
 /** Módulos que puede ver el usuario: los de su rol que además incluye el plan. */
 export const allowedModules = (planModules: readonly string[], rolePermissions: readonly string[]): string[] => rolePermissions.filter((m) => planModules.includes(m));
+
+export const STATUS_LABEL: Record<AccountStatus, string> = { trial: "En prueba", active: "Activa", overdue: "Vencida", suspended: "Suspendida" };
+
+export interface AccountNotice {
+  tone: "info" | "warn" | "error";
+  message: string;
+}
+
+/** Aviso a mostrar arriba en toda la app. Una cuenta activa no muestra nada. */
+export function accountNotice(account: Pick<Account, "status" | "trialEndsAt">, today: string): AccountNotice | null {
+  const status = effectiveStatus(account, today);
+  if (status === "suspended") return { tone: "error", message: "Tu cuenta está suspendida: puedes mirar todo, pero no registrar cambios (solo lectura)." };
+  if (status === "overdue") return { tone: "warn", message: "Tu plan está vencido. Regulariza el pago para no perder el acceso." };
+  if (status === "trial" && account.trialEndsAt) {
+    const d = daysLeft(account.trialEndsAt, today);
+    return { tone: d <= 3 ? "warn" : "info", message: d === 0 ? "Tu prueba gratis termina hoy." : d === 1 ? "Te queda 1 día de prueba gratis." : `Te quedan ${d} días de prueba gratis.` };
+  }
+  return null;
+}

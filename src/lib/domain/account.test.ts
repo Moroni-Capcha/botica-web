@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allowedModules, daysLeft, effectiveStatus, isReadOnly, limaDay } from "./account";
+import { accountNotice, allowedModules, daysLeft, effectiveStatus, isReadOnly, limaDay } from "./account";
 
 describe("cuenta", () => {
   it("solo la suspendida es de solo lectura", () => {
@@ -30,5 +30,23 @@ describe("cuenta", () => {
   it("toma el día de Lima, no el UTC", () => {
     expect(limaDay(Date.parse("2026-10-28T03:00:00Z"))).toBe("2026-10-27"); // 22:00 en Lima
     expect(limaDay(Date.parse("2026-10-28T06:00:00Z"))).toBe("2026-10-28");
+  });
+});
+
+describe("aviso de cuenta", () => {
+  const today = "2026-10-28";
+  it("no avisa si la cuenta está activa", () => {
+    expect(accountNotice({ status: "active" }, today)).toBeNull();
+  });
+  it("avisa los días de prueba y se pone en alerta cerca del final", () => {
+    expect(accountNotice({ status: "trial", trialEndsAt: "2026-11-10" }, today)).toMatchObject({ tone: "info", message: "Te quedan 13 días de prueba gratis." });
+    expect(accountNotice({ status: "trial", trialEndsAt: "2026-10-29" }, today)).toMatchObject({ tone: "warn", message: "Te queda 1 día de prueba gratis." });
+    expect(accountNotice({ status: "trial", trialEndsAt: today }, today)?.message).toBe("Tu prueba gratis termina hoy.");
+  });
+  it("una prueba pasada se avisa como vencida", () => {
+    expect(accountNotice({ status: "trial", trialEndsAt: "2026-10-01" }, today)?.tone).toBe("warn");
+  });
+  it("suspendida es error de solo lectura", () => {
+    expect(accountNotice({ status: "suspended" }, today)).toMatchObject({ tone: "error" });
   });
 });

@@ -1,8 +1,8 @@
 "use client";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
-import { Toaster } from "@/components/ui/toast";
+import { Toaster, notify } from "@/components/ui/toast";
 import { useConfig } from "@/lib/queries";
 import { isApiError } from "@/lib/api";
 
@@ -22,6 +22,12 @@ export function Providers({ children }: { children: ReactNode }) {
   const [client] = useState(
     () =>
       new QueryClient({
+        // Red de seguridad: cualquier escritura rechazada por cuenta suspendida avisa con un mensaje claro.
+        mutationCache: new MutationCache({
+          onError: (err) => {
+            if (isApiError(err) && err.code === "CUENTA_SUSPENDIDA") notify("Tu cuenta está suspendida (solo lectura). No se pudo guardar el cambio.", "warn");
+          },
+        }),
         defaultOptions: {
           queries: {
             refetchOnWindowFocus: false,

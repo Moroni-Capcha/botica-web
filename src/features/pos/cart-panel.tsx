@@ -18,13 +18,14 @@ interface CartPanelProps {
   onClear: () => void;
   onCharge: () => void;
   canCharge: boolean;
+  writable?: boolean;
   cashOpen: boolean;
   equivalents: { base: Product; options: Product[] } | null;
   onAddEquivalent: (p: Product) => void;
   onClose?: () => void;
 }
 
-export function CartPanel({ lines, totals, customer, onCustomer, onQty, onClear, onCharge, canCharge, cashOpen, equivalents, onAddEquivalent, onClose }: CartPanelProps) {
+export function CartPanel({ lines, totals, customer, onCustomer, onQty, onClear, onCharge, canCharge, writable = true, cashOpen, equivalents, onAddEquivalent, onClose }: CartPanelProps) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-center gap-2 border-b border-zinc-100 px-4 py-3">
@@ -149,6 +150,7 @@ export function CartPanel({ lines, totals, customer, onCustomer, onQty, onClear,
         <Button variant="primary" size="lg" className="mt-3 w-full" disabled={!canCharge} onClick={onCharge}>
           <Banknote className="h-5 w-5" /> Cobrar {lines.length ? soles(totals.total) : ""}
         </Button>
+        {!writable && <p className="mt-2 text-center text-[11px] text-rose-700">Tu cuenta está en solo lectura. No se puede cobrar.</p>}
         {!cashOpen && <p className="mt-2 text-center text-[11px] text-amber-700">La caja está cerrada. Ábrela arriba para poder cobrar.</p>}
       </div>
     </div>

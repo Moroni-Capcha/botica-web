@@ -2,12 +2,14 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { effectiveStatus, isReadOnly, limaDay } from "@/lib/domain/account";
 import type { ClockRequest, ContactRequest, CustomerInput, ManualMarkRequest, WorkerInput } from "@/lib/api";
 import type { BranchId, CashCloseRequest, CashMovementRequest, Lot, Product, ProductInput, PurchaseRequest, SaleRequest, Supplier, SupplierInput, Transfer, TransferAskRequest, TransferSendRequest, WriteOffRequest } from "@/lib/api";
 import type { NewCustomer, AccountInput, BranchCreateInput, BranchInput, Pharmacy, RulesInput, PublicConfig } from "@/lib/api";
 
 export const qk = {
   config: ["config"] as const,
+  account: ["account"] as const,
   staff: ["staff"] as const,
   products: ["products"] as const,
   lots: (b: BranchId) => ["lots", b] as const,
@@ -34,7 +36,16 @@ export const qk = {
 };
 
 export const useConfig = () => useQuery({ queryKey: qk.config, queryFn: api.getPublicConfig, staleTime: 10 * 60_000 });
-export const useStaff = () => useQuery({ queryKey: qk.staff, queryFn: api.listStaff, staleTime: 60_000 });
+export const useStaff = (enabled = true) => useQuery({ queryKey: qk.staff, queryFn: api.listStaff, staleTime: 60_000, enabled });
+
+/** Estado de la cuenta y módulos del plan. Se vuelve a leer al volver a la pestaña. Solo con sesión iniciada. */
+export const useAccount = (enabled = true) => useQuery({ queryKey: qk.account, queryFn: api.getAccount, staleTime: 60_000, refetchOnWindowFocus: true, enabled });
+
+/** false cuando la cuenta está suspendida (solo lectura). Mientras no se sabe el estado, se permite escribir. */
+export function useWritable(): boolean {
+  const { data } = useAccount();
+  return !(data && isReadOnly(effectiveStatus(data, limaDay(Date.now()))));
+}
 export const useProducts = () => useQuery({ queryKey: qk.products, queryFn: api.listProducts, staleTime: 5 * 60_000 });
 export const useLots = (branchId: BranchId) => useQuery({ queryKey: qk.lots(branchId), queryFn: () => api.listLots(branchId), staleTime: 30_000 });
 export const useBranchStock = () => useQuery({ queryKey: qk.branchStock, queryFn: api.listBranchStock, staleTime: 60_000 });

@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Ellipsis } from "lucide-react";
 import type { User } from "@/lib/api/types";
 import { navFor } from "@/lib/nav";
+import { useAccount } from "@/lib/queries";
 import { cn } from "@/lib/cn";
 
 const MAX = 5;
@@ -13,7 +14,7 @@ const MAX = 5;
 export function MobileNav({ user }: { user: User }) {
   const pathname = usePathname();
   const [more, setMore] = useState(false);
-  const nav = navFor(user);
+  const nav = navFor(user, useAccount().data?.modules);
   const overflow = nav.length > MAX;
   const primary = overflow ? nav.slice(0, MAX - 1) : nav;
   const rest = overflow ? nav.slice(MAX - 1) : [];

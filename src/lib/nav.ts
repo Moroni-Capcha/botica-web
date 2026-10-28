@@ -25,7 +25,8 @@ export const NAV: NavItem[] = [
   { id: "ajustes", href: "/ajustes", label: "Ajustes", short: "Ajustes", icon: Settings, ready: true },
 ];
 
-export const navFor = (user: User) => NAV.filter((n) => user.permissions.includes(n.id));
+/** Módulos del rol que además incluye el plan. Sin datos de cuenta (`modules` indefinido) se muestran todos los del rol. */
+export const navFor = (user: User, modules?: readonly string[]) => NAV.filter((n) => user.permissions.includes(n.id) && (!modules || modules.includes(n.id)));
 
 /** Primera pantalla al entrar: el administrador ve el panel; las cuentas de local, el punto de venta. */
 export const homeFor = (user: User) => {

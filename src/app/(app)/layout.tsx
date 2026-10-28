@@ -11,6 +11,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { NAV } from "@/lib/nav";
+import { AccountBanner } from "@/features/account/account-banner";
 
 /** Zona protegida: exige sesión y arma el marco (barra lateral, barra superior, navegación móvil). */
 export default function AppLayout({ children }: { children: ReactNode }) {
@@ -31,7 +32,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     () =>
       tokenStore.onExpired(() => {
         signOut();
-        notify("Tu sesión terminó. Vuelve a ingresar con tu PIN.", "warn");
+        notify("Tu sesión terminó. Vuelve a ingresar.", "warn");
       }),
     [signOut],
   );
@@ -53,6 +54,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       <Sidebar user={session.user} onLogout={logout} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar title={current?.label ?? ""} user={session.user} onLogout={logout} />
+        <AccountBanner />
         <main className="min-h-0 flex-1 overflow-y-auto pb-20 md:pb-0">{children}</main>
       </div>
       <MobileNav user={session.user} />

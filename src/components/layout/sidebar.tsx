@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { LogOut } from "lucide-react";
 import type { User } from "@/lib/api/types";
 import { navFor } from "@/lib/nav";
-import { useConfig } from "@/lib/queries";
+import { useAccount, useConfig } from "@/lib/queries";
 import { BrandMark, DigiSeal } from "@/components/brand-mark";
 import { cn } from "@/lib/cn";
 import { initials } from "@/lib/format";
@@ -13,6 +13,7 @@ import { initials } from "@/lib/format";
 export function Sidebar({ user, onLogout }: { user: User; onLogout: () => void }) {
   const pathname = usePathname();
   const { data: config } = useConfig();
+  const modules = useAccount().data?.modules;
   const place = user.branchId ? config?.branches.find((b) => b.id === user.branchId)?.name : "Todos los locales";
   return (
     <aside className="hidden w-60 shrink-0 flex-col bg-brand text-white md:flex">
@@ -24,7 +25,7 @@ export function Sidebar({ user, onLogout }: { user: User; onLogout: () => void }
         </div>
       </div>
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3" aria-label="Módulos">
-        {navFor(user).map((n) => {
+        {navFor(user, modules).map((n) => {
           const active = pathname.startsWith(n.href);
           const Icon = n.icon;
           return (

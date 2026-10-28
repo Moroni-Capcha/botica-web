@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "r
 import { Search, TriangleAlert, Wallet, X } from "lucide-react";
 import type { Lot, Product, Sale } from "@/lib/api/types";
 import { errorMessage } from "@/lib/api";
-import { useBranchStock, useCash, useConfig, useCreateSale, useLots, useOpenCash, useProducts } from "@/lib/queries";
+import { useBranchStock, useCash, useConfig, useCreateSale, useLots, useOpenCash, useProducts, useWritable } from "@/lib/queries";
 import { useOperatingBranch } from "@/lib/auth/session-store";
 import {
   buildCartLines, cartTotals, daysUntil, findPresentation, sellableLots, stockLabel, unitsInCart, DEFAULT_THRESHOLDS,
@@ -97,8 +97,9 @@ export function PosScreen() {
 
   const lines = useMemo(() => buildCartLines(cart.items, productMap, lotList, now), [cart.items, productMap, lotList, now]);
   const totals = useMemo(() => cartTotals(lines), [lines]);
+  const writable = useWritable();
   const cashOpen = cash.data?.open ?? false;
-  const canCharge = lines.length > 0 && cashOpen && lines.every((l) => l.missing === 0);
+  const canCharge = writable && lines.length > 0 && cashOpen && lines.every((l) => l.missing === 0);
 
   const add = useCallback(
     (p: Product, presentationId: Parameters<typeof findPresentation>[1], el?: HTMLElement, qty = 1) => {
@@ -186,6 +187,7 @@ export function PosScreen() {
         setPaying(true);
       }}
       canCharge={canCharge}
+      writable={writable}
       cashOpen={cashOpen}
       equivalents={equivalents}
       onAddEquivalent={(p) => add(p, "unidad")}
