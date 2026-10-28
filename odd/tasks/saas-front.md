@@ -12,7 +12,7 @@ Build the front-end side of the SaaS roadmap in `CLAUDE.md` (items 1-6), contrac
 ## Tasks
 - [x] T1 (ef0cbff, typecheck ok, 101 tests) Contract + types + mock + domain: tenant (botica code), owner login (email/password), account status (trial/active/overdue/suspended), plan modules, read-only guard. Docs in `docs/API.md`.
 - [x] T2+T3 done together (typecheck/build ok, 105 tests; NOT verified in browser). T2 Login UI: botica code + owner/counter modes; session carries tenant; PIN stays for counter.
-- [ ] T3 Ajustes "Plan y facturación" tab, account banner, read-only blocking, modules gated by plan (`nav.ts`).
+- [x] T3 (cf166f0, with T2) Ajustes "Plan y facturación" tab, account banner, read-only blocking, modules gated by plan (`nav.ts`).
 - [x] T4 (typecheck ok, 114 tests, build ok; NOT verified in browser) Guided signup (`/registro`) and first-run setup checklist on the panel. Mock: one dataset per botica code (`bh.mock.v1.<code>`), `VERSION` 13.
 - [ ] T5 SUNAT vouchers: status, resend, void, credit note, 80 mm ticket print.
 - [ ] T6 Offline POS (PWA + sales queue).
