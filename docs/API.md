@@ -79,6 +79,29 @@ El backend valida el local en cada endpoint que recibe `branchId`; el front tamb
 
 En el mock, el dueño de ejemplo es `dueno@botica-huanuco.pe` con contraseña `Clave2026!` y el código de botica es `botica-huanuco`.
 
+### Registro y primera configuración
+
+`GET /public/plans` (sin token) → `PlanOffer[]`, los planes que se pueden contratar:
+
+```json
+[{ "id": "inicio", "name": "Plan Inicio", "priceMonthly": 59, "maxBranches": 1, "modules": ["panel", "pos", "caja"] }]
+```
+
+- `priceMonthly`: soles por mes **con IGV** (18 %), con 2 decimales (`round2`). Se calcula desde el precio sin IGV (`PLAN_CATALOG` en `src/lib/domain/plans.ts`).
+
+`POST /public/signup` (sin token) con `{ "boticaName", "code", "ownerName", "email", "password", "plan" }` → `Session` del dueño (`admin`, ya con sesión iniciada). Crea la botica en **prueba de 14 días** (`status: "trial"`, `trialEndsAt` = hoy + 14, día de Lima), con el plan elegido (`plan` = `id` de `PlanOffer`), un local "Principal" (serie `001`) y al dueño como único usuario.
+
+- `code`: minúsculas, números y guiones (3 a 40), `isValidBoticaCode`. `409 CODIGO_EN_USO` si ya existe.
+- `email` válido (`isValidEmail`); `409 CORREO_EN_USO` si otra botica ya lo usa como dueño (el backend debe garantizarlo; el mock solo ve su propia botica). Contraseña con `passwordError`.
+- `400 DATOS_INVALIDOS` si falta el nombre (3 a 40 caracteres), el nombre del dueño o el plan no existe.
+- La contraseña se guarda con hash. Después del registro el front manda `X-Botica: <code>` como en cualquier ingreso.
+
+`GET /setup` (solo `admin`) → `Setup` `{ "done": ["botica", "local"] }`: pasos de la primera configuración ya hechos. Pasos, en orden: `botica` (RUC, dirección y colores), `local` (datos del primer local), `series` (series de comprobantes), `usuario` (primer usuario de mostrador con PIN), `productos` (importar productos o saltar).
+
+`POST /setup/steps/:step` (solo `admin`) → `Setup`. Marca el paso como hecho (idempotente). `400 DATOS_INVALIDOS` si el paso no existe. Una botica ya configurada (o creada antes de esta función) devuelve todos los pasos hechos.
+
+**Mock con varias boticas:** cada botica registrada vive en su propio dato `bh.mock.v1.<code>` (la de ejemplo sigue en `bh.mock.v1`). `createMockClient` elige la botica por el código de `tenant.ts` (el mismo que el front manda en `X-Botica`) en cada llamada. Las boticas registradas en el mock no se regeneran si sube `VERSION`: se descartan.
+
 ### Sesión
 
 `GET /auth/me` → `User`

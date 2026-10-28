@@ -53,6 +53,7 @@ El contrato está en [docs/API.md](docs/API.md).
 src/
   app/                  Rutas (App Router)
     login/              Ingreso con usuario y PIN
+    registro/           Registro público de una botica nueva (3 pasos)
     (app)/              Zona protegida: barra lateral, barra superior
       panel/            Panel del día (inicio del administrador)
       pos/              Punto de venta
@@ -104,4 +105,5 @@ public/brand/           Logo e isotipo de Digi!HME (PNG transparente)
 - [x] Asistencia del personal: marcación con PIN personal (también desde la pantalla de ingreso), estado de hoy con línea del día, historial, resumen por trabajador con tardanzas, faltas, horas y extra, marcas manuales, personal y horarios, Excel
 - [x] Reportes: venta por periodo con comparación, por día u hora, por producto, laboratorio, tipo, local, quien atendió y método de pago; utilidad y margen; productos sin movimiento; libro de recetas; libro Excel completo
 - [x] Ajustes: datos y colores de la botica con vista previa y control de contraste, locales según el plan contratado (crear con su cuenta, desactivar sin perder historial, reactivar), series de comprobantes con el siguiente correlativo, cuentas y PIN (siempre queda un administrador activo), plazos de vencimiento, reglas de compra y de asistencia
-- [ ] SaaS (en curso, sin pantallas aún): contrato y mock de botica por código (`X-Botica`), ingreso del dueño con correo y contraseña, estado de la cuenta (prueba, activa, vencida, suspendida) con módulos del plan y modo solo lectura
+- [ ] SaaS (en curso): contrato y mock de botica por código (`X-Botica`), ingreso del dueño con correo y contraseña, estado de la cuenta (prueba, activa, vencida, suspendida) con módulos del plan y modo solo lectura
+- [x] Registro y primera configuración: `/registro` en 3 pasos (plan, datos, listo) crea la botica en prueba de 14 días; tarjeta de pasos pendientes en el panel (datos, local, series, usuario de mostrador, productos). El mock guarda cada botica nueva en `bh.mock.v1.<código>`

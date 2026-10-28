@@ -62,6 +62,34 @@ export interface Account {
   modules: string[];
 }
 
+/** Plan que se puede contratar (público, para el registro). Precio en soles por mes, con IGV. */
+export interface PlanOffer {
+  id: string;
+  name: string;
+  priceMonthly: number;
+  maxBranches: number;
+  /** Ids de módulo (los de `src/lib/nav.ts`) que incluye. */
+  modules: string[];
+}
+
+export interface SignUpInput {
+  boticaName: string;
+  /** Código de la botica: minúsculas, números y guiones. */
+  code: string;
+  ownerName: string;
+  email: string;
+  password: string;
+  /** `PlanOffer.id` */
+  plan: string;
+}
+
+/** Pasos de la primera configuración, en orden. */
+export type SetupStep = "botica" | "local" | "series" | "usuario" | "productos";
+
+export interface Setup {
+  done: SetupStep[];
+}
+
 /** Lo que se puede mostrar de una botica antes de ingresar (sin datos sensibles). */
 export interface BoticaPublic {
   /** Código de la botica: "botica-huanuco". */

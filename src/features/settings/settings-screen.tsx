@@ -31,9 +31,10 @@ export function SettingsScreen() {
   const isAdmin = useSessionStore((s) => s.session?.user.role === "admin");
   const config = useConfig();
   const [tab, setTab] = useState<Tab>("botica");
-  // Enlace desde el aviso de cuenta: /ajustes?tab=plan (se lee en el cliente para no exigir Suspense).
+  // Enlaces desde el aviso de cuenta y la primera configuración: /ajustes?tab=plan, ?tab=locales… (se lee en el cliente para no exigir Suspense).
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("tab") === "plan") setTab("plan");
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t === "plan" || t === "botica" || t === "locales" || t === "cuentas" || t === "reglas") setTab(t);
   }, []);
 
   if (!isAdmin) {

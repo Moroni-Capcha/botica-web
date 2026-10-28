@@ -5,7 +5,7 @@
  * Las pantallas solo conocen esta interfaz.
  */
 import type {
-  Account, BoticaPublic, Branch, CashCloseRequest, CashClosing, CashMovement, CashMovementRequest, CashSession, CashSummary, Customer, ExpiryThresholds, Kardex, Lot, Pharmacy, Product, ProductInput, ProductVelocity, Purchase, PurchaseRequest, PurchasingSettings, Sale, SaleRequest, Session,
+  Account, BoticaPublic, PlanOffer, SignUpInput, Setup, SetupStep, Branch, CashCloseRequest, CashClosing, CashMovement, CashMovementRequest, CashSession, CashSummary, Customer, ExpiryThresholds, Kardex, Lot, Pharmacy, Product, ProductInput, ProductVelocity, Purchase, PurchaseRequest, PurchasingSettings, Sale, SaleRequest, Session,
   Dashboard, SalesReportLine, AttendanceMark, ContactRequest, CustomerInput, CustomerPurchase, CustomerSummary, RefillInfo, AttendanceSettings, ClockRequest, KioskWorker, ManualMarkRequest, Worker, WorkerInput,
   AccountInput, BranchCreateInput, BranchCreated, Plan, BranchInput, BranchSeries, RulesInput, StaffAccount,
   StaffSummary, Supplier, SupplierInput, Transfer, TransferAskRequest, TransferSendRequest, User, BranchId, WriteOffRequest,
@@ -47,6 +47,11 @@ export interface ApiClient {
   /** Ingreso del dueño (administrador) con correo y contraseña. CREDENCIALES_INVALIDAS (401) si no coinciden. */
   loginOwner(email: string, password: string): Promise<Session>;
 
+  /** Planes que se pueden contratar (público). */
+  listPlans(): Promise<PlanOffer[]>;
+  /** Crea una botica en prueba de 14 días y devuelve la sesión del dueño. CODIGO_EN_USO (409), CORREO_EN_USO (409) o DATOS_INVALIDOS (400). */
+  signUp(input: SignUpInput): Promise<Session>;
+
   /* Marcación de asistencia (sin sesión: el equipo del local, con el PIN personal del trabajador) */
   listKioskWorkers(branchId: BranchId): Promise<KioskWorker[]>;
   clock(input: ClockRequest): Promise<AttendanceMark>;
@@ -56,6 +61,10 @@ export interface ApiClient {
   logout(): Promise<void>;
   /** Estado de la cuenta y módulos del plan. Lo puede leer cualquier sesión (el aviso se muestra a todos). */
   getAccount(): Promise<Account>;
+
+  /* Primera configuración (solo administrador) */
+  getSetup(): Promise<Setup>;
+  completeSetupStep(step: SetupStep): Promise<Setup>;
 
   /* Panel */
   /** Venta de hoy y de los `days` días anteriores. El encargado recibe solo su local. */

@@ -20,6 +20,7 @@ import { soles } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { allLabel, ScopeToggle, useBranchScope } from "@/features/shared/branch-scope";
 import { useExpiryData } from "@/features/expiry/use-expiry-data";
+import { SetupChecklist } from "@/features/onboarding/setup-checklist";
 
 const SERIES_DAYS = 14;
 const DOW = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
@@ -135,6 +136,8 @@ export function PanelScreen() {
           </Link>
         )}
       </div>
+
+      <SetupChecklist />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi

@@ -3,13 +3,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { effectiveStatus, isReadOnly, limaDay } from "@/lib/domain/account";
-import type { ClockRequest, ContactRequest, CustomerInput, ManualMarkRequest, WorkerInput } from "@/lib/api";
+import type { SetupStep, ClockRequest, ContactRequest, CustomerInput, ManualMarkRequest, WorkerInput } from "@/lib/api";
 import type { BranchId, CashCloseRequest, CashMovementRequest, Lot, Product, ProductInput, PurchaseRequest, SaleRequest, Supplier, SupplierInput, Transfer, TransferAskRequest, TransferSendRequest, WriteOffRequest } from "@/lib/api";
 import type { NewCustomer, AccountInput, BranchCreateInput, BranchInput, Pharmacy, RulesInput, PublicConfig } from "@/lib/api";
 
 export const qk = {
   config: ["config"] as const,
   account: ["account"] as const,
+  plans: ["plans"] as const,
+  setup: ["setup"] as const,
   staff: ["staff"] as const,
   products: ["products"] as const,
   lots: (b: BranchId) => ["lots", b] as const,
@@ -40,6 +42,17 @@ export const useStaff = (enabled = true) => useQuery({ queryKey: qk.staff, query
 
 /** Estado de la cuenta y módulos del plan. Se vuelve a leer al volver a la pestaña. Solo con sesión iniciada. */
 export const useAccount = (enabled = true) => useQuery({ queryKey: qk.account, queryFn: api.getAccount, staleTime: 60_000, refetchOnWindowFocus: true, enabled });
+
+/** Planes que se pueden contratar (público: no necesita sesión). */
+export const usePlans = () => useQuery({ queryKey: qk.plans, queryFn: api.listPlans, staleTime: 10 * 60_000 });
+
+/** Pasos de la primera configuración ya hechos. Solo para el administrador. */
+export const useSetup = (enabled = true) => useQuery({ queryKey: qk.setup, queryFn: api.getSetup, staleTime: 30_000, enabled });
+
+export function useCompleteSetupStep() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (step: SetupStep) => api.completeSetupStep(step), onSuccess: (setup) => qc.setQueryData(qk.setup, setup) });
+}
 
 /** false cuando la cuenta está suspendida (solo lectura). Mientras no se sabe el estado, se permite escribir. */
 export function useWritable(): boolean {

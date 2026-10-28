@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowLeftRight, CalendarClock, FileSpreadsheet, Fingerprint, Pill, TrendingUp } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -267,7 +268,14 @@ export default function LoginPage() {
             </>
           )}
 
-          <button type="button" onClick={() => setKiosk(true)} className="mx-auto mt-8 flex items-center gap-2 rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50">
+          <p className="mt-8 text-center text-sm text-zinc-600">
+            ¿Aún no tienes botica?{" "}
+            <Link href="/registro" className="font-semibold text-brand underline underline-offset-2">
+              Crear mi botica
+            </Link>
+          </p>
+
+          <button type="button" onClick={() => setKiosk(true)} className="mx-auto mt-6 flex items-center gap-2 rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50">
             <Fingerprint className="h-4 w-4 text-brand" /> Marcar asistencia del personal
           </button>
 

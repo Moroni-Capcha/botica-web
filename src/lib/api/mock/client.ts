@@ -7,9 +7,10 @@ import { ApiError } from "../errors";
 import type {
   SalesReportLine, AttendanceMark, AttendanceSettings, KioskWorker, Worker, CustomerPurchase, CustomerInput,
   Branch, CashClosing, CashMovement, CashSession, Customer, ExpiryThresholds, KardexEntry, Lot, MoveType, Product, ProductInput, ProductVelocity, Purchase, PurchasingSettings, Sale, SaleRequest, Session,
-  StaffSummary, Supplier, SupplierInput, Transfer, TransferItem, User, Role, StaffAccount, AccountInput, BranchInput, RulesInput, Pharmacy, Plan, Account, AccountStatus, BoticaPublic,
+  StaffSummary, Supplier, SupplierInput, Transfer, TransferItem, User, Role, StaffAccount, AccountInput, BranchInput, RulesInput, Pharmacy, Plan, Account, AccountStatus, BoticaPublic, PlanOffer, SignUpInput, Setup, SetupStep,
 } from "../types";
 import { tokenStore } from "../token";
+import { tenantStore } from "../tenant";
 import { allocateFefo, daysUntil, findPresentation, isValidCmp, documentIsValid, parseDay, round2, IGV, weightedDiscount } from "@/lib/domain/pharmacy";
 import { normalizeProduct, validateProduct } from "@/lib/domain/inventory";
 import { isValidLotCode, isValidSupplierDocument, normalizeLotCode } from "@/lib/domain/purchasing";
@@ -18,15 +19,20 @@ import { allowedMarks, scheduleError, MARK_LABEL } from "@/lib/domain/attendance
 import { pointsFor, validateCustomer } from "@/lib/domain/customers";
 import { closeDifference, countDenominations, expectedCash, movementError, movementTotals, paymentTotals } from "@/lib/domain/cash";
 import { ALL_MODULES, effectiveStatus, isReadOnly, limaDay } from "@/lib/domain/account";
-import { isValidEmail, normalizeBoticaCode, normalizeEmail, passwordError } from "@/lib/domain/auth";
+import { isValidBoticaCode, isValidEmail, normalizeBoticaCode, normalizeEmail, passwordError } from "@/lib/domain/auth";
+import { findPlan, listPlanOffers, TRIAL_DAYS } from "@/lib/domain/plans";
+import { isSetupStep, normalizeDone, SETUP_STEPS } from "@/lib/domain/onboarding";
 import { accountErrors, accountGuard, branchErrors, branchSlug, deactivateBlockers, planUsage, hasErrors, normalizePharmacy, pharmacyErrors, rulesErrors } from "@/lib/domain/settings";
 import { SEED_DAILY_UNITS, SEED_LOT_PLAN, SEED_PRODUCTS, SEED_SUC_MISSING } from "./seed-data";
 
 const KEY = "bh.mock.v1";
-const VERSION = 12; // subir cuando cambie la forma de los datos: se regeneran
+const VERSION = 13; // subir cuando cambie la forma de los datos: se regeneran
 const DAY = 86_400_000;
 
-/** Código de la botica de los datos de ejemplo. El mock es de una sola botica: solo acepta este código. */
+/**
+ * Código de la botica de los datos de ejemplo (vive en `bh.mock.v1`). Las boticas registradas con `signUp` viven cada una
+ * en `bh.mock.v1.<código>`; el cliente elige la botica por el código de `tenant.ts` en cada llamada.
+ */
 export const MOCK_BOTICA_CODE = "botica-huanuco";
 
 interface StaffRecord extends StaffSummary {
@@ -60,6 +66,8 @@ interface MockDb {
   plan: Plan;
   boticaCode: string;
   account: Account;
+  /** Primera configuración: pasos ya hechos. */
+  setup: { done: SetupStep[] };
   staff: StaffRecord[];
   products: Product[];
   lots: Lot[];
@@ -165,6 +173,7 @@ function seed(now: number): MockDb {
     plan: { name: "Plan Crece", maxBranches: 3 },
     boticaCode: MOCK_BOTICA_CODE,
     account: { status: "active", renewsAt: limaDay(t0 + 30 * DAY), modules: [...ALL_MODULES] },
+    setup: { done: [...SETUP_STEPS] },
     staff: [
       { id: "u1", name: "Carmen Salazar", role: "admin", branchId: null, email: "dueno@botica-huanuco.pe", password: "Clave2026!", pin: "1234", active: true },
       { id: "u2", name: "Q.F. Daniel Rojas", role: "encargado", branchId: "principal", pin: "1111", active: true },
@@ -545,17 +554,22 @@ function seedTransfers(lots: Lot[], moves: StockMove[], t0: number): Transfer[] 
   return out;
 }
 
-function load(): MockDb {
-  if (typeof window === "undefined") return seed(Date.now());
+const keyFor = (code: string) => (code === MOCK_BOTICA_CODE ? KEY : `${KEY}.${code}`);
+
+/** Lee los datos de una botica. La de ejemplo se genera si falta; las registradas, si no existen, devuelven null. */
+function load(code: string = MOCK_BOTICA_CODE): MockDb | null {
+  const isDefault = code === MOCK_BOTICA_CODE;
+  if (typeof window === "undefined") return isDefault ? seed(Date.now()) : null;
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(keyFor(code));
     if (raw) {
       const db = JSON.parse(raw) as MockDb;
       if (db.version === VERSION) return db;
     }
   } catch {
-    /* datos dañados o sin acceso: se regenera */
+    /* datos dañados o sin acceso: se regenera (solo la de ejemplo) */
   }
+  if (!isDefault) return null;
   const db = seed(Date.now());
   save(db);
   return db;
@@ -563,10 +577,47 @@ function load(): MockDb {
 
 function save(db: MockDb) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(db));
+    localStorage.setItem(keyFor(db.boticaCode), JSON.stringify(db));
   } catch {
     /* sin almacenamiento: sigue en memoria */
   }
+}
+
+/** Botica vacía en prueba: un local "Principal", el dueño como único usuario y la primera configuración pendiente. */
+function seedEmpty(input: SignUpInput, now: number): MockDb {
+  const plan = findPlan(input.plan)!;
+  return {
+    version: VERSION,
+    expiry: { red: 30, yellow: 90 },
+    purchasing: { coverDays: 15, minShelfDays: 180 },
+    pharmacy: { name: input.boticaName.trim(), tagline: "", ruc: "", phone: "", brand: "#0B4F45", accent: "#3DDC97" },
+    branches: [{ id: "principal", name: "Principal", address: "", series: "001", active: true }],
+    plan: { name: plan.name, maxBranches: plan.maxBranches },
+    boticaCode: input.code,
+    account: { status: "trial", trialEndsAt: limaDay(now + TRIAL_DAYS * DAY), modules: [...plan.modules] },
+    setup: { done: [] },
+    // Sin PIN de mostrador todavía: el dueño ingresa con correo y contraseña. Un PIN vacío nunca coincide.
+    staff: [{ id: "u1", name: input.ownerName.trim(), role: "admin", branchId: null, email: normalizeEmail(input.email), password: input.password, pin: "", active: true }],
+    products: [],
+    lots: [],
+    customers: [],
+    customerHistory: [],
+    contacts: {},
+    cash: {},
+    cashMovements: { principal: [] },
+    closings: [],
+    attendanceSettings: { toleranceMinutes: 10, breakMinutes: 60, overtimeAfterMinutes: 15 },
+    workers: [],
+    marks: [],
+    sales: [],
+    moves: [],
+    suppliers: [],
+    purchases: [],
+    transfers: [],
+    seq: { principal: { b: 0, f: 0 } },
+    seriesArchive: {},
+    sessions: {},
+  };
 }
 
 const wait = (ms = 180 + Math.random() * 160) => new Promise((r) => setTimeout(r, ms));
@@ -669,7 +720,7 @@ function checkWorker(d: MockDb, input: Omit<Worker, "id">, selfId?: string): Omi
 }
 
 /** Lecturas y acceso: siguen funcionando con la cuenta suspendida. Todo lo demás es escritura y se bloquea. */
-const READ_OR_AUTH = /^(get|list|search|resolve|login|me$|logout$)/;
+const READ_OR_AUTH = /^(get|list|search|resolve|login|signUp$|me$|logout$)/;
 
 /** Con la cuenta suspendida (solo lectura) rechaza cada escritura con CUENTA_SUSPENDIDA, salvo ingreso y salida. */
 function guardWrites(client: ApiClient, account: () => Account): ApiClient {
@@ -689,17 +740,32 @@ let active: { get: () => MockDb; commit: () => void } | null = null;
 
 /** Solo pruebas: cambia el estado de la cuenta simulada (p. ej. "suspended" para ver el modo solo lectura). Se ve al volver a leer getAccount. */
 export function setMockAccount(patch: Partial<Account> & { status?: AccountStatus }) {
-  const ctl = active ?? { get: load, commit: () => undefined };
+  const ctl = active ?? { get: () => load(currentCode())!, commit: () => undefined };
   const d = ctl.get();
   d.account = { ...d.account, ...patch };
   if (active) active.commit();
   else save(d);
 }
 
+/** Botica con la que se está trabajando: la de `tenant.ts`; si no hay o ya no existe, la de ejemplo. */
+function currentCode(): string {
+  const code = tenantStore.get();
+  return code && (code === MOCK_BOTICA_CODE || load(code)) ? code : MOCK_BOTICA_CODE;
+}
+
 export function createMockClient(): ApiClient {
-  let db: MockDb | null = null;
-  const get = () => (db ??= load());
-  const commit = () => db && save(db);
+  const cache = new Map<string, MockDb>();
+  /** Datos de una botica (en memoria una sola vez), o null si no existe. */
+  const tenant = (code: string): MockDb | null => {
+    let d = cache.get(code) ?? null;
+    if (!d) {
+      d = load(code);
+      if (d) cache.set(code, d);
+    }
+    return d;
+  };
+  const get = (): MockDb => tenant(currentCode())!;
+  const commit = () => save(get());
   active = { get, commit };
 
   const currentUser = (): StaffRecord => {
@@ -721,10 +787,49 @@ export function createMockClient(): ApiClient {
   const client: ApiClient = {
     async resolveBotica(code) {
       await wait(120);
-      const d = get();
-      if (normalizeBoticaCode(code) !== d.boticaCode) fail("BOTICA_NO_ENCONTRADA", "No encontramos una botica con ese código. Revísalo e intenta de nuevo.", 404);
+      const d = tenant(normalizeBoticaCode(code)) ?? fail("BOTICA_NO_ENCONTRADA", "No encontramos una botica con ese código. Revísalo e intenta de nuevo.", 404);
       const b: BoticaPublic = { code: d.boticaCode, name: d.pharmacy.name, tagline: d.pharmacy.tagline, brand: d.pharmacy.brand, accent: d.pharmacy.accent };
       return b;
+    },
+    async listPlans(): Promise<PlanOffer[]> {
+      await wait(80);
+      return listPlanOffers();
+    },
+    async signUp(input) {
+      await wait(400);
+      const code = normalizeBoticaCode(input.code);
+      const email = normalizeEmail(input.email);
+      const name = input.boticaName.trim();
+      if (name.length < 3 || name.length > 40) fail("DATOS_INVALIDOS", "Escribe el nombre de tu botica (3 a 40 caracteres).");
+      if (input.ownerName.trim().length < 3) fail("DATOS_INVALIDOS", "Escribe tu nombre completo.");
+      if (!isValidBoticaCode(code)) fail("DATOS_INVALIDOS", "El código usa letras minúsculas, números y guiones (3 a 40 caracteres).");
+      if (!isValidEmail(email)) fail("DATOS_INVALIDOS", "Escribe un correo válido.");
+      const pwd = passwordError(input.password);
+      if (pwd) fail("DATOS_INVALIDOS", pwd);
+      if (!findPlan(input.plan)) fail("DATOS_INVALIDOS", "Elige un plan.");
+      if (tenant(code)) fail("CODIGO_EN_USO", "Ese código ya lo usa otra botica. Prueba con otro.", 409);
+      const d = seedEmpty({ ...input, code, email }, Date.now());
+      const owner = d.staff[0]!;
+      const token = `mock.${owner.id}.${Date.now().toString(36)}`;
+      d.sessions[token] = owner.id;
+      cache.set(code, d);
+      save(d);
+      const session: Session = { token, user: toUser(owner), expiresAt: new Date(Date.now() + 12 * 3600_000).toISOString() };
+      return session;
+    },
+    async getSetup(): Promise<Setup> {
+      await wait(60);
+      requireAdmin(currentUser(), "la primera configuración");
+      return { done: normalizeDone(get().setup.done) };
+    },
+    async completeSetupStep(step: SetupStep): Promise<Setup> {
+      await wait(100);
+      requireAdmin(currentUser(), "la primera configuración");
+      if (!isSetupStep(step)) fail("DATOS_INVALIDOS", "Ese paso no existe.");
+      const d = get();
+      d.setup.done = normalizeDone([...d.setup.done, step]);
+      commit();
+      return { done: [...d.setup.done] };
     },
     async getPublicConfig() {
       await wait(80);
@@ -1618,7 +1723,7 @@ export function createMockClient(): ApiClient {
 /** Para la pantalla de ajustes o pruebas: borra los datos simulados. */
 export function resetMockData() {
   try {
-    localStorage.removeItem(KEY);
+    for (const k of Object.keys(localStorage)) if (k === KEY || k.startsWith(`${KEY}.`)) localStorage.removeItem(k);
   } catch {
     /* nada */
   }

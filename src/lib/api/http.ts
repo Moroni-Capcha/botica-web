@@ -1,7 +1,7 @@
 /** Implementación del contrato contra la API REST del backend. Endpoints: docs/API.md */
 import type { ApiClient, BranchStock, NewCustomer, PublicConfig } from "./contract";
 import { ApiError } from "./errors";
-import type { Account, AccountInput, BoticaPublic, Branch, BranchCreateInput, BranchCreated, BranchInput, BranchSeries, Pharmacy, RulesInput, StaffAccount, SalesReportLine, ContactRequest, CustomerInput, CustomerPurchase, CustomerSummary, RefillInfo, Dashboard, AttendanceMark, ClockRequest, KioskWorker, ManualMarkRequest, Worker, WorkerInput } from "./types";
+import type { PlanOffer, SignUpInput, Setup, SetupStep, Account, AccountInput, BoticaPublic, Branch, BranchCreateInput, BranchCreated, BranchInput, BranchSeries, Pharmacy, RulesInput, StaffAccount, SalesReportLine, ContactRequest, CustomerInput, CustomerPurchase, CustomerSummary, RefillInfo, Dashboard, AttendanceMark, ClockRequest, KioskWorker, ManualMarkRequest, Worker, WorkerInput } from "./types";
 import type { ApiErrorBody, BranchId, CashCloseRequest, CashClosing, CashMovement, CashMovementRequest, CashSession, CashSummary, Customer, Kardex, Lot, Product, ProductInput, ProductVelocity, Purchase, PurchaseRequest, Supplier, SupplierInput, Transfer, TransferAskRequest, TransferSendRequest, Sale, SaleRequest, Session, StaffSummary, User, WriteOffRequest } from "./types";
 import { tenantStore } from "./tenant";
 import { tokenStore } from "./token";
@@ -53,6 +53,10 @@ export function createHttpClient(baseUrl: string): ApiClient {
     me: () => request<User>("GET", "/auth/me"),
     logout: () => request<void>("POST", "/auth/logout"),
     getAccount: () => request<Account>("GET", "/account"),
+    listPlans: () => request<PlanOffer[]>("GET", "/public/plans"),
+    signUp: (input: SignUpInput) => request<Session>("POST", "/public/signup", input),
+    getSetup: () => request<Setup>("GET", "/setup"),
+    completeSetupStep: (step: SetupStep) => request<Setup>("POST", `/setup/steps/${encodeURIComponent(step)}`),
 
     updatePharmacy: (input: Pharmacy) => request<Pharmacy>("PUT", "/settings/pharmacy", input),
     createBranch: (input: BranchCreateInput) => request<BranchCreated>("POST", "/settings/branches", input),
