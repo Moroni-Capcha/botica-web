@@ -32,7 +32,7 @@ const fmtRate = (n: number) => `${n.toLocaleString("es-PE", { maximumFractionDig
 export function ExpiryScreen() {
   const user = useSessionStore((s) => s.session?.user);
   const setAdminBranch = useSessionStore((s) => s.setAdminBranch);
-  const { scope, setScope, ids: scopeIds, multi, isAdmin, operating, branches, branchName, label: scopeLabel } = useBranchScope();
+  const { allBranches, scope, setScope, ids: scopeIds, multi, isAdmin, operating, branches, branchName, label: scopeLabel } = useBranchScope();
   const { rows: allRows, rates, thresholds, products, pharmacy, isLoading, error, refetch } = useExpiryData(scopeIds);
 
   const [tab, setTab] = useState<Tab>("prioridad");
@@ -82,7 +82,7 @@ export function ExpiryScreen() {
   };
 
   const doExport = () => {
-    exportExpiry({ rows, branches, scopeLabel, pharmacy, thresholds, velocityDays: VELOCITY_DAYS });
+    exportExpiry({ rows, branches: allBranches, scopeLabel, pharmacy, thresholds, velocityDays: VELOCITY_DAYS });
     notify("Excel de vencimientos descargado");
   };
 
@@ -254,12 +254,13 @@ export function ExpiryScreen() {
                     <td className={cn(td, "text-right")}>
                       <div className="flex items-center justify-end gap-1">
                         {move && (
-                          <span
-                            className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg bg-sky-50 px-2 py-1 text-[11px] font-semibold text-sky-700"
-                            title={`${branchName(move.branchId)} vende ${fmtRate(move.rate)}. Conviene trasladar este lote.`}
+                          <Link
+                            href={`/traslados?${new URLSearchParams({ from: r.branchId, to: move.branchId, productId: String(r.product.id), lotId: String(r.lot.id), units: String(Math.min(r.atRisk, r.lot.qty)) })}`}
+                            className="inline-flex h-8 items-center gap-1 whitespace-nowrap rounded-xl bg-sky-50 px-2.5 text-[11px] font-semibold text-sky-700 transition hover:bg-sky-100"
+                            title={`${branchName(move.branchId)} vende ${fmtRate(move.rate)}. Prepara el traslado de este lote.`}
                           >
-                            <ArrowLeftRight className="h-3.5 w-3.5" /> {branchName(move.branchId)} {fmtRate(move.rate)}
-                          </span>
+                            <ArrowLeftRight className="h-3.5 w-3.5" /> A {branchName(move.branchId)} · {fmtRate(move.rate)}
+                          </Link>
                         )}
                         {canSell && (
                           <Link

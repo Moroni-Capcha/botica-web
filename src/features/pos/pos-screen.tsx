@@ -61,7 +61,6 @@ export function PosScreen() {
   const categories = useMemo(() => ["Todos", ...new Set(productList.map((p) => p.category))], [productList]);
   const labs = useMemo(() => [...new Set(productList.map((p) => p.lab))].sort((a, b) => a.localeCompare(b)), [productList]);
   const branches = config.data?.branches ?? [];
-  const otherBranch = branches.find((b) => b.id !== branchId);
 
   /** Por producto: stock vigente, lote que sale primero y si solo queda stock vencido. */
   const stockInfo = useMemo(() => {
@@ -74,11 +73,17 @@ export function PosScreen() {
     return m;
   }, [productList, lotList, now]);
 
+  /** Por producto, el otro local activo que más stock tiene (para sugerir un traslado cuando aquí se agotó). */
   const otherStock = useMemo(() => {
-    const m = new Map<number, number>();
-    for (const s of branchStock.data ?? []) if (s.branchId === otherBranch?.id) m.set(s.productId, s.units);
+    const active = new Set(branches.map((b) => b.id));
+    const m = new Map<number, { branchId: string; units: number }>();
+    for (const s of branchStock.data ?? []) {
+      if (s.branchId === branchId || !active.has(s.branchId) || s.units <= 0) continue;
+      const cur = m.get(s.productId);
+      if (!cur || s.units > cur.units) m.set(s.productId, { branchId: s.branchId, units: s.units });
+    }
     return m;
-  }, [branchStock.data, otherBranch?.id]);
+  }, [branchStock.data, branchId, branches]);
 
   const results = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -252,7 +257,10 @@ export function PosScreen() {
                 minStock={minFor(p, branchId)}
                 nextLot={next}
                 hasExpiredOnly={info?.expiredOnly ?? false}
-                otherBranch={otherBranch ? { name: otherBranch.name, units: otherStock.get(p.id) ?? 0 } : null}
+                otherBranch={(() => {
+                  const o = otherStock.get(p.id);
+                  return o ? { id: o.branchId, name: branches.find((b) => b.id === o.branchId)?.name ?? o.branchId, units: o.units, toId: branchId } : null;
+                })()}
                 sellFirst={!!next && (next.discount > 0 || (days !== null && days <= DEFAULT_THRESHOLDS.red))}
                 now={now}
                 onAdd={(prod, pres, el) => add(prod, pres, el)}

@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Building2, LogOut, MapPin } from "lucide-react";
+import { Building2, Fingerprint, LogOut, MapPin } from "lucide-react";
 import type { User } from "@/lib/api/types";
 import { useConfig } from "@/lib/queries";
-import { useSessionStore } from "@/lib/auth/session-store";
+import { useOperatingBranch, useSessionStore } from "@/lib/auth/session-store";
 import { BrandMark } from "@/components/brand-mark";
 import { cn } from "@/lib/cn";
+import { KioskDialog } from "@/features/attendance/kiosk-dialog";
 
 function Clock() {
   const [now, setNow] = useState<Date | null>(null);
@@ -21,9 +22,10 @@ function Clock() {
 
 export function Topbar({ title, user, onLogout }: { title: string; user: User; onLogout: () => void }) {
   const { data: config } = useConfig();
-  const adminBranch = useSessionStore((s) => s.adminBranch);
+  const adminBranch = useOperatingBranch();
   const setAdminBranch = useSessionStore((s) => s.setAdminBranch);
   const branches = config?.branches ?? [];
+  const [kiosk, setKiosk] = useState(false);
   const today = new Date().toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   return (
@@ -35,7 +37,17 @@ export function Topbar({ title, user, onLogout }: { title: string; user: User; o
         <h1 className="truncate text-lg font-semibold tracking-tight">{title}</h1>
         <p className="hidden text-xs text-zinc-500 first-letter:uppercase lg:block">{today}</p>
       </div>
-      {user.role === "admin" ? (
+      {user.role === "admin" && branches.length > 3 ? (
+        <label className="flex items-center gap-1.5 rounded-xl bg-zinc-100 py-1 pl-2.5 pr-1">
+          <Building2 className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
+          <span className="sr-only">Local donde operas</span>
+          <select value={adminBranch} onChange={(e) => setAdminBranch(e.target.value)} className="h-7 max-w-40 rounded-lg bg-white px-2 text-xs font-semibold text-zinc-800 outline-none">
+            {branches.map((b) => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
+        </label>
+      ) : user.role === "admin" ? (
         <div className="flex items-center gap-1 rounded-xl bg-zinc-100 p-1" role="radiogroup" aria-label="Local donde operas">
           <Building2 className="ml-1.5 hidden h-4 w-4 text-zinc-500 sm:block" />
           {branches.map((b) => (
@@ -57,10 +69,15 @@ export function Topbar({ title, user, onLogout }: { title: string; user: User; o
           {branches.find((b) => b.id === user.branchId)?.name ?? user.branchId}
         </span>
       )}
+      <button type="button" onClick={() => setKiosk(true)} className="flex items-center gap-1.5 rounded-lg p-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100" title="Marcar asistencia del personal">
+        <Fingerprint className="h-4 w-4 text-brand" />
+        <span className="hidden 2xl:inline">Asistencia</span>
+      </button>
       <Clock />
       <button type="button" onClick={onLogout} className="rounded-lg p-2 text-zinc-500 transition hover:bg-zinc-100 md:hidden" aria-label="Cerrar turno">
         <LogOut className="h-4 w-4" />
       </button>
+      {kiosk && <KioskDialog branches={branches} fixedBranch={user.role === "admin" ? null : user.branchId} onClose={() => setKiosk(false)} />}
     </header>
   );
 }

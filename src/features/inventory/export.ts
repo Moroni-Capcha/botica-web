@@ -126,7 +126,7 @@ export function exportKardex({ product, lines, opening, days, scopeLabel, branch
         rows: ordered,
         columns: [
           { header: "Fecha", value: (r) => localDay(r.at), type: "date", width: 12 },
-          { header: "Hora", value: (r) => new Date(r.at).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }), width: 8 },
+          { header: "Hora", value: (r) => new Date(r.at).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }), width: 12 },
           { header: "Local", value: (r) => name(r.branchId), width: 13 },
           { header: "Movimiento", value: (r) => MOVE_LABEL[r.type], width: 14 },
           { header: "Documento / motivo", value: (r) => r.reference, width: 36 },

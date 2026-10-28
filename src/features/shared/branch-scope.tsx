@@ -12,7 +12,7 @@ export type Scope = "one" | "all";
 
 /**
  * Locales que mira una pantalla de consulta. El encargado siempre ve el suyo;
- * el administrador puede ver solo el local donde opera o ambos.
+ * el administrador puede ver solo el local donde opera o todos los activos.
  */
 export function useBranchScope() {
   const isAdmin = useSessionStore((s) => s.session?.user.role) === "admin";
@@ -21,8 +21,9 @@ export function useBranchScope() {
   const [all, setAll] = useState(false);
   const scope: Scope = isAdmin && all ? "all" : "one";
   const branches = config.data?.branches ?? [];
+  const allBranches = useMemo(() => [...(config.data?.branches ?? []), ...(config.data?.closedBranches ?? [])], [config.data]);
   const ids = useMemo<BranchId[]>(() => (scope === "all" ? (config.data?.branches.map((b) => b.id) ?? [operating]) : [operating]), [scope, config.data, operating]);
-  const branchName = (id: BranchId) => branches.find((b) => b.id === id)?.name ?? id;
+  const branchName = (id: BranchId) => allBranches.find((b) => b.id === id)?.name ?? id;
   return {
     scope,
     setScope: (v: Scope) => setAll(v === "all"),
@@ -30,14 +31,22 @@ export function useBranchScope() {
     multi: scope === "all",
     isAdmin,
     operating,
+    /** Locales activos */
     branches,
+    /** Activos y desactivados: para nombrar locales en el historial */
+    allBranches,
     branchName,
-    label: scope === "all" ? "Ambos locales" : `Local ${branchName(operating)}`,
+    label: scope === "all" ? allLabel(branches.length) : `Local ${branchName(operating)}`,
   };
 }
 
-/** Selector "Solo Principal / Ambos locales" (solo para el administrador). */
+/** "Ambos locales" si son dos; "Todos los locales (4)" si son más. */
+export const allLabel = (count: number) => (count === 2 ? "Ambos locales" : count > 2 ? `Todos los locales (${count})` : "Todos los locales");
+
+/** Selector "Solo Principal / Todos los locales" (solo para el administrador, si hay más de un local). */
 export function ScopeToggle({ scope, onChange, operatingName }: { scope: Scope; onChange: (v: Scope) => void; operatingName: string }) {
+  const count = useConfig().data?.branches.length ?? 0;
+  if (count < 2) return null;
   return (
     <Segmented<Scope>
       label="Locales"
@@ -45,7 +54,7 @@ export function ScopeToggle({ scope, onChange, operatingName }: { scope: Scope; 
       onChange={onChange}
       options={[
         { id: "one", label: `Solo ${operatingName}` },
-        { id: "all", label: "Ambos locales" },
+        { id: "all", label: allLabel(count) },
       ]}
     />
   );

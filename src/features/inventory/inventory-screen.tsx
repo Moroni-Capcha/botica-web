@@ -33,7 +33,7 @@ const fmtInt = (n: number) => n.toLocaleString("es-PE");
 
 export function InventoryScreen() {
   const scope = useBranchScope();
-  const { ids: branchIds, multi, isAdmin, operating, branches, branchName } = scope;
+  const { allBranches, ids: branchIds, multi, isAdmin, operating, branches, branchName } = scope;
   const config = useConfig();
   const products = useProducts();
   const lotsQ = useBranchLots(branchIds);
@@ -99,7 +99,7 @@ export function InventoryScreen() {
   const detail = detailId !== null ? productList.find((p) => p.id === detailId) : undefined;
 
   const doExport = () => {
-    exportInventory({ rows: base, lots: lotsQ.lots, branches, branchIds, scopeLabel: scope.label, pharmacy: config.data?.pharmacy });
+    exportInventory({ rows: base, lots: lotsQ.lots, branches: allBranches, branchIds, scopeLabel: scope.label, pharmacy: config.data?.pharmacy });
     notify("Inventario valorizado descargado");
   };
 
@@ -117,7 +117,7 @@ export function InventoryScreen() {
   return (
     <div className="mx-auto grid max-w-7xl gap-4 p-4 sm:p-6">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi icon={Package} label="Productos" value={fmtInt(kpi.products)} hint={`${fmtInt(kpi.lots)} lotes con stock${multi ? " en los dos locales" : ""}`} loading={isLoading} />
+        <Kpi icon={Package} label="Productos" value={fmtInt(kpi.products)} hint={`${fmtInt(kpi.lots)} lotes con stock${multi ? ` en ${branchIds.length} locales` : ""}`} loading={isLoading} />
         <Kpi
           icon={Wallet}
           label="Inventario a costo"
@@ -336,7 +336,7 @@ export function InventoryScreen() {
           product={detail}
           lots={lotsQ.lots}
           branchIds={branchIds}
-          branches={branches}
+          branches={allBranches}
           scopeLabel={scope.label}
           pharmacy={config.data?.pharmacy}
           thresholds={thresholds}
@@ -353,7 +353,7 @@ export function InventoryScreen() {
         <ProductFormDialog
           product={editing === "new" ? null : editing}
           products={productList}
-          branches={branches}
+          branches={allBranches}
           onClose={() => setEditing(null)}
           onSaved={(p) => setDetailId(p.id)}
         />

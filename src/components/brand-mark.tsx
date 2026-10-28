@@ -9,10 +9,38 @@ export function BrandMark({ size = 40, className }: { size?: number; className?:
   );
 }
 
+/* ------------------------------ Digi!HME (la plataforma) ------------------------------ */
+
+export const DIGIHME = { name: "Digi!HME", navy: "#313572", ink: "#0C1136", cyan: "#34C4CC" } as const;
+
+/** Isotipo de Digi!HME (la D con circuitos). Funciona sobre fondos claros y oscuros. */
+export function DigiHmeIcon({ size = 24, className }: { size?: number; className?: string }) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/brand/digihme-icon.png" width={size} height={size} alt="" aria-hidden className={className} />;
+}
+
+/** Logo completo de Digi!HME. Solo sobre fondo claro: las letras son azul oscuro. */
+export function DigiHmeLogo({ height = 28, className }: { height?: number; className?: string }) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/brand/digihme-logo.png" height={height} style={{ height, width: "auto" }} alt="Digi!HME" className={className} />;
+}
+
+/** Nombre escrito con el "!" en cian. Sobre fondo oscuro va en blanco. */
+export function DigiHmeName({ light, className }: { light?: boolean; className?: string }) {
+  return (
+    <b className={`font-black tracking-tight ${className ?? ""}`} style={{ color: light ? "#fff" : DIGIHME.navy }}>
+      Dig<span style={{ color: DIGIHME.cyan }}>!</span>HME
+    </b>
+  );
+}
+
+/** Sello "Desarrollado por Digi!HME" del pie de la barra lateral y del ingreso. */
 export function DigiSeal({ light }: { light?: boolean }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 text-[11px] ${light ? "text-white/45" : "text-zinc-400"}`}>
-      Desarrollado por <b className="font-black" style={{ color: light ? "#fff" : "#1B1D4F" }}>Dig<span style={{ color: "#22C7D6" }}>!</span>HME</b>
+    <span className={`inline-flex items-center gap-1.5 text-[11px] ${light ? "text-white/55" : "text-zinc-400"}`}>
+      Desarrollado por
+      <DigiHmeIcon size={18} />
+      <DigiHmeName light={light} className="text-xs" />
     </span>
   );
 }

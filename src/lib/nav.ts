@@ -12,20 +12,24 @@ export interface NavItem {
 }
 
 export const NAV: NavItem[] = [
-  { id: "panel", href: "/panel", label: "Panel", short: "Panel", icon: LayoutDashboard, ready: false },
+  { id: "panel", href: "/panel", label: "Panel del día", short: "Panel", icon: LayoutDashboard, ready: true },
   { id: "pos", href: "/pos", label: "Punto de venta", short: "Vender", icon: ShoppingCart, ready: true },
   { id: "vencimientos", href: "/vencimientos", label: "Vencimientos", short: "Venc.", icon: CalendarClock, ready: true },
   { id: "inventario", href: "/inventario", label: "Inventario", short: "Stock", icon: Package, ready: true },
-  { id: "traslados", href: "/traslados", label: "Traslados", short: "Traslados", icon: ArrowLeftRight, ready: false },
-  { id: "compras", href: "/compras", label: "Compras", short: "Compras", icon: Truck, ready: false },
-  { id: "clientes", href: "/clientes", label: "Clientes", short: "Clientes", icon: Users, ready: false },
-  { id: "caja", href: "/caja", label: "Caja", short: "Caja", icon: Wallet, ready: false },
-  { id: "asistencia", href: "/asistencia", label: "Asistencia", short: "Asistencia", icon: Clock, ready: false },
-  { id: "reportes", href: "/reportes", label: "Reportes", short: "Reportes", icon: ChartColumn, ready: false },
-  { id: "ajustes", href: "/ajustes", label: "Ajustes", short: "Ajustes", icon: Settings, ready: false },
+  { id: "traslados", href: "/traslados", label: "Traslados", short: "Traslados", icon: ArrowLeftRight, ready: true },
+  { id: "compras", href: "/compras", label: "Compras", short: "Compras", icon: Truck, ready: true },
+  { id: "clientes", href: "/clientes", label: "Clientes", short: "Clientes", icon: Users, ready: true },
+  { id: "caja", href: "/caja", label: "Caja", short: "Caja", icon: Wallet, ready: true },
+  { id: "asistencia", href: "/asistencia", label: "Asistencia", short: "Asistencia", icon: Clock, ready: true },
+  { id: "reportes", href: "/reportes", label: "Reportes", short: "Reportes", icon: ChartColumn, ready: true },
+  { id: "ajustes", href: "/ajustes", label: "Ajustes", short: "Ajustes", icon: Settings, ready: true },
 ];
 
 export const navFor = (user: User) => NAV.filter((n) => user.permissions.includes(n.id));
 
-/** Primera pantalla al entrar. Mientras el panel no esté migrado, todos entran al punto de venta. */
-export const homeFor = (user: User) => (navFor(user).find((n) => n.ready)?.href ?? "/pos");
+/** Primera pantalla al entrar: el administrador ve el panel; las cuentas de local, el punto de venta. */
+export const homeFor = (user: User) => {
+  const items = navFor(user).filter((n) => n.ready);
+  const preferred = user.role === "admin" ? "panel" : "pos";
+  return (items.find((n) => n.id === preferred) ?? items[0])?.href ?? "/pos";
+};

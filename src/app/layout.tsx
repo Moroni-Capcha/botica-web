@@ -6,8 +6,9 @@ import { Providers } from "./providers";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
 export const metadata: Metadata = {
-  title: { default: "Botica Huánuco", template: "%s · Botica Huánuco" },
-  description: "Sistema de ventas, lotes y vencimientos de Botica Huánuco",
+  title: { default: "Digi!HME · Sistema para boticas", template: "%s · Digi!HME" },
+  description: "Digi!HME: ventas, lotes, vencimientos, caja e inventario para boticas y farmacias",
+  applicationName: "Digi!HME",
   robots: { index: false, follow: false },
 };
 

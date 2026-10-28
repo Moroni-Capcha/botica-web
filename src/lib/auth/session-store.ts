@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import type { BranchId, Session } from "@/lib/api/types";
 import { tokenStore } from "@/lib/api/token";
+import { useConfig } from "@/lib/queries";
 
 interface SessionState {
   session: Session | null;
@@ -42,9 +43,12 @@ export const useSessionStore = create<SessionState>((set) => ({
   setAdminBranch: (adminBranch) => set({ adminBranch }),
 }));
 
-/** Local en el que se vende, cobra y recibe mercadería. */
+/** Local en el que se vende, cobra y recibe mercadería. Si el que eligió el administrador se desactivó, usa el primero activo. */
 export const useOperatingBranch = (): BranchId => {
   const user = useSessionStore((s) => s.session?.user);
   const adminBranch = useSessionStore((s) => s.adminBranch);
-  return user?.branchId ?? adminBranch;
+  const branches = useConfig().data?.branches;
+  if (user?.branchId) return user.branchId;
+  if (branches?.length && !branches.some((b) => b.id === adminBranch)) return branches[0]!.id;
+  return adminBranch;
 };

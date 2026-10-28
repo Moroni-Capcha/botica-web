@@ -15,7 +15,8 @@ export interface ProductCardProps {
   minStock: number; // mínimo de este local
   nextLot: Lot | undefined; // el que sale primero (FEFO)
   hasExpiredOnly: boolean;
-  otherBranch: { name: string; units: number } | null;
+  /** Otro local con stock de este producto (el que más tiene) */
+  otherBranch: { id: string; name: string; units: number; toId: string } | null;
   sellFirst: boolean;
   now: number;
   onAdd: (product: Product, presentation: PresentationId, el: HTMLButtonElement) => void;
@@ -53,7 +54,7 @@ export const ProductCard = memo(function ProductCard({ product: p, stock, minSto
               </span>
             )}
             {stock === 0 && otherBranch && otherBranch.units > 0 && (
-              <Link href={`/traslados?producto=${p.id}`} className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-700 ring-1 ring-violet-200 hover:bg-violet-100">
+              <Link href={`/traslados?from=${otherBranch.id}&to=${otherBranch.toId}&productId=${p.id}`} className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-700 ring-1 ring-violet-200 hover:bg-violet-100">
                 <ArrowLeftRight className="h-3 w-3" />
                 {stockLabel(p, otherBranch.units)} en {otherBranch.name} · pedir traslado
               </Link>

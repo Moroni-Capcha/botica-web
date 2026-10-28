@@ -2,17 +2,18 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowLeftRight, CalendarClock, FileSpreadsheet, Pill, TrendingUp } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, CalendarClock, FileSpreadsheet, Fingerprint, Pill, TrendingUp } from "lucide-react";
 import { api, apiMode, errorMessage } from "@/lib/api";
 import { useSessionStore } from "@/lib/auth/session-store";
 import { useConfig, useStaff } from "@/lib/queries";
 import { homeFor } from "@/lib/nav";
-import { BrandMark, DigiSeal } from "@/components/brand-mark";
+import { BrandMark, DigiHmeLogo, DigiSeal } from "@/components/brand-mark";
 import { cn } from "@/lib/cn";
 import { initials } from "@/lib/format";
+import { KioskDialog } from "@/features/attendance/kiosk-dialog";
 
 const FEATURES = [
-  { icon: ArrowLeftRight, text: "Principal y sucursal con stock separado y traslados" },
+  { icon: ArrowLeftRight, text: "Varios locales con stock separado y traslados" },
   { icon: CalendarClock, text: "Lotes con fecha de vencimiento y alertas por semáforo" },
   { icon: TrendingUp, text: "Prioridad de venta: qué vender primero antes de perderlo" },
   { icon: Pill, text: "Venta por unidad, blíster o caja, genéricos y receta" },
@@ -29,8 +30,9 @@ export default function LoginPage() {
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [kiosk, setKiosk] = useState(false);
   const sel = staff?.find((s) => s.id === selId);
-  const branchName = (id: string | null) => (id ? config?.branches.find((b) => b.id === id)?.name ?? id : "Ve los dos locales");
+  const branchName = (id: string | null) => (id ? config?.branches.find((b) => b.id === id)?.name ?? id : "Ve todos los locales");
 
   const submit = useCallback(
     async (code: string) => {
@@ -65,13 +67,14 @@ export default function LoginPage() {
   );
 
   useEffect(() => {
+    if (kiosk) return; // el teclado lo usa la marcación de asistencia
     const onKey = (e: KeyboardEvent) => {
       if (/^\d$/.test(e.key)) press(e.key);
       if (e.key === "Backspace") press("←");
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [press]);
+  }, [press, kiosk]);
 
   return (
     <main className="flex min-h-dvh w-full flex-col bg-white lg:flex-row">
@@ -87,7 +90,7 @@ export default function LoginPage() {
           </div>
         </div>
         <div className="relative mt-10 max-w-md lg:mt-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">Sistema de botica</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">Sistema para boticas</p>
           <h1 className="mt-3 text-balance text-3xl font-semibold leading-[1.1] tracking-tight sm:text-4xl">Ventas, lotes y vencimientos bajo control.</h1>
           <ul className="mt-6 grid gap-3">
             {FEATURES.map(({ icon: Icon, text }) => (
@@ -167,8 +170,18 @@ export default function LoginPage() {
               )}
             </div>
           </div>
+
+          <button type="button" onClick={() => setKiosk(true)} className="mx-auto mt-8 flex items-center gap-2 rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50">
+            <Fingerprint className="h-4 w-4 text-brand" /> Marcar asistencia del personal
+          </button>
+
+          <div className="mt-10 flex flex-col items-center gap-1.5 border-t border-zinc-100 pt-6">
+            <DigiHmeLogo height={26} />
+            <p className="text-[11px] text-zinc-400">Plataforma para boticas y farmacias</p>
+          </div>
         </div>
       </section>
+      {kiosk && config && <KioskDialog branches={config.branches} fixedBranch={null} onClose={() => setKiosk(false)} />}
     </main>
   );
 }
