@@ -37,5 +37,8 @@ Browser check 2026-11-02 (dev server, Chrome, mock `bh-huanuco` data, no console
 - NOT checked: real service worker install (prod build only), real 80 mm printer, Excel downloads, error boundary, real Sentry.
 - Known gap: resending a voucher is not recorded in the audit log.
 
+Browser check T8 (2026-11-02, fresh `.next`, mock `VERSION` 16, no console errors): partial credit note BC01-000001 of S/ 1.80 on a cash boleta (a pending voucher correctly offered no credit note until resent; a voucher with a note cannot be voided). Cash screen: cash S/ 31.40 -> S/ 29.60, expected S/ 169.40 -> S/ 167.60, "vendido 52.80 - devoluciones 1.80 = neta 51.00". Panel today S/ 51.00 and cash S/ 167.60; reports "vendido 7,554.60 - devoluciones 1.80 = neta 7,552.80"; customers page loads. NOT checked: customer totals with a named customer, Excel downloads, closing the cash with returns.
+- Env note: running `npm run build` while `npm run dev` is open corrupts `.next` (MODULE_NOT_FOUND, pages stuck on "Cargando…"); stop dev and delete `.next` before restarting.
+
 ## Next step
 Front work is complete (T1-T8). Remaining: PR decision, remaining manual checks above, and the backend implementing `docs/API.md`.
