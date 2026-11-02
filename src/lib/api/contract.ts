@@ -5,10 +5,12 @@
  * Las pantallas solo conocen esta interfaz.
  */
 import type {
-  Branch, CashCloseRequest, CashClosing, CashMovement, CashMovementRequest, CashSession, CashSummary, Customer, ExpiryThresholds, Kardex, Lot, Pharmacy, Product, ProductInput, ProductVelocity, Purchase, PurchaseRequest, PurchasingSettings, Sale, SaleRequest, Session,
+  Account, BoticaPublic, PlanOffer, SignUpInput, Setup, SetupStep, Branch, CashCloseRequest, CashClosing, CashMovement, CashMovementRequest, CashSession, CashSummary, Customer, ExpiryThresholds, Kardex, Lot, Pharmacy, Product, ProductInput, ProductVelocity, Purchase, PurchaseRequest, PurchasingSettings, Sale, SaleRequest, Session,
   Dashboard, SalesReportLine, AttendanceMark, ContactRequest, CustomerInput, CustomerPurchase, CustomerSummary, RefillInfo, AttendanceSettings, ClockRequest, KioskWorker, ManualMarkRequest, Worker, WorkerInput,
   AccountInput, BranchCreateInput, BranchCreated, Plan, BranchInput, BranchSeries, RulesInput, StaffAccount,
   StaffSummary, Supplier, SupplierInput, Transfer, TransferAskRequest, TransferSendRequest, User, BranchId, WriteOffRequest,
+  CreditNote, CreditNoteRequest, Voucher, VoidRequest, SaleSyncRequest, SaleSyncResponse,
+  AuditEntry, AuditQuery, CustomersQuery, Page, PlatformSession, TenantAction, TenantPage, TenantSummary, TenantsQuery,
 } from "./types";
 
 export interface PublicConfig {
@@ -38,10 +40,19 @@ export interface NewCustomer {
 }
 
 export interface ApiClient {
-  /* Público (antes del login) */
+  /* Público (antes del login). Cada llamada lleva la botica elegida en el header X-Botica (ver tenant.ts). */
+  /** Datos públicos de una botica por su código. Error BOTICA_NO_ENCONTRADA (404) si no existe. */
+  resolveBotica(code: string): Promise<BoticaPublic>;
   getPublicConfig(): Promise<PublicConfig>;
   listStaff(): Promise<StaffSummary[]>;
   login(userId: string, pin: string): Promise<Session>;
+  /** Ingreso del dueño (administrador) con correo y contraseña. CREDENCIALES_INVALIDAS (401) si no coinciden. */
+  loginOwner(email: string, password: string): Promise<Session>;
+
+  /** Planes que se pueden contratar (público). */
+  listPlans(): Promise<PlanOffer[]>;
+  /** Crea una botica en prueba de 14 días y devuelve la sesión del dueño. CODIGO_EN_USO (409), CORREO_EN_USO (409) o DATOS_INVALIDOS (400). */
+  signUp(input: SignUpInput): Promise<Session>;
 
   /* Marcación de asistencia (sin sesión: el equipo del local, con el PIN personal del trabajador) */
   listKioskWorkers(branchId: BranchId): Promise<KioskWorker[]>;
@@ -50,6 +61,12 @@ export interface ApiClient {
   /* Sesión */
   me(): Promise<User>;
   logout(): Promise<void>;
+  /** Estado de la cuenta y módulos del plan. Lo puede leer cualquier sesión (el aviso se muestra a todos). */
+  getAccount(): Promise<Account>;
+
+  /* Primera configuración (solo administrador) */
+  getSetup(): Promise<Setup>;
+  completeSetupStep(step: SetupStep): Promise<Setup>;
 
   /* Panel */
   /** Venta de hoy y de los `days` días anteriores. El encargado recibe solo su local. */
@@ -80,8 +97,11 @@ export interface ApiClient {
   /** Alta y edición del catálogo (solo administrador). */
   createProduct(input: ProductInput): Promise<Product>;
   updateProduct(id: number, input: ProductInput): Promise<Product>;
-  /** Movimientos de un producto en los últimos `days` días. Sin `branchId`, todos los locales (solo administrador). */
-  getKardex(productId: number, options: { branchId?: BranchId; days: number }): Promise<Kardex>;
+  /**
+   * Movimientos de un producto en los últimos `days` días. Sin `branchId`, todos los locales (solo administrador).
+   * Con `page` (y `pageSize`) devuelve solo esa página de movimientos más el total y las cifras del periodo (`Kardex.summary`).
+   */
+  getKardex(productId: number, options: { branchId?: BranchId; days: number; page?: number; pageSize?: number }): Promise<Kardex>;
 
   /* Vencimientos */
   /** Unidades vendidas por local y producto en los últimos `days` días (todos los locales; sirve para sugerir traslados). */
@@ -127,6 +147,8 @@ export interface ApiClient {
   createCustomer(input: NewCustomer): Promise<Customer>;
   /** Cartera completa con totales de compra. */
   listCustomers(): Promise<CustomerSummary[]>;
+  /** La misma cartera por páginas y con búsqueda en el servidor, de la compra más reciente a la más antigua. */
+  listCustomersPage(query: CustomersQuery): Promise<Page<CustomerSummary>>;
   updateCustomer(id: number, input: CustomerInput): Promise<Customer>;
   /** Compras del cliente, de la más reciente a la más antigua (máximo 50). */
   listCustomerPurchases(id: number): Promise<CustomerPurchase[]>;
@@ -145,5 +167,40 @@ export interface ApiClient {
   closeCash(branchId: BranchId, input: CashCloseRequest): Promise<CashClosing>;
   /** Cierres de los últimos `days` días. Sin `branchId`, todos los locales (solo administrador). */
   listCashClosings(options: { branchId?: BranchId; days: number }): Promise<CashClosing[]>;
+  /** Con `clientSaleId`, repetir la llamada devuelve la venta original (idempotente). Con otros datos y la misma clave: CLAVE_REPETIDA (409). */
   createSale(input: SaleRequest): Promise<Sale>;
+  /** Registra en orden un lote de ventas hechas sin conexión (máx. 50). Cada una responde por separado; un fallo no frena a las demás. */
+  syncSales(input: SaleSyncRequest): Promise<SaleSyncResponse>;
+
+  /* Comprobantes electrónicos (SUNAT) */
+  /** Boletas y facturas emitidas entre dos fechas (YYYY-MM-DD, ambas incluidas), con su estado ante SUNAT. El encargado recibe solo su local. */
+  listVouchers(options: { from: string; to: string; branchId?: BranchId }): Promise<Voucher[]>;
+  /** Notas de crédito emitidas entre dos fechas. El encargado recibe solo las de su local. */
+  listCreditNotes(options: { from: string; to: string; branchId?: BranchId }): Promise<CreditNote[]>;
+  /** Vuelve a enviar a SUNAT un comprobante pendiente o rechazado. ESTADO_INVALIDO (409) si ya está aceptado o anulado. */
+  resendVoucher(id: string): Promise<Voucher>;
+  /** Igual que resendVoucher, para una nota de crédito. */
+  resendCreditNote(id: string): Promise<CreditNote>;
+  /** Comunicación de baja: anula un comprobante aceptado dentro de los 7 días de su emisión. */
+  voidVoucher(id: string, input: VoidRequest): Promise<Voucher>;
+  /** Emite una nota de crédito sobre un comprobante aceptado. Devuelve la nota. */
+  createCreditNote(voucherId: string, input: CreditNoteRequest): Promise<CreditNote>;
+
+  /* Auditoría (solo administrador) */
+  /** Quién hizo qué y cuándo, del más reciente al más antiguo, siempre por páginas. */
+  listAudit(query: AuditQuery): Promise<Page<AuditEntry>>;
+}
+
+/**
+ * API de la consola interna de Digi!HME. Es otra puerta, separada de `ApiClient`: otro inicio de sesión, otro token
+ * y ninguna botica elegida (no lleva `X-Botica`). Una sesión de botica nunca sirve aquí, ni al revés.
+ */
+export interface PlatformClient {
+  /** Ingreso del operador con correo y contraseña. CREDENCIALES_INVALIDAS (401) si no coinciden. */
+  login(email: string, password: string): Promise<PlatformSession>;
+  logout(): Promise<void>;
+  /** Boticas clientes, siempre por páginas, con el conteo por estado. */
+  listTenants(query?: TenantsQuery): Promise<TenantPage>;
+  /** Cambiar de plan, extender la prueba, suspender o reactivar. Devuelve la botica ya actualizada. */
+  updateTenant(code: string, input: TenantAction): Promise<TenantSummary>;
 }

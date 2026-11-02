@@ -6,25 +6,47 @@ import type { ApiClient, BranchStock, NewCustomer, PublicConfig } from "../contr
 import { ApiError } from "../errors";
 import type {
   SalesReportLine, AttendanceMark, AttendanceSettings, KioskWorker, Worker, CustomerPurchase, CustomerInput,
-  Branch, CashClosing, CashMovement, CashSession, Customer, ExpiryThresholds, KardexEntry, Lot, MoveType, Product, ProductInput, ProductVelocity, Purchase, PurchasingSettings, Sale, SaleRequest, Session,
-  StaffSummary, Supplier, SupplierInput, Transfer, TransferItem, User, Role, StaffAccount, AccountInput, BranchInput, RulesInput, Pharmacy, Plan,
+  Branch, CashClosing, CashMovement, CashSession, Customer, CustomerSummary, ExpiryThresholds, KardexEntry, Lot, MoveType, Product, ProductInput, ProductVelocity, Purchase, PurchasingSettings, Sale, SaleRequest, Session,
+  StaffSummary, Supplier, SupplierInput, Transfer, TransferItem, User, Role, StaffAccount, AccountInput, BranchInput, RulesInput, Pharmacy, Plan, Account, AccountStatus, BoticaPublic, PlanOffer, SignUpInput, Setup, SetupStep,
+  CreditNote, ElectronicState, Voucher, VoidInfo, SaleSyncResult, AuditEntry, AuditQuery, Page,
 } from "../types";
+import { SYNC_BATCH_MAX } from "@/lib/domain/offline-sales";
+import { auditRangeError } from "@/lib/domain/audit";
+import { paginate } from "@/lib/domain/pagination";
+import { kardexSummary } from "@/lib/domain/inventory";
+import { appendAudit, auditWrites, seedAudit, type AuditActor, type AuditLookup } from "./audit";
 import { tokenStore } from "../token";
+import { tenantStore } from "../tenant";
 import { allocateFefo, daysUntil, findPresentation, isValidCmp, documentIsValid, parseDay, round2, IGV, weightedDiscount } from "@/lib/domain/pharmacy";
 import { normalizeProduct, validateProduct } from "@/lib/domain/inventory";
 import { isValidLotCode, isValidSupplierDocument, normalizeLotCode } from "@/lib/domain/purchasing";
 import { transferActions, transferCode } from "@/lib/domain/transfers";
 import { allowedMarks, scheduleError, MARK_LABEL } from "@/lib/domain/attendance";
-import { pointsFor, validateCustomer } from "@/lib/domain/customers";
+import { byRecentPurchase, matchesCustomer, pointsFor, validateCustomer } from "@/lib/domain/customers";
 import { closeDifference, countDenominations, expectedCash, movementError, movementTotals, paymentTotals } from "@/lib/domain/cash";
+import { ALL_MODULES, effectiveStatus, isReadOnly, limaDay } from "@/lib/domain/account";
+import { isValidBoticaCode, isValidEmail, normalizeBoticaCode, normalizeEmail, passwordError } from "@/lib/domain/auth";
+import { findPlan, listPlanOffers, TRIAL_DAYS } from "@/lib/domain/plans";
+import { isSetupStep, normalizeDone, SETUP_STEPS } from "@/lib/domain/onboarding";
 import { accountErrors, accountGuard, branchErrors, branchSlug, deactivateBlockers, planUsage, hasErrors, normalizePharmacy, pharmacyErrors, rulesErrors } from "@/lib/domain/settings";
+import { netPayments, netPurchase, returnLines, returnsByMethod, type LotCost } from "@/lib/domain/returns";
+import { acceptedResponse, allocateReturn, canResend, creditableLines, creditNoteNumber, creditedTotalOf, noteSeries, planCreditNote, voidBlocker, voidReasonError } from "@/lib/domain/vouchers";
 import { SEED_DAILY_UNITS, SEED_LOT_PLAN, SEED_PRODUCTS, SEED_SUC_MISSING } from "./seed-data";
 
 const KEY = "bh.mock.v1";
-const VERSION = 11; // subir cuando cambie la forma de los datos: se regeneran
+const VERSION = 16; // subir cuando cambie la forma de los datos: se regeneran
 const DAY = 86_400_000;
 
+/**
+ * Código de la botica de los datos de ejemplo (vive en `bh.mock.v1`). Las boticas registradas con `signUp` viven cada una
+ * en `bh.mock.v1.<código>`; el cliente elige la botica por el código de `tenant.ts` en cada llamada.
+ */
+export const MOCK_BOTICA_CODE = "botica-huanuco";
+
 interface StaffRecord extends StaffSummary {
+  /** Solo el administrador (dueño): ingresa con correo y contraseña. En el mock va en texto plano; el backend la guarda con hash. */
+  email?: string;
+  password?: string;
   pin: string;
   active: boolean;
 }
@@ -43,6 +65,11 @@ interface StockMove {
   userName: string;
 }
 
+/** Estado electrónico de una venta ante SUNAT. Si una venta no figura aquí, se considera aceptada al emitirse. */
+interface VoucherRecord extends ElectronicState {
+  voided: VoidInfo | null;
+}
+
 interface MockDb {
   version: typeof VERSION;
   expiry: ExpiryThresholds;
@@ -50,6 +77,10 @@ interface MockDb {
   pharmacy: PublicConfig["pharmacy"];
   branches: Branch[];
   plan: Plan;
+  boticaCode: string;
+  account: Account;
+  /** Primera configuración: pasos ya hechos. */
+  setup: { done: SetupStep[] };
   staff: StaffRecord[];
   products: Product[];
   lots: Lot[];
@@ -66,6 +97,11 @@ interface MockDb {
   /** Avisos de recompra enviados: cliente:producto → fecha */
   contacts: Record<string, string>;
   sales: Sale[];
+  /** Estado ante SUNAT por id de venta (solo las que ya cambiaron del estado "aceptado"). */
+  vouchers: Record<string, VoucherRecord>;
+  creditNotes: CreditNote[];
+  /** Último correlativo de nota de crédito por serie: "BC01" → 3 */
+  noteSeq: Record<string, number>;
   moves: StockMove[];
   suppliers: Supplier[];
   purchases: Purchase[];
@@ -74,11 +110,15 @@ interface MockDb {
   /** Correlativos de series que un local dejó de usar: "principal:001" → último emitido. Si vuelve a esa serie, sigue desde ahí. */
   seriesArchive: Record<string, { b: number; f: number }>;
   sessions: Record<string, string>; // token → userId
+  /** Auditoría: quién hizo qué y cuándo, de la más antigua a la más reciente (ver `audit.ts`). */
+  audit: AuditEntry[];
+  /** Cuándo se creó la botica (la ve la consola de Digi!HME). */
+  createdAt: string;
 }
 
 const PERMISSIONS: Record<Role, string[]> = {
-  admin: ["panel", "pos", "vencimientos", "inventario", "traslados", "compras", "clientes", "caja", "asistencia", "reportes", "ajustes"],
-  encargado: ["panel", "pos", "vencimientos", "inventario", "traslados", "compras", "clientes", "caja"],
+  admin: ["panel", "pos", "vencimientos", "inventario", "traslados", "compras", "clientes", "caja", "comprobantes", "asistencia", "reportes", "auditoria", "ajustes"],
+  encargado: ["panel", "pos", "vencimientos", "inventario", "traslados", "compras", "clientes", "caja", "comprobantes"],
 };
 
 /* Generador estable para que los datos de ejemplo sean iguales en cada carga */
@@ -153,8 +193,11 @@ function seed(now: number): MockDb {
       { id: "sucursal", name: "Sucursal", address: "Av. Canto Grande 3150", series: "002", active: true },
     ],
     plan: { name: "Plan Crece", maxBranches: 3 },
+    boticaCode: MOCK_BOTICA_CODE,
+    account: { status: "active", renewsAt: limaDay(t0 + 30 * DAY), modules: [...ALL_MODULES] },
+    setup: { done: [...SETUP_STEPS] },
     staff: [
-      { id: "u1", name: "Carmen Salazar", role: "admin", branchId: null, pin: "1234", active: true },
+      { id: "u1", name: "Carmen Salazar", role: "admin", branchId: null, email: "dueno@botica-huanuco.pe", password: "Clave2026!", pin: "1234", active: true },
       { id: "u2", name: "Q.F. Daniel Rojas", role: "encargado", branchId: "principal", pin: "1111", active: true },
       { id: "u3", name: "Q.F. Lucía Ramos", role: "encargado", branchId: "sucursal", pin: "2222", active: true },
     ],
@@ -176,6 +219,9 @@ function seed(now: number): MockDb {
     workers: SEED_WORKERS.map((w) => ({ ...w, schedule: { ...w.schedule, days: [...w.schedule.days] } })),
     marks: [],
     sales: [],
+    vouchers: {},
+    creditNotes: [],
+    noteSeq: {},
     moves,
     suppliers: SEED_SUPPLIERS.map((x) => ({ ...x })),
     purchases,
@@ -183,12 +229,29 @@ function seed(now: number): MockDb {
     seq: { principal: { b: 3120, f: 236 }, sucursal: { b: 1288, f: 54 } },
     seriesArchive: {},
     sessions: {},
+    audit: [],
+    createdAt: new Date(t0 - 120 * DAY).toISOString(),
   };
   seedTodaySales(db, t0, now, rnd);
   db.closings = seedClosings(db, t0, rnd);
   db.marks = seedMarks(db.workers, t0, now);
   seedCustomers(db, t0);
+  seedVouchers(db);
+  db.audit = seedAudit({ closings: db.closings, staff: db.staff, branches: db.branches, t0 });
   return db;
+}
+
+/** Para que la pantalla de comprobantes tenga casos reales: uno pendiente y uno rechazado entre las ventas de hoy. */
+function seedVouchers(db: MockDb) {
+  const mine = db.sales.filter((s) => s.branchId === "principal");
+  const pending = mine[mine.length - 1];
+  const rejected = mine[mine.length - 2];
+  if (pending) db.vouchers[pending.id] = { status: "pendiente", sunat: null, attempts: 1, voided: null };
+  if (rejected)
+    db.vouchers[rejected.id] = {
+      status: "rechazado", attempts: 1, voided: null,
+      sunat: { code: "1033", message: `El comprobante ${rejected.number} fue registrado previamente con otros datos`, at: rejected.createdAt },
+    };
 }
 
 /**
@@ -260,14 +323,43 @@ function seedCustomers(db: MockDb, t0: number) {
   db.contacts["8:19"] = new Date(t0 - DAY + 17 * 3600_000).toISOString();
 }
 
-/** Compras del cliente: historial de ejemplo más las ventas con el cliente asignado. */
+/** Ventas que siguen vigentes: las anuladas (comunicación de baja) no cuentan en reportes, caja ni compras del cliente. */
+const liveSales = (d: Pick<MockDb, "sales" | "vouchers">): Sale[] => d.sales.filter((s) => d.vouchers[s.id]?.status !== "anulado");
+
+/** Costo del lote para revertirlo al devolver mercadería; si el lote ya no existe, el costo del producto. */
+function lotCostOf(d: Pick<MockDb, "lots" | "products">): LotCost {
+  const lots = new Map(d.lots.map((l) => [l.id, l.cost]));
+  const products = new Map(d.products.map((p) => [p.id, p.cost]));
+  return (lotId, productId) => lots.get(lotId) ?? products.get(productId) ?? 0;
+}
+
+/** Líneas en negativo de las notas de crédito válidas que cumplen `keep` (por local y fecha de emisión de la nota). */
+function returnLinesIn(d: MockDb, keep: (l: SalesReportLine) => boolean): SalesReportLine[] {
+  const cost = lotCostOf(d);
+  return d.sales.flatMap((s) => {
+    const notes = d.creditNotes.filter((n) => n.voucherId === s.id);
+    return notes.length ? returnLines(s, notes, cost).filter(keep) : [];
+  });
+}
+
+/** Compras del cliente: historial de ejemplo más las ventas con el cliente asignado, ya sin lo devuelto. */
 function purchasesOf(d: MockDb, customerId: number): CustomerPurchase[] {
-  const fromSales: CustomerPurchase[] = d.sales
+  const fromSales: CustomerPurchase[] = liveSales(d)
     .filter((s) => s.customerId === customerId)
-    .map((s) => ({ saleId: s.id, number: s.number, branchId: s.branchId, at: s.createdAt, total: s.total, items: s.items.map((it) => ({ productId: it.productId, units: it.units, total: it.total, presentationLabel: it.presentationLabel, qty: it.qty })) }));
+    .map((s) => ({ s, net: netPurchase(s, d.creditNotes.filter((n) => n.voucherId === s.id)) }))
+    .filter(({ s, net }) => net.total > 0 || net.returned === 0 || s.total === 0)
+    .map(({ s, net }) => ({ saleId: s.id, number: s.number, branchId: s.branchId, at: s.createdAt, total: net.total, items: net.items, ...(net.returned > 0 ? { returned: net.returned } : {}) }));
   const idPrefix = [`h${customerId}-`, `x${customerId}-`];
   const history = d.customerHistory.filter((h) => idPrefix.some((p) => h.saleId.startsWith(p)) || (h as CustomerPurchase & { customerId?: number }).customerId === customerId);
   return [...fromSales, ...history].sort((a, b) => b.at.localeCompare(a.at));
+}
+
+/** Cartera con los totales de compra de cada cliente. */
+function customerSummaries(d: MockDb): CustomerSummary[] {
+  return d.customers.map((c) => {
+    const ps = purchasesOf(d, c.id);
+    return { ...c, purchases: ps.length, totalSpent: round2(ps.reduce((a, p) => a + p.total, 0)), totalReturned: round2(ps.reduce((a, p) => a + (p.returned ?? 0), 0)), lastPurchaseAt: ps[0]?.at ?? null };
+  });
 }
 
 const SEED_WORKERS: (Worker & { pin: string })[] = [
@@ -385,7 +477,7 @@ function seedClosings(db: MockDb, t0: number, rnd: () => number): CashClosing[] 
       const { difference } = closeDifference(counted, expected);
       out.push({
         id: id++, branchId: branch.id, openedAt: new Date(day + 8 * 3600_000).toISOString(), openedBy: SELLER[branch.id] ?? "", closedAt: new Date(day + 21 * 3600_000 + 10 * 60_000).toISOString(), closedBy: SELLER[branch.id] ?? "",
-        openingAmount: 150, sales: { efectivo, yape, tarjeta }, tickets: Math.max(1, Math.round(revenue / 9)), ...m, expected, counted, difference, denominations: {},
+        openingAmount: 150, sales: { efectivo, yape, tarjeta }, returns: { efectivo: 0, yape: 0, tarjeta: 0, count: 0 }, tickets: Math.max(1, Math.round(revenue / 9)), ...m, expected, counted, difference, denominations: {},
         note: Math.abs(difference) >= 1 ? (difference < 0 ? "Vuelto mal dado en hora punta" : "Cliente dejó el vuelto") : "", movements,
       });
     }
@@ -533,17 +625,22 @@ function seedTransfers(lots: Lot[], moves: StockMove[], t0: number): Transfer[] 
   return out;
 }
 
-function load(): MockDb {
-  if (typeof window === "undefined") return seed(Date.now());
+const keyFor = (code: string) => (code === MOCK_BOTICA_CODE ? KEY : `${KEY}.${code}`);
+
+/** Lee los datos de una botica. La de ejemplo se genera si falta; las registradas, si no existen, devuelven null. */
+function load(code: string = MOCK_BOTICA_CODE): MockDb | null {
+  const isDefault = code === MOCK_BOTICA_CODE;
+  if (typeof window === "undefined") return isDefault ? seed(Date.now()) : null;
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(keyFor(code));
     if (raw) {
       const db = JSON.parse(raw) as MockDb;
       if (db.version === VERSION) return db;
     }
   } catch {
-    /* datos dañados o sin acceso: se regenera */
+    /* datos dañados o sin acceso: se regenera (solo la de ejemplo) */
   }
+  if (!isDefault) return null;
   const db = seed(Date.now());
   save(db);
   return db;
@@ -551,10 +648,52 @@ function load(): MockDb {
 
 function save(db: MockDb) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(db));
+    localStorage.setItem(keyFor(db.boticaCode), JSON.stringify(db));
   } catch {
     /* sin almacenamiento: sigue en memoria */
   }
+}
+
+/** Botica vacía en prueba: un local "Principal", el dueño como único usuario y la primera configuración pendiente. */
+function seedEmpty(input: SignUpInput, now: number): MockDb {
+  const plan = findPlan(input.plan)!;
+  return {
+    version: VERSION,
+    expiry: { red: 30, yellow: 90 },
+    purchasing: { coverDays: 15, minShelfDays: 180 },
+    pharmacy: { name: input.boticaName.trim(), tagline: "", ruc: "", phone: "", brand: "#0B4F45", accent: "#3DDC97" },
+    branches: [{ id: "principal", name: "Principal", address: "", series: "001", active: true }],
+    plan: { name: plan.name, maxBranches: plan.maxBranches },
+    boticaCode: input.code,
+    account: { status: "trial", trialEndsAt: limaDay(now + TRIAL_DAYS * DAY), modules: [...plan.modules] },
+    setup: { done: [] },
+    // Sin PIN de mostrador todavía: el dueño ingresa con correo y contraseña. Un PIN vacío nunca coincide.
+    staff: [{ id: "u1", name: input.ownerName.trim(), role: "admin", branchId: null, email: normalizeEmail(input.email), password: input.password, pin: "", active: true }],
+    products: [],
+    lots: [],
+    customers: [],
+    customerHistory: [],
+    contacts: {},
+    cash: {},
+    cashMovements: { principal: [] },
+    closings: [],
+    attendanceSettings: { toleranceMinutes: 10, breakMinutes: 60, overtimeAfterMinutes: 15 },
+    workers: [],
+    marks: [],
+    sales: [],
+    vouchers: {},
+    creditNotes: [],
+    noteSeq: {},
+    moves: [],
+    suppliers: [],
+    purchases: [],
+    transfers: [],
+    seq: { principal: { b: 0, f: 0 } },
+    seriesArchive: {},
+    sessions: {},
+    audit: [],
+    createdAt: new Date(now).toISOString(),
+  };
 }
 
 const wait = (ms = 180 + Math.random() * 160) => new Promise((r) => setTimeout(r, ms));
@@ -612,19 +751,52 @@ function recordExit(d: MockDb, t: Transfer, userName: string, now: number) {
     d.moves.push({ id: ++moveId, at: new Date(now).toISOString(), branchId: t.fromBranchId, productId: it.productId, lotId: it.lotId, lotCode: it.lotCode, type: "traslado_salida", delta: -it.units, note: `Traslado ${t.code} a ${BRANCH_NAME[t.toBranchId] ?? t.toBranchId}`, userName });
 }
 
+/** Estado ante SUNAT de una venta. Las que nunca cambiaron figuran como aceptadas en el momento de emitirse. */
+function recordOf(d: MockDb, sale: Sale): VoucherRecord {
+  return d.vouchers[sale.id] ?? { status: "aceptado", sunat: acceptedResponse(sale.document.type, sale.number, Date.parse(sale.createdAt)), attempts: 1, voided: null };
+}
+
+function toVoucher(d: MockDb, sale: Sale): Voucher {
+  const customerName = sale.document.customerName || d.customers.find((c) => c.id === sale.customerId)?.name || "";
+  const notes = d.creditNotes.filter((n) => n.voucherId === sale.id);
+  return {
+    id: sale.id, number: sale.number, type: sale.document.type, branchId: sale.branchId, issuedAt: sale.createdAt, customerName, customerDocId: sale.document.customerDocId ?? "",
+    total: sale.total, taxBase: sale.taxBase, igv: sale.igv, ...recordOf(d, sale), creditedTotal: creditedTotalOf(notes), creditNotes: notes, sale,
+  };
+}
+
+/** Entra al kardex y al lote unidades que vuelven a la botica (devolución de un cliente). */
+function returnToLot(d: MockDb, lotId: number, units: number, note: string, userName: string, now: number) {
+  const lot = d.lots.find((l) => l.id === lotId);
+  if (!lot) return;
+  lot.qty += units;
+  d.moves.push({ id: Math.max(0, ...d.moves.map((m) => m.id)) + 1, at: new Date(now).toISOString(), branchId: lot.branchId, productId: lot.productId, lotId: lot.id, lotCode: lot.code, type: "devolucion", delta: units, note, userName });
+}
+
 const closedSession = (branchId: string): CashSession => ({ branchId, open: false, openedAt: null, openedBy: null, openingAmount: 0 });
 
 /** Ventas y movimientos del turno abierto y el efectivo que debe haber. */
 function summaryOf(d: MockDb, branchId: string) {
   const session = d.cash[branchId] ?? closedSession(branchId);
   const since = session.openedAt ? new Date(session.openedAt).getTime() : Number.POSITIVE_INFINITY;
-  const sales = d.sales
+  const sales = liveSales(d)
     .filter((s) => s.branchId === branchId && new Date(s.createdAt).getTime() >= since)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .map((s) => ({ id: s.id, number: s.number, createdAt: s.createdAt, total: s.total, method: s.payment.method, sellerName: s.sellerName, hasPrescription: !!s.prescription }));
   const totals = paymentTotals(sales);
+  /* Devoluciones: notas emitidas en este turno. Solo las de ventas pagadas en efectivo sacan plata de la caja. */
+  const saleOf = new Map(d.sales.map((s) => [s.id, s]));
+  const notes = d.creditNotes.filter((n) => n.branchId === branchId && new Date(n.issuedAt).getTime() >= since);
+  const returns = returnsByMethod(notes, (id) => saleOf.get(id)?.payment.method);
+  const returnRows = notes
+    .filter((n) => n.status !== "rechazado" && n.status !== "anulado" && saleOf.has(n.voucherId))
+    .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt))
+    .map((n) => ({ id: n.id, number: n.number, voucherNumber: n.voucherNumber, issuedAt: n.issuedAt, total: n.total, method: saleOf.get(n.voucherId)!.payment.method, userName: n.userName }));
   const movements = session.open ? (d.cashMovements[branchId] ?? []) : [];
-  return { session, sales, totals: { ...totals, tickets: sales.length }, movements: [...movements].reverse(), expected: session.open ? expectedCash(session.openingAmount, totals.efectivo, movements) : 0 };
+  return {
+    session, sales, totals: { ...totals, tickets: sales.length }, returns, returnRows, movements: [...movements].reverse(),
+    expected: session.open ? expectedCash(session.openingAmount, netPayments(totals, returns).efectivo, movements) : 0,
+  };
 }
 
 function requireAdmin(u: StaffRecord, what = "la asistencia") {
@@ -656,10 +828,77 @@ function checkWorker(d: MockDb, input: Omit<Worker, "id">, selfId?: string): Omi
   return w;
 }
 
+/** Lecturas y acceso: siguen funcionando con la cuenta suspendida. Todo lo demás es escritura y se bloquea. */
+const READ_OR_AUTH = /^(get|list|search|resolve|login|signUp$|me$|logout$)/;
+
+/** Con la cuenta suspendida (solo lectura) rechaza cada escritura con CUENTA_SUSPENDIDA, salvo ingreso y salida. */
+function guardWrites(client: ApiClient, account: () => Account): ApiClient {
+  const guarded = {} as Record<string, unknown>;
+  for (const [name, fn] of Object.entries(client) as [string, (...a: unknown[]) => Promise<unknown>][]) {
+    guarded[name] = READ_OR_AUTH.test(name)
+      ? fn
+      : async (...args: unknown[]) => {
+          if (isReadOnly(effectiveStatus(account(), limaDay(Date.now())))) fail("CUENTA_SUSPENDIDA", "Tu cuenta está suspendida: solo puedes consultar. Comunícate con Digi!HME para reactivarla.", 403);
+          return fn(...args);
+        };
+  }
+  return guarded as unknown as ApiClient;
+}
+
+let active: { get: () => MockDb; commit: () => void } | null = null;
+
+/** Solo pruebas: cambia el estado de la cuenta simulada (p. ej. "suspended" para ver el modo solo lectura). Se ve al volver a leer getAccount. */
+export function setMockAccount(patch: Partial<Account> & { status?: AccountStatus }) {
+  const ctl = active ?? { get: () => load(currentCode())!, commit: () => undefined };
+  const d = ctl.get();
+  d.account = { ...d.account, ...patch };
+  if (active) active.commit();
+  else save(d);
+}
+
+/** Botica con la que se está trabajando: la de `tenant.ts`; si no hay o ya no existe, la de ejemplo. */
+function currentCode(): string {
+  const code = tenantStore.get();
+  return code && (code === MOCK_BOTICA_CODE || load(code)) ? code : MOCK_BOTICA_CODE;
+}
+
+/** Datos de las boticas ya leídas, compartidos por la API de la botica y la consola de Digi!HME para que un cambio se vea en ambas. */
+const dbCache = new Map<string, MockDb>();
+
+/** Datos de una botica (en memoria una sola vez), o null si no existe. */
+export function tenantDb(code: string): MockDb | null {
+  let d = dbCache.get(code) ?? null;
+  if (!d) {
+    d = load(code);
+    if (d) dbCache.set(code, d);
+  }
+  return d;
+}
+
+/** Guarda en el navegador los cambios hechos a los datos de una botica. */
+export const commitTenantDb = (db: MockDb) => save(db);
+
+/** Códigos de todas las boticas del mock: la de ejemplo, las registradas en este navegador y las ya cargadas en memoria. */
+export function knownTenantCodes(): string[] {
+  const codes = new Set<string>([MOCK_BOTICA_CODE, ...dbCache.keys()]);
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k?.startsWith(`${KEY}.`)) codes.add(k.slice(KEY.length + 1));
+    }
+  } catch {
+    /* sin almacenamiento: solo las de memoria */
+  }
+  return [...codes];
+}
+
+export type { MockDb };
+
 export function createMockClient(): ApiClient {
-  let db: MockDb | null = null;
-  const get = () => (db ??= load());
-  const commit = () => db && save(db);
+  const tenant = tenantDb;
+  const get = (): MockDb => tenant(currentCode())!;
+  const commit = () => save(get());
+  active = { get, commit };
 
   const currentUser = (): StaffRecord => {
     const token = tokenStore.get();
@@ -677,7 +916,87 @@ export function createMockClient(): ApiClient {
     if (u.role !== "admin" && u.branchId !== branchId) fail("SIN_PERMISO", "Tu cuenta solo puede operar en tu local.", 403);
   };
 
-  return {
+  /** Rango y local de una consulta de comprobantes; devuelve quién entra (local y fecha). */
+  const voucherWindow = (u: StaffRecord, d: MockDb, { from, to, branchId }: { from: string; to: string; branchId?: string }) => {
+    if (branchId) assertBranch(u, branchId);
+    const scope = branchId ? [branchId] : u.role === "admin" ? d.branches.map((b) => b.id) : [u.branchId!];
+    const a = parseDay(from);
+    const b = parseDay(to) + DAY;
+    if (!(a < b) || b - a > 370 * DAY) fail("DATOS_INVALIDOS", "Rango de fechas no válido (máximo un año).");
+    return (branch: string, iso: string) => {
+      const t = Date.parse(iso);
+      return scope.includes(branch) && t >= a && t < b;
+    };
+  };
+  const saleOf = (u: StaffRecord, d: MockDb, id: string): Sale => {
+    const sale = d.sales.find((s) => s.id === id) ?? fail("COMPROBANTE_NO_EXISTE", "El comprobante no existe.", 404);
+    assertBranch(u, sale.branchId);
+    return sale;
+  };
+
+  const client: ApiClient = {
+    async resolveBotica(code) {
+      await wait(120);
+      const d = tenant(normalizeBoticaCode(code)) ?? fail("BOTICA_NO_ENCONTRADA", "No encontramos una botica con ese código. Revísalo e intenta de nuevo.", 404);
+      const b: BoticaPublic = { code: d.boticaCode, name: d.pharmacy.name, tagline: d.pharmacy.tagline, brand: d.pharmacy.brand, accent: d.pharmacy.accent };
+      return b;
+    },
+    async listPlans(): Promise<PlanOffer[]> {
+      await wait(80);
+      return listPlanOffers();
+    },
+    async signUp(input) {
+      await wait(400);
+      const code = normalizeBoticaCode(input.code);
+      const email = normalizeEmail(input.email);
+      const name = input.boticaName.trim();
+      if (name.length < 3 || name.length > 40) fail("DATOS_INVALIDOS", "Escribe el nombre de tu botica (3 a 40 caracteres).");
+      if (input.ownerName.trim().length < 3) fail("DATOS_INVALIDOS", "Escribe tu nombre completo.");
+      if (!isValidBoticaCode(code)) fail("DATOS_INVALIDOS", "El código usa letras minúsculas, números y guiones (3 a 40 caracteres).");
+      if (!isValidEmail(email)) fail("DATOS_INVALIDOS", "Escribe un correo válido.");
+      const pwd = passwordError(input.password);
+      if (pwd) fail("DATOS_INVALIDOS", pwd);
+      if (!findPlan(input.plan)) fail("DATOS_INVALIDOS", "Elige un plan.");
+      if (tenant(code)) fail("CODIGO_EN_USO", "Ese código ya lo usa otra botica. Prueba con otro.", 409);
+      const d = seedEmpty({ ...input, code, email }, Date.now());
+      const owner = d.staff[0]!;
+      const token = `mock.${owner.id}.${Date.now().toString(36)}`;
+      d.sessions[token] = owner.id;
+      dbCache.set(code, d);
+      appendAudit(d.audit, { action: "sesion_iniciada", entity: "sesion", entityId: owner.id, entityLabel: owner.name, after: { via: "correo" } }, { id: owner.id, name: owner.name, role: owner.role, branchId: null }, Date.now());
+      save(d);
+      const session: Session = { token, user: toUser(owner), expiresAt: new Date(Date.now() + 12 * 3600_000).toISOString() };
+      return session;
+    },
+    async listAudit(query: AuditQuery): Promise<Page<AuditEntry>> {
+      await wait(160);
+      requireAdmin(currentUser(), "el registro de auditoría");
+      const rangeError = auditRangeError(query.from, query.to);
+      if (rangeError) fail("DATOS_INVALIDOS", rangeError);
+      const a = parseDay(query.from);
+      const b = parseDay(query.to) + DAY;
+      const rows = get()
+        .audit.filter((e) => {
+          const t = Date.parse(e.at);
+          return t >= a && t < b && (!query.userId || e.userId === query.userId) && (!query.action || e.action === query.action) && (!query.entity || e.entity === query.entity);
+        })
+        .sort((x, y) => y.at.localeCompare(x.at) || y.id.localeCompare(x.id, undefined, { numeric: true }));
+      return paginate(rows, query);
+    },
+    async getSetup(): Promise<Setup> {
+      await wait(60);
+      requireAdmin(currentUser(), "la primera configuración");
+      return { done: normalizeDone(get().setup.done) };
+    },
+    async completeSetupStep(step: SetupStep): Promise<Setup> {
+      await wait(100);
+      requireAdmin(currentUser(), "la primera configuración");
+      if (!isSetupStep(step)) fail("DATOS_INVALIDOS", "Ese paso no existe.");
+      const d = get();
+      d.setup.done = normalizeDone([...d.setup.done, step]);
+      commit();
+      return { done: [...d.setup.done] };
+    },
     async getPublicConfig() {
       await wait(80);
       const d = get();
@@ -796,7 +1115,7 @@ export function createMockClient(): ApiClient {
     async listAccounts() {
       await wait(120);
       requireAdmin(currentUser(), "las cuentas");
-      return get().staff.map(({ pin: _pin, ...s }): StaffAccount => s);
+      return get().staff.map(({ id, name, role, branchId, active }): StaffAccount => ({ id, name, role, branchId, active }));
     },
     async createAccount(input) {
       await wait(220);
@@ -828,7 +1147,7 @@ export function createMockClient(): ApiClient {
     },
     async listStaff() {
       await wait(80);
-      return get().staff.filter((s) => s.active).map(({ pin: _pin, active: _a, ...s }) => s);
+      return get().staff.filter((s) => s.active).map(({ id, name, role, branchId }): StaffSummary => ({ id, name, role, branchId }));
     },
     async login(userId, pin) {
       await wait(260);
@@ -836,6 +1155,17 @@ export function createMockClient(): ApiClient {
       if (!s || !s.active || s.pin !== pin) return fail("PIN_INVALIDO", "PIN incorrecto. Intenta de nuevo.", 401);
       const token = `mock.${userId}.${Date.now().toString(36)}`;
       get().sessions[token] = userId;
+      commit();
+      const session: Session = { token, user: toUser(s), expiresAt: new Date(Date.now() + 12 * 3600_000).toISOString() };
+      return session;
+    },
+    async loginOwner(email, password) {
+      await wait(260);
+      const e = normalizeEmail(email);
+      const s = get().staff.find((x) => x.role === "admin" && x.active && x.email === e);
+      if (!isValidEmail(e) || passwordError(password) || !s || s.password !== password) return fail("CREDENCIALES_INVALIDAS", "Correo o contraseña incorrectos. Intenta de nuevo.", 401);
+      const token = `mock.${s.id}.${Date.now().toString(36)}`;
+      get().sessions[token] = s.id;
       commit();
       const session: Session = { token, user: toUser(s), expiresAt: new Date(Date.now() + 12 * 3600_000).toISOString() };
       return session;
@@ -867,6 +1197,12 @@ export function createMockClient(): ApiClient {
     async me() {
       await wait(60);
       return toUser(currentUser());
+    },
+    async getAccount() {
+      await wait(60);
+      currentUser();
+      const a = get().account;
+      return { ...a, status: effectiveStatus(a, limaDay(Date.now())), modules: [...a.modules] };
     },
     async logout() {
       const token = tokenStore.get();
@@ -913,7 +1249,7 @@ export function createMockClient(): ApiClient {
         });
       }
       /* Ventas registradas */
-      for (const sale of d.sales) {
+      for (const sale of liveSales(d)) {
         if (!scope.includes(sale.branchId) || !inRange(sale.createdAt)) continue;
         for (const it of sale.items) {
           lines.push({
@@ -923,6 +1259,8 @@ export function createMockClient(): ApiClient {
           });
         }
       }
+      /* Notas de crédito: restan el día en que se emitieron, no el de la venta */
+      lines.push(...returnLinesIn(d, (l) => scope.includes(l.branchId) && inRange(l.at)));
       return lines.sort((x, y) => x.at.localeCompare(y.at));
     },
     async getDashboard(days) {
@@ -939,13 +1277,24 @@ export function createMockClient(): ApiClient {
         const date = isoDay(t0 - i * DAY + 12 * 3600_000);
         for (const branchId of branchIds) {
           const cs = d.closings.filter((c) => c.branchId === branchId && isoDay(new Date(c.closedAt).getTime()) === date);
-          series.push({ date, branchId, total: round2(cs.reduce((a, c) => a + c.sales.efectivo + c.sales.yape + c.sales.tarjeta, 0)), tickets: cs.reduce((a, c) => a + c.tickets, 0) });
+          const returns = round2(cs.reduce((a, c) => a + (c.returns ? c.returns.efectivo + c.returns.yape + c.returns.tarjeta : 0), 0));
+          series.push({ date, branchId, total: round2(cs.reduce((a, c) => a + c.sales.efectivo + c.sales.yape + c.sales.tarjeta, 0) - returns), returns, tickets: cs.reduce((a, c) => a + c.tickets, 0) });
         }
       }
       const todayStats = branchIds.map((branchId) => {
-        const sales = d.sales.filter((x) => x.branchId === branchId && new Date(x.createdAt).getTime() >= t0);
+        const sales = liveSales(d).filter((x) => x.branchId === branchId && new Date(x.createdAt).getTime() >= t0);
         const byHour = Array.from({ length: 24 }, () => 0);
         const top = new Map<number, { productId: number; units: number; total: number }>();
+        /* Devoluciones emitidas hoy (de cualquier venta): restan en la hora, el método y el producto */
+        const back = returnLinesIn(d, (l) => l.branchId === branchId && new Date(l.at).getTime() >= t0);
+        for (const l of back) {
+          const h = new Date(l.at).getHours();
+          byHour[h] = round2((byHour[h] ?? 0) + l.total);
+          const cur = top.get(l.productId) ?? { productId: l.productId, units: 0, total: 0 };
+          cur.units += l.units;
+          cur.total = round2(cur.total + l.total);
+          top.set(l.productId, cur);
+        }
         for (const x of sales) {
           const h = new Date(x.createdAt).getHours();
           byHour[h] = round2((byHour[h] ?? 0) + x.total);
@@ -956,9 +1305,12 @@ export function createMockClient(): ApiClient {
             top.set(it.productId, cur);
           }
         }
+        const gross = round2(sales.reduce((a, x) => a + x.total, 0));
+        const returns = round2(-back.reduce((a, l) => a + l.total, 0));
         return {
-          branchId, total: round2(sales.reduce((a, x) => a + x.total, 0)), tickets: sales.length, byMethod: paymentTotals(sales.map((x) => ({ method: x.payment.method, total: x.total }))), byHour,
-          topProducts: [...top.values()].sort((a, b) => b.total - a.total).slice(0, 8),
+          branchId, total: round2(gross - returns), gross, returns, tickets: sales.length,
+          byMethod: paymentTotals([...sales.map((x) => ({ method: x.payment.method, total: x.total })), ...back.map((l) => ({ method: l.method, total: l.total }))]), byHour,
+          topProducts: [...top.values()].filter((t) => t.total > 0).sort((a, b) => b.total - a.total).slice(0, 8),
         };
       });
       return { series, today: todayStats };
@@ -1010,7 +1362,7 @@ export function createMockClient(): ApiClient {
       commit();
       return product;
     },
-    async getKardex(productId, { branchId, days }) {
+    async getKardex(productId, { branchId, days, page, pageSize }) {
       await wait(180);
       const u = currentUser();
       if (branchId) assertBranch(u, branchId);
@@ -1038,7 +1390,12 @@ export function createMockClient(): ApiClient {
       }
       entries.sort((a, b) => b.at.localeCompare(a.at));
       const closing = d.lots.filter((l) => l.productId === productId && inScope(l.branchId)).reduce((sum, l) => sum + l.qty, 0);
-      return { productId, branchId: branchId ?? null, from: new Date(from).toISOString(), to: new Date(to).toISOString(), closing, entries };
+      const head = { productId, branchId: branchId ?? null, from: new Date(from).toISOString(), to: new Date(to).toISOString(), closing };
+      if (page === undefined) return { ...head, entries };
+      /* Con página: solo esos movimientos, más el total, el saldo con el que parte la página y las cifras de todo el periodo */
+      const slice = paginate(entries, { page, pageSize });
+      const newer = entries.slice(0, (slice.page - 1) * slice.pageSize).reduce((sum, e) => sum + e.delta, 0);
+      return { ...head, entries: slice.items, total: slice.total, page: slice.page, pageSize: slice.pageSize, pageClosing: closing - newer, summary: kardexSummary(entries, closing) };
     },
 
     async listSuppliers() {
@@ -1310,10 +1667,12 @@ export function createMockClient(): ApiClient {
         m.set(k, v);
       };
       for (const mv of d.moves) if (mv.type === "venta" && new Date(mv.at).getTime() >= from) add(mv.branchId, mv.productId, -mv.delta);
-      for (const sale of d.sales) {
+      for (const sale of liveSales(d)) {
         if (new Date(sale.createdAt).getTime() < from) continue;
         for (const it of sale.items) add(sale.branchId, it.productId, it.units);
       }
+      /* Lo devuelto por nota de crédito baja la demanda (las unidades, no los descuentos) */
+      for (const l of returnLinesIn(d, (x) => new Date(x.at).getTime() >= from)) if (l.units) add(l.branchId, l.productId, l.units);
       return [...m.values()].filter((v) => v.units > 0);
     },
     async setLotDiscount(branchId, lotIds, discount) {
@@ -1366,11 +1725,12 @@ export function createMockClient(): ApiClient {
     async listCustomers() {
       await wait(160);
       currentUser();
-      const d = get();
-      return d.customers.map((c) => {
-        const ps = purchasesOf(d, c.id);
-        return { ...c, purchases: ps.length, totalSpent: round2(ps.reduce((a, p) => a + p.total, 0)), lastPurchaseAt: ps[0]?.at ?? null };
-      });
+      return customerSummaries(get());
+    },
+    async listCustomersPage({ q, page, pageSize }) {
+      await wait(160);
+      currentUser();
+      return paginate(customerSummaries(get()).filter((c) => matchesCustomer(c, q ?? "")).sort(byRecentPurchase), { page, pageSize });
     },
     async updateCustomer(id, input) {
       await wait(220);
@@ -1470,7 +1830,7 @@ export function createMockClient(): ApiClient {
       const movements = d.cashMovements[branchId] ?? [];
       const closing: CashClosing = {
         id: Math.max(0, ...d.closings.map((c) => c.id)) + 1, branchId, openedAt: session!.openedAt!, openedBy: session!.openedBy ?? "", closedAt: new Date().toISOString(), closedBy: u.name,
-        openingAmount: session!.openingAmount, sales: { efectivo: sum.totals.efectivo, yape: sum.totals.yape, tarjeta: sum.totals.tarjeta }, tickets: sum.totals.tickets,
+        openingAmount: session!.openingAmount, sales: { efectivo: sum.totals.efectivo, yape: sum.totals.yape, tarjeta: sum.totals.tarjeta }, returns: sum.returns, tickets: sum.totals.tickets,
         ...movementTotals(movements), expected: sum.expected, counted: round2(counted), difference, denominations: input.denominations, note: input.note.trim(), movements,
       };
       d.closings.push(closing);
@@ -1495,6 +1855,21 @@ export function createMockClient(): ApiClient {
       const u = currentUser();
       assertBranch(u, req.branchId);
       const d = get();
+      /* Idempotencia: la misma clave devuelve la venta original; con otros datos, es un error. */
+      if (req.clientSaleId !== undefined) {
+        if (!/^[A-Za-z0-9_-]{8,64}$/.test(req.clientSaleId)) fail("DATOS_INVALIDOS", "La clave de la venta (clientSaleId) no es válida.", 400);
+        const prior = d.sales.find((s) => s.clientSaleId === req.clientSaleId);
+        if (prior) {
+          const same = prior.branchId === req.branchId && prior.items.length === req.items.length && prior.items.every((l, i) => l.productId === req.items[i]?.productId && l.presentation === req.items[i]?.presentation && l.qty === req.items[i]?.qty);
+          if (!same) fail("CLAVE_REPETIDA", "Esa clave de venta ya se usó con otros datos.", 409);
+          return prior;
+        }
+      }
+      let soldAtMs: number | null = null;
+      if (req.soldAt !== undefined) {
+        soldAtMs = Date.parse(req.soldAt);
+        if (!Number.isFinite(soldAtMs) || soldAtMs > Date.now() + 5 * 60_000) fail("DATOS_INVALIDOS", "La hora de la venta (soldAt) no es válida.", 400);
+      }
       if (!d.cash[req.branchId]?.open) fail("CAJA_CERRADA", "La caja de este local está cerrada. Ábrela para poder cobrar.");
       if (!req.items.length) fail("VENTA_VACIA", "Agrega al menos un producto.");
       const now = Date.now();
@@ -1532,8 +1907,11 @@ export function createMockClient(): ApiClient {
       const number = req.document.type === "factura" ? `F${branch.series}-${String(++sq.f).padStart(6, "0")}` : `B${branch.series}-${String(++sq.b).padStart(6, "0")}`;
       const taxBase = round2(total / (1 + IGV));
       const received = req.payment.method === "efectivo" ? req.payment.received ?? total : total;
+      let saleId = `s_${now.toString(36)}`;
+      while (d.sales.some((s) => s.id === saleId)) saleId += "x";
       const sale: Sale = {
-        id: `s_${now.toString(36)}`, branchId: req.branchId, number, createdAt: new Date(now).toISOString(), sellerName: u.name,
+        id: saleId, branchId: req.branchId, number, createdAt: new Date(soldAtMs ?? now).toISOString(), sellerName: u.name,
+        clientSaleId: req.clientSaleId ?? null, offlineTicket: req.offlineTicket ?? null,
         items: items.map((x) => x.line), total, taxBase, igv: round2(total - taxBase),
         payment: { method: req.payment.method, received, change: round2(received - total), reference: req.payment.reference },
         document: req.document, customerId: req.customerId ?? null, prescription: needsRx ? req.prescription ?? null : null, approvedBy,
@@ -1546,13 +1924,154 @@ export function createMockClient(): ApiClient {
       commit();
       return sale;
     },
+
+    async syncSales(input) {
+      const sales = input?.sales;
+      if (!Array.isArray(sales) || sales.length === 0 || sales.length > SYNC_BATCH_MAX) fail("DATOS_INVALIDOS", `Envía entre 1 y ${SYNC_BATCH_MAX} ventas por lote.`, 400);
+      const results: SaleSyncResult[] = [];
+      /* En orden, una por una; cada resultado es independiente: una venta rechazada no frena a las demás. */
+      for (const item of sales) {
+        const clientSaleId = item?.clientSaleId;
+        if (typeof clientSaleId !== "string" || !clientSaleId) {
+          results.push({ clientSaleId: String(clientSaleId ?? ""), status: "failed", error: { code: "DATOS_INVALIDOS", message: "Falta la clave de la venta (clientSaleId)." } });
+          continue;
+        }
+        const existed = get().sales.some((s) => s.clientSaleId === clientSaleId);
+        try {
+          const sale = await client.createSale(item);
+          results.push({ clientSaleId, status: existed ? "replayed" : "created", sale });
+        } catch (e) {
+          const err = e instanceof ApiError ? { code: e.code, message: e.message, details: e.details } : { code: "ERROR_INTERNO", message: "El servidor no pudo registrar la venta." };
+          results.push({ clientSaleId, status: "failed", error: err });
+        }
+      }
+      return { results };
+    },
+
+    async listVouchers(options) {
+      await wait(220);
+      const u = currentUser();
+      const d = get();
+      const inScope = voucherWindow(u, d, options);
+      return d.sales
+        .filter((s) => inScope(s.branchId, s.createdAt))
+        .map((s) => toVoucher(d, s))
+        .sort((x, y) => y.issuedAt.localeCompare(x.issuedAt));
+    },
+    async listCreditNotes(options) {
+      await wait(180);
+      const u = currentUser();
+      const d = get();
+      const inScope = voucherWindow(u, d, options);
+      return d.creditNotes.filter((n) => inScope(n.branchId, n.issuedAt)).sort((x, y) => y.issuedAt.localeCompare(x.issuedAt));
+    },
+    async resendVoucher(id) {
+      await wait(700);
+      const u = currentUser();
+      const d = get();
+      const sale = saleOf(u, d, id);
+      const rec = recordOf(d, sale);
+      if (rec.status === "anulado") fail("ESTADO_INVALIDO", "Este comprobante está anulado: no se envía a SUNAT.", 409);
+      if (!canResend(rec.status)) fail("ESTADO_INVALIDO", "SUNAT ya aceptó este comprobante. No hace falta reenviarlo.", 409);
+      /* En la simulación, SUNAT acepta el reenvío */
+      d.vouchers[sale.id] = { ...rec, status: "aceptado", sunat: acceptedResponse(sale.document.type, sale.number, Date.now()), attempts: rec.attempts + 1 };
+      commit();
+      return toVoucher(d, sale);
+    },
+    async resendCreditNote(id) {
+      await wait(700);
+      const u = currentUser();
+      const d = get();
+      const i = d.creditNotes.findIndex((n) => n.id === id);
+      const note = d.creditNotes[i] ?? fail("COMPROBANTE_NO_EXISTE", "La nota de crédito no existe.", 404);
+      assertBranch(u, note.branchId);
+      if (!canResend(note.status)) fail("ESTADO_INVALIDO", "SUNAT ya aceptó esta nota de crédito. No hace falta reenviarla.", 409);
+      const next: CreditNote = { ...note, status: "aceptado", sunat: acceptedResponse("nota_credito", note.number, Date.now()), attempts: note.attempts + 1 };
+      d.creditNotes[i] = next;
+      commit();
+      return next;
+    },
+    async voidVoucher(id, input) {
+      await wait(600);
+      const u = currentUser();
+      const d = get();
+      const sale = saleOf(u, d, id);
+      assertOpen(d, sale.branchId);
+      const reasonError = voidReasonError(input.reason);
+      if (reasonError) fail("DATOS_INVALIDOS", reasonError);
+      const v = toVoucher(d, sale);
+      const now = Date.now();
+      const blocker = voidBlocker(v, now);
+      if (blocker) fail(v.status === "aceptado" && v.creditedTotal === 0 ? "PLAZO_VENCIDO" : "ESTADO_INVALIDO", blocker, 409);
+      if (input.returnStock) {
+        for (const line of sale.items) for (const l of line.lots) returnToLot(d, l.lotId, l.units, `Anulación de ${sale.number}`, u.name, now);
+      }
+      const voided: VoidInfo = { at: new Date(now).toISOString(), by: u.name, reason: input.reason.trim(), ticket: String(now).padStart(15, "0") };
+      d.vouchers[sale.id] = { ...recordOf(d, sale), status: "anulado", voided };
+      commit();
+      return toVoucher(d, sale);
+    },
+    async createCreditNote(voucherId, input) {
+      await wait(600);
+      const u = currentUser();
+      const d = get();
+      const sale = saleOf(u, d, voucherId);
+      const branch = assertOpen(d, sale.branchId);
+      const rec = recordOf(d, sale);
+      if (rec.status === "anulado") fail("ESTADO_INVALIDO", "El comprobante está anulado: no admite nota de crédito.", 409);
+      if (rec.status !== "aceptado") fail("ESTADO_INVALIDO", "SUNAT aún no acepta este comprobante. Reenvíalo antes de emitir la nota de crédito.", 409);
+      const prior = toVoucher(d, sale).creditNotes;
+      const plan = planCreditNote(sale, prior, input);
+      if (!plan.ok) return fail("DATOS_INVALIDOS", plan.error);
+      const now = Date.now();
+      const returnStock = plan.reason.stock && plan.items.length > 0 && (input.returnStock ?? true);
+      const prefix = noteSeries(sale.document.type, branch.series);
+      const seq = (d.noteSeq[prefix] ?? 0) + 1;
+      const number = creditNoteNumber(sale.document.type, branch.series, seq);
+      if (returnStock) {
+        const lines = creditableLines(sale, prior);
+        for (const it of plan.items) {
+          const c = lines[it.lineIndex]!;
+          for (const a of allocateReturn(c.line.lots.map((l) => ({ lotId: l.lotId, units: l.units })), c.returnedUnits, it.units)) returnToLot(d, a.lotId, a.units, `Nota de crédito ${number}`, u.name, now);
+        }
+      }
+      d.noteSeq[prefix] = seq;
+      const note: CreditNote = {
+        id: `nc_${now.toString(36)}`, number, type: sale.document.type, branchId: sale.branchId, issuedAt: new Date(now).toISOString(), userName: u.name,
+        voucherId: sale.id, voucherNumber: sale.number, customerName: toVoucher(d, sale).customerName, customerDocId: sale.document.customerDocId ?? "",
+        reasonCode: plan.reason.code, reasonLabel: plan.reason.label, note: input.note.trim(), items: plan.items, total: plan.total, taxBase: plan.taxBase, igv: plan.igv,
+        returnedToStock: returnStock, status: "aceptado", sunat: acceptedResponse("nota_credito", number, now), attempts: 1,
+      };
+      d.creditNotes.push(note);
+      commit();
+      return note;
+    },
   };
+  /* Auditoría: un solo envoltorio para todos los endpoints (las reglas están en audit.ts). */
+  const actor = (): AuditActor | null => {
+    const d = get();
+    const token = tokenStore.get();
+    const s = token ? d.staff.find((x) => x.id === d.sessions[token] && x.active) : undefined;
+    return s ? { id: s.id, name: s.name, role: s.role, branchId: s.branchId } : null;
+  };
+  const look = (): AuditLookup => {
+    const d = get();
+    return {
+      staff: (id) => d.staff.find((x) => x.id === id),
+      product: (id) => d.products.find((x) => x.id === id),
+      branch: (id) => d.branches.find((x) => x.id === id),
+      lot: (id) => d.lots.find((x) => x.id === id),
+      pharmacy: () => d.pharmacy,
+      rules: () => ({ expiry: d.expiry, purchasing: d.purchasing, attendance: d.attendanceSettings }),
+    };
+  };
+  return guardWrites(auditWrites(client, { log: () => get().audit, actor, look, commit }), () => get().account);
 }
 
 /** Para la pantalla de ajustes o pruebas: borra los datos simulados. */
 export function resetMockData() {
   try {
-    localStorage.removeItem(KEY);
+    for (const k of Object.keys(localStorage)) if (k === KEY || k.startsWith(`${KEY}.`)) localStorage.removeItem(k);
   } catch {
     /* nada */
   }

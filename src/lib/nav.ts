@@ -1,4 +1,4 @@
-import { ArrowLeftRight, CalendarClock, ChartColumn, Clock, LayoutDashboard, Package, Settings, ShoppingCart, Truck, Users, Wallet, type LucideIcon } from "lucide-react";
+import { ArrowLeftRight, CalendarClock, ChartColumn, Clock, FileText, LayoutDashboard, Package, ScrollText, Settings, ShoppingCart, Truck, Users, Wallet, type LucideIcon } from "lucide-react";
 import type { User } from "@/lib/api/types";
 
 export interface NavItem {
@@ -20,12 +20,15 @@ export const NAV: NavItem[] = [
   { id: "compras", href: "/compras", label: "Compras", short: "Compras", icon: Truck, ready: true },
   { id: "clientes", href: "/clientes", label: "Clientes", short: "Clientes", icon: Users, ready: true },
   { id: "caja", href: "/caja", label: "Caja", short: "Caja", icon: Wallet, ready: true },
+  { id: "comprobantes", href: "/comprobantes", label: "Comprobantes", short: "SUNAT", icon: FileText, ready: true },
   { id: "asistencia", href: "/asistencia", label: "Asistencia", short: "Asistencia", icon: Clock, ready: true },
   { id: "reportes", href: "/reportes", label: "Reportes", short: "Reportes", icon: ChartColumn, ready: true },
+  { id: "auditoria", href: "/auditoria", label: "Auditoría", short: "Auditoría", icon: ScrollText, ready: true },
   { id: "ajustes", href: "/ajustes", label: "Ajustes", short: "Ajustes", icon: Settings, ready: true },
 ];
 
-export const navFor = (user: User) => NAV.filter((n) => user.permissions.includes(n.id));
+/** Módulos del rol que además incluye el plan. Sin datos de cuenta (`modules` indefinido) se muestran todos los del rol. */
+export const navFor = (user: User, modules?: readonly string[]) => NAV.filter((n) => user.permissions.includes(n.id) && (!modules || modules.includes(n.id)));
 
 /** Primera pantalla al entrar: el administrador ve el panel; las cuentas de local, el punto de venta. */
 export const homeFor = (user: User) => {

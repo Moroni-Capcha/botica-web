@@ -1,5 +1,6 @@
 import type { Branch, CashClosing, Pharmacy } from "@/lib/api/types";
 import { MOVEMENT_LABEL } from "@/lib/domain/cash";
+import { netPayments, sumPayments } from "@/lib/domain/returns";
 import { round2 } from "@/lib/domain/pharmacy";
 import { downloadXlsx, fileStamp, sheet } from "@/lib/excel/xlsx";
 
@@ -35,7 +36,12 @@ export function exportClosings({ closings, branches, scopeLabel, days, pharmacy 
           { header: "Efectivo", value: (c) => c.sales.efectivo, type: "money", width: 12 },
           { header: "Yape / Plin", value: (c) => c.sales.yape, type: "money", width: 12 },
           { header: "Tarjeta", value: (c) => c.sales.tarjeta, type: "money", width: 12 },
-          { header: "Venta total", value: (c) => round2(c.sales.efectivo + c.sales.yape + c.sales.tarjeta), type: "money", width: 13 },
+          { header: "Venta total", value: (c) => sumPayments(c.sales), type: "money", width: 13 },
+          { header: "Devol. efectivo", value: (c) => c.returns.efectivo, type: "money", width: 13 },
+          { header: "Devol. Yape / Plin", value: (c) => c.returns.yape, type: "money", width: 13 },
+          { header: "Devol. tarjeta", value: (c) => c.returns.tarjeta, type: "money", width: 13 },
+          { header: "Devoluciones / notas de crédito", value: (c) => sumPayments(c.returns), type: "money", width: 16 },
+          { header: "Venta neta", value: (c) => sumPayments(netPayments(c.sales, c.returns)), type: "money", width: 13 },
           { header: "Egresos", value: (c) => c.egresos, type: "money", width: 11 },
           { header: "Retiros", value: (c) => c.retiros, type: "money", width: 11 },
           { header: "Ingresos", value: (c) => c.ingresos, type: "money", width: 11 },
@@ -49,7 +55,12 @@ export function exportClosings({ closings, branches, scopeLabel, days, pharmacy 
           Efectivo: sum((c) => c.sales.efectivo),
           "Yape / Plin": sum((c) => c.sales.yape),
           Tarjeta: sum((c) => c.sales.tarjeta),
-          "Venta total": sum((c) => c.sales.efectivo + c.sales.yape + c.sales.tarjeta),
+          "Venta total": sum((c) => sumPayments(c.sales)),
+          "Devol. efectivo": sum((c) => c.returns.efectivo),
+          "Devol. Yape / Plin": sum((c) => c.returns.yape),
+          "Devol. tarjeta": sum((c) => c.returns.tarjeta),
+          "Devoluciones / notas de crédito": sum((c) => sumPayments(c.returns)),
+          "Venta neta": sum((c) => sumPayments(netPayments(c.sales, c.returns))),
           Egresos: sum((c) => c.egresos),
           Retiros: sum((c) => c.retiros),
           Ingresos: sum((c) => c.ingresos),

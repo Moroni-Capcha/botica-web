@@ -1,13 +1,19 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
-import type { ClockRequest, ContactRequest, CustomerInput, ManualMarkRequest, WorkerInput } from "@/lib/api";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { api, platformApi } from "@/lib/api";
+import { effectiveStatus, isReadOnly, limaDay } from "@/lib/domain/account";
+import type { SetupStep, ClockRequest, ContactRequest, CustomerInput, ManualMarkRequest, WorkerInput } from "@/lib/api";
+import type { CreditNote, CreditNoteRequest, Voucher, VoidRequest } from "@/lib/api";
 import type { BranchId, CashCloseRequest, CashMovementRequest, Lot, Product, ProductInput, PurchaseRequest, SaleRequest, Supplier, SupplierInput, Transfer, TransferAskRequest, TransferSendRequest, WriteOffRequest } from "@/lib/api";
+import type { AuditQuery, TenantAction, TenantsQuery } from "@/lib/api";
 import type { NewCustomer, AccountInput, BranchCreateInput, BranchInput, Pharmacy, RulesInput, PublicConfig } from "@/lib/api";
 
 export const qk = {
   config: ["config"] as const,
+  account: ["account"] as const,
+  plans: ["plans"] as const,
+  setup: ["setup"] as const,
   staff: ["staff"] as const,
   products: ["products"] as const,
   lots: (b: BranchId) => ["lots", b] as const,
@@ -22,6 +28,8 @@ export const qk = {
   workers: ["workers"] as const,
   dashboard: (days: number) => ["dashboard", days] as const,
   customersAll: ["customers-all"] as const,
+  /** Cuelga de `customersAll`: lo que refresca la cartera completa refresca también sus páginas. */
+  customersPage: (q: string, page: number, pageSize: number) => ["customers-all", "page", q, page, pageSize] as const,
   salesReport: (from: string, to: string, branchId: BranchId | null) => ["sales-report", from, to, branchId] as const,
   refills: ["refills"] as const,
   accounts: ["accounts"] as const,
@@ -30,17 +38,47 @@ export const qk = {
   marks: (from: string, to: string) => ["marks", from, to] as const,
   transfers: (days: number) => ["transfers", days] as const,
   purchases: (branchId: BranchId | null, days: number) => ["purchases", branchId, days] as const,
-  kardex: (productId: number, branchId: BranchId | null, days: number) => ["kardex", productId, branchId, days] as const,
+  kardex: (productId: number, branchId: BranchId | null, days: number, page?: number, pageSize?: number) => ["kardex", productId, branchId, days, page ?? null, pageSize ?? null] as const,
+  vouchers: (from: string, to: string, branchId: BranchId | null) => ["vouchers", from, to, branchId] as const,
+  creditNotes: (from: string, to: string, branchId: BranchId | null) => ["credit-notes", from, to, branchId] as const,
+  tenants: (q: TenantsQuery) => ["platform-tenants", q.q ?? "", q.status ?? null, q.page ?? 1, q.pageSize ?? null] as const,
+  audit: (q: AuditQuery) => ["audit", q.from, q.to, q.userId ?? null, q.action ?? null, q.entity ?? null, q.page ?? 1, q.pageSize ?? null] as const,
 };
 
-export const useConfig = () => useQuery({ queryKey: qk.config, queryFn: api.getPublicConfig, staleTime: 10 * 60_000 });
-export const useStaff = () => useQuery({ queryKey: qk.staff, queryFn: api.listStaff, staleTime: 60_000 });
+export const useConfig = (enabled = true) => useQuery({ queryKey: qk.config, queryFn: api.getPublicConfig, staleTime: 10 * 60_000, enabled });
+export const useStaff = (enabled = true) => useQuery({ queryKey: qk.staff, queryFn: api.listStaff, staleTime: 60_000, enabled });
+
+/** Estado de la cuenta y módulos del plan. Se vuelve a leer al volver a la pestaña. Solo con sesión iniciada. */
+export const useAccount = (enabled = true) => useQuery({ queryKey: qk.account, queryFn: api.getAccount, staleTime: 60_000, refetchOnWindowFocus: true, enabled });
+
+/** Planes que se pueden contratar (público: no necesita sesión). */
+export const usePlans = () => useQuery({ queryKey: qk.plans, queryFn: api.listPlans, staleTime: 10 * 60_000 });
+
+/** Pasos de la primera configuración ya hechos. Solo para el administrador. */
+export const useSetup = (enabled = true) => useQuery({ queryKey: qk.setup, queryFn: api.getSetup, staleTime: 30_000, enabled });
+
+export function useCompleteSetupStep() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (step: SetupStep) => api.completeSetupStep(step), onSuccess: (setup) => qc.setQueryData(qk.setup, setup) });
+}
+
+/** false cuando la cuenta está suspendida (solo lectura). Mientras no se sabe el estado, se permite escribir. */
+export function useWritable(): boolean {
+  const { data } = useAccount();
+  return !(data && isReadOnly(effectiveStatus(data, limaDay(Date.now()))));
+}
 export const useProducts = () => useQuery({ queryKey: qk.products, queryFn: api.listProducts, staleTime: 5 * 60_000 });
 export const useLots = (branchId: BranchId) => useQuery({ queryKey: qk.lots(branchId), queryFn: () => api.listLots(branchId), staleTime: 30_000 });
 export const useBranchStock = () => useQuery({ queryKey: qk.branchStock, queryFn: api.listBranchStock, staleTime: 60_000 });
 export const useVelocity = (days = 30) => useQuery({ queryKey: qk.velocity(days), queryFn: () => api.listVelocity(days), staleTime: 5 * 60_000 });
-export const useKardex = (productId: number, branchId: BranchId | null, days = 30) =>
-  useQuery({ queryKey: qk.kardex(productId, branchId, days), queryFn: () => api.getKardex(productId, { branchId: branchId ?? undefined, days }), staleTime: 30_000 });
+/** Sin `page`, todos los movimientos del periodo. Con `page`, solo esa página (más el total y las cifras del periodo). */
+export const useKardex = (productId: number, branchId: BranchId | null, days = 30, page?: number, pageSize?: number) =>
+  useQuery({
+    queryKey: qk.kardex(productId, branchId, days, page, pageSize),
+    queryFn: () => api.getKardex(productId, { branchId: branchId ?? undefined, days, page, pageSize }),
+    staleTime: 30_000,
+    placeholderData: page ? (prev) => prev : undefined,
+  });
 export const useTransfers = (days: number) => useQuery({ queryKey: qk.transfers(days), queryFn: () => api.listTransfers(days), staleTime: 20_000, refetchInterval: 60_000 });
 export const useCashSummary = (branchId: BranchId) => useQuery({ queryKey: qk.cashSummary(branchId), queryFn: () => api.getCashSummary(branchId), refetchInterval: 60_000 });
 export const useCashClosings = (branchId: BranchId | null, days: number) =>
@@ -52,6 +90,9 @@ export const useDashboard = (days: number) => useQuery({ queryKey: qk.dashboard(
 export const useSalesReport = (from: string, to: string, branchId: BranchId | null, enabled = true) =>
   useQuery({ queryKey: qk.salesReport(from, to, branchId), queryFn: () => api.getSalesReport({ from, to, branchId: branchId ?? undefined }), staleTime: 60_000, enabled, placeholderData: (prev) => prev });
 export const useCustomers = () => useQuery({ queryKey: qk.customersAll, queryFn: api.listCustomers, staleTime: 30_000 });
+/** Una página de la cartera, con la búsqueda hecha en el servidor. Mientras llega la siguiente se sigue mostrando la anterior. */
+export const useCustomersPage = (q: string, page: number, pageSize: number, enabled = true) =>
+  useQuery({ queryKey: qk.customersPage(q, page, pageSize), queryFn: () => api.listCustomersPage({ q, page, pageSize }), staleTime: 30_000, enabled, placeholderData: (prev) => prev });
 export const useRefills = () => useQuery({ queryKey: qk.refills, queryFn: api.listRefills, staleTime: 30_000 });
 export const useCustomerPurchases = (id: number | null) => useQuery({ queryKey: qk.customerPurchases(id ?? 0), queryFn: () => api.listCustomerPurchases(id!), enabled: id !== null, staleTime: 30_000 });
 export const useSuppliers = () => useQuery({ queryKey: qk.suppliers, queryFn: api.listSuppliers, staleTime: 5 * 60_000 });
@@ -61,19 +102,24 @@ export const useCash = (branchId: BranchId) => useQuery({ queryKey: qk.cash(bran
 export const useCustomerSearch = (q: string, enabled: boolean) =>
   useQuery({ queryKey: qk.customers(q), queryFn: () => api.searchCustomers(q), enabled, staleTime: 30_000 });
 
+/** Refresca lo que cambia una venta: lotes, stock, kardex, caja, panel y compras del cliente. */
+export function invalidateAfterSale(qc: QueryClient, branchId: BranchId, customerId?: number | null) {
+  void qc.invalidateQueries({ queryKey: qk.lots(branchId) });
+  void qc.invalidateQueries({ queryKey: qk.branchStock });
+  void qc.invalidateQueries({ queryKey: ["velocity"] });
+  void qc.invalidateQueries({ queryKey: ["kardex"] });
+  void qc.invalidateQueries({ queryKey: qk.cashSummary(branchId) });
+  void qc.invalidateQueries({ queryKey: ["dashboard"] });
+  if (customerId) for (const key of [qk.customersAll, qk.refills, qk.customerPurchases(customerId)]) void qc.invalidateQueries({ queryKey: key });
+}
+
 export function useCreateSale() {
   const qc = useQueryClient();
   return useMutation({
+    // 'always': sin internet la mutación no debe quedar en pausa; el punto de venta decide guardar la venta en la cola.
+    networkMode: "always",
     mutationFn: (req: SaleRequest) => api.createSale(req),
-    onSuccess: (sale) => {
-      void qc.invalidateQueries({ queryKey: qk.lots(sale.branchId) });
-      void qc.invalidateQueries({ queryKey: qk.branchStock });
-      void qc.invalidateQueries({ queryKey: ["velocity"] });
-      void qc.invalidateQueries({ queryKey: ["kardex"] });
-      void qc.invalidateQueries({ queryKey: qk.cashSummary(sale.branchId) });
-      void qc.invalidateQueries({ queryKey: ["dashboard"] });
-      if (sale.customerId) for (const key of [qk.customersAll, qk.refills, qk.customerPurchases(sale.customerId)]) void qc.invalidateQueries({ queryKey: key });
-    },
+    onSuccess: (sale) => invalidateAfterSale(qc, sale.branchId, sale.customerId),
   });
 }
 
@@ -255,6 +301,43 @@ export function useLogContact() {
   });
 }
 
+/* ------------------------------ Comprobantes (SUNAT) ------------------------------ */
+
+export const useVouchers = (from: string, to: string, branchId: BranchId | null, enabled = true) =>
+  useQuery({ queryKey: qk.vouchers(from, to, branchId), queryFn: () => api.listVouchers({ from, to, branchId: branchId ?? undefined }), staleTime: 20_000, refetchInterval: 60_000, enabled, placeholderData: (prev) => prev });
+export const useCreditNotes = (from: string, to: string, branchId: BranchId | null, enabled = true) =>
+  useQuery({ queryKey: qk.creditNotes(from, to, branchId), queryFn: () => api.listCreditNotes({ from, to, branchId: branchId ?? undefined }), staleTime: 20_000, refetchInterval: 60_000, enabled, placeholderData: (prev) => prev });
+
+/** Reenviar solo cambia el estado ante SUNAT. */
+export function useResendVoucher() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (a: { kind: "voucher" | "note"; id: string }): Promise<Voucher | CreditNote> => (a.kind === "voucher" ? api.resendVoucher(a.id) : api.resendCreditNote(a.id)),
+    onSuccess: () => {
+      for (const key of [["vouchers"], ["credit-notes"]]) void qc.invalidateQueries({ queryKey: key });
+    },
+  });
+}
+
+/** Anular o emitir una nota puede devolver mercadería al stock y quita ventas de la caja, el panel y los reportes: se refresca todo eso. */
+function useRefreshAfterVoucherChange() {
+  const qc = useQueryClient();
+  return (branchId: BranchId) => {
+    for (const key of [["vouchers"], ["credit-notes"], qk.lots(branchId), qk.branchStock, ["kardex"], ["velocity"], qk.cashSummary(branchId), ["dashboard"], ["sales-report"], qk.customersAll, qk.refills, ["customer-purchases"]])
+      void qc.invalidateQueries({ queryKey: key });
+  };
+}
+
+export function useVoidVoucher() {
+  const refresh = useRefreshAfterVoucherChange();
+  return useMutation({ mutationFn: ({ id, input }: { id: string; input: VoidRequest }) => api.voidVoucher(id, input), onSuccess: (v) => refresh(v.branchId) });
+}
+
+export function useCreateCreditNote() {
+  const refresh = useRefreshAfterVoucherChange();
+  return useMutation({ mutationFn: ({ voucherId, input }: { voucherId: string; input: CreditNoteRequest }) => api.createCreditNote(voucherId, input), onSuccess: (n) => refresh(n.branchId) });
+}
+
 /* ------------------------------ Ajustes ------------------------------ */
 
 export const useAccounts = () => useQuery({ queryKey: qk.accounts, queryFn: api.listAccounts, staleTime: 60_000 });
@@ -320,5 +403,25 @@ export function useSaveAccount() {
       void qc.invalidateQueries({ queryKey: qk.accounts });
       void qc.invalidateQueries({ queryKey: qk.staff });
     },
+  });
+}
+
+/* ------------------------------ Auditoría ------------------------------ */
+
+/** Una página del registro de auditoría. Mientras llega la siguiente se sigue mostrando la anterior. */
+export const useAuditLog = (query: AuditQuery, enabled = true) =>
+  useQuery({ queryKey: qk.audit(query), queryFn: () => api.listAudit(query), staleTime: 15_000, enabled, placeholderData: (prev) => prev });
+
+/* ------------------------------ Consola interna de Digi!HME ------------------------------ */
+
+/** Boticas clientes, por páginas. Solo con la sesión del operador. */
+export const useTenants = (query: TenantsQuery, enabled = true) =>
+  useQuery({ queryKey: qk.tenants(query), queryFn: () => platformApi.listTenants(query), staleTime: 15_000, enabled, placeholderData: (prev) => prev });
+
+export function useUpdateTenant() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ code, input }: { code: string; input: TenantAction }) => platformApi.updateTenant(code, input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["platform-tenants"] }),
   });
 }

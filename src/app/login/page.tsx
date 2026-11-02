@@ -1,16 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowLeftRight, CalendarClock, FileSpreadsheet, Fingerprint, Pill, TrendingUp } from "lucide-react";
-import { api, apiMode, errorMessage } from "@/lib/api";
+import { useQueryClient } from "@tanstack/react-query";
+import { api, apiMode, errorMessage, type BoticaPublic, type Session } from "@/lib/api";
+import { tenantStore } from "@/lib/api/tenant";
 import { useSessionStore } from "@/lib/auth/session-store";
 import { useConfig, useStaff } from "@/lib/queries";
 import { homeFor } from "@/lib/nav";
 import { BrandMark, DigiHmeLogo, DigiSeal } from "@/components/brand-mark";
 import { cn } from "@/lib/cn";
 import { initials } from "@/lib/format";
+import { Segmented } from "@/components/ui/segmented";
 import { KioskDialog } from "@/features/attendance/kiosk-dialog";
+import { BoticaStep, lookupBotica } from "@/features/auth/botica-step";
+import { OwnerForm } from "@/features/auth/owner-form";
 
 const FEATURES = [
   { icon: ArrowLeftRight, text: "Varios locales con stock separado y traslados" },
@@ -19,18 +25,68 @@ const FEATURES = [
   { icon: Pill, text: "Venta por unidad, blíster o caja, genéricos y receta" },
   { icon: FileSpreadsheet, text: "Reportes e inventario exportables a Excel" },
 ];
+type Mode = "mostrador" | "dueno";
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "←"];
 
 export default function LoginPage() {
   const router = useRouter();
+  const qc = useQueryClient();
   const { data: config } = useConfig();
-  const { data: staff, isLoading, isError, refetch } = useStaff();
+  const [botica, setBotica] = useState<BoticaPublic | null>(null);
+  const [booting, setBooting] = useState(true);
+  const [lastCode, setLastCode] = useState("");
+  const [mode, setMode] = useState<Mode>("mostrador");
+  const { data: staff, isLoading, isError, refetch } = useStaff(!!botica && mode === "mostrador");
   const signIn = useSessionStore((s) => s.signIn);
   const [selId, setSelId] = useState<string | null>(null);
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [kiosk, setKiosk] = useState(false);
+
+  /** Recuerda la botica elegida y recarga lo que depende de ella (marca y lista de usuarios). */
+  const choose = useCallback(
+    (b: BoticaPublic) => {
+      tenantStore.set(b.code);
+      setLastCode(b.code);
+      setBotica(b);
+      void qc.invalidateQueries({ queryKey: ["config"] });
+      void qc.invalidateQueries({ queryKey: ["staff"] });
+    },
+    [qc],
+  );
+
+  // Si ya había una botica guardada, se vuelve a reconocer sola.
+  useEffect(() => {
+    const saved = tenantStore.get();
+    if (!saved) return setBooting(false);
+    setLastCode(saved);
+    void lookupBotica(saved).then((res) => {
+      if ("botica" in res) choose(res.botica);
+      setBooting(false);
+    });
+  }, [choose]);
+
+  // Los colores de la botica elegida se ven desde el primer paso.
+  useEffect(() => {
+    if (!botica) return;
+    document.documentElement.style.setProperty("--brand", botica.brand);
+    document.documentElement.style.setProperty("--accent", botica.accent);
+  }, [botica]);
+
+  const changeBotica = () => {
+    tenantStore.clear();
+    setBotica(null);
+    setSelId(null);
+    setPin("");
+    setError(null);
+  };
+
+  const enterOwner = (session: Session) => {
+    signIn(session);
+    router.replace(homeFor(session.user));
+  };
+
   const sel = staff?.find((s) => s.id === selId);
   const branchName = (id: string | null) => (id ? config?.branches.find((b) => b.id === id)?.name ?? id : "Ve todos los locales");
 
@@ -52,18 +108,24 @@ export default function LoginPage() {
     [sel, signIn, router],
   );
 
+  // Un PIN completo se envía una sola vez: tras entrar, el PIN sigue lleno mientras navega.
+  const sentPin = useRef("");
   useEffect(() => {
-    if (pin.length === 4 && !busy) void submit(pin);
+    if (pin.length < 4) sentPin.current = "";
+    else if (!busy && sentPin.current !== pin) {
+      sentPin.current = pin;
+      void submit(pin);
+    }
   }, [pin, busy, submit]);
 
   const press = useCallback(
     (k: string) => {
-      if (!sel || busy) return;
+      if (!sel || busy || mode !== "mostrador") return;
       setError(null);
       if (k === "←") setPin((p) => p.slice(0, -1));
       else if (k) setPin((p) => (p.length < 4 ? p + k : p));
     },
-    [sel, busy],
+    [sel, busy, mode],
   );
 
   useEffect(() => {
@@ -85,8 +147,8 @@ export default function LoginPage() {
         <div className="flex items-center gap-3">
           <BrandMark size={46} />
           <div className="leading-tight">
-            <p className="text-lg font-semibold">{config?.pharmacy.name ?? "Botica"}</p>
-            <p className="text-xs text-white/60">{config?.pharmacy.tagline}</p>
+            <p className="text-lg font-semibold">{botica?.name ?? config?.pharmacy.name ?? "Botica"}</p>
+            <p className="text-xs text-white/60">{botica?.tagline ?? config?.pharmacy.tagline}</p>
           </div>
         </div>
         <div className="relative mt-10 max-w-md lg:mt-0">
@@ -110,68 +172,116 @@ export default function LoginPage() {
 
       <section className="flex flex-1 justify-center px-4 py-10 sm:px-8">
         <div className="my-auto w-full max-w-md">
-          <h2 className="text-xl font-semibold tracking-tight">Iniciar turno</h2>
-          <p className="mt-1 text-sm text-zinc-500">Elige tu usuario e ingresa tu PIN de 4 dígitos.</p>
-          {apiMode === "mock" && <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">Modo de prueba sin servidor. PIN: administrador 1234 · principal 1111 · sucursal 2222</p>}
-
-          <div className="mt-6 grid gap-2.5" role="radiogroup" aria-label="Usuario">
-            {isLoading && [0, 1, 2].map((i) => <div key={i} className="h-16 animate-pulse rounded-2xl bg-zinc-100" />)}
-            {isError && (
-              <button type="button" onClick={() => void refetch()} className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-left text-sm text-rose-700">
-                No se pudo cargar la lista de usuarios. Toca para reintentar.
-              </button>
-            )}
-            {staff?.map((u) => {
-              const active = selId === u.id;
-              return (
-                <button
-                  key={u.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={active}
-                  onClick={() => {
-                    setSelId(u.id);
-                    setPin("");
+          {booting ? (
+            <div className="h-40 animate-pulse rounded-2xl bg-zinc-100" />
+          ) : !botica ? (
+            <BoticaStep initialCode={lastCode} onFound={choose} mockHint={apiMode === "mock" ? "Modo de prueba sin servidor. Código de botica: botica-huanuco" : undefined} />
+          ) : (
+            <>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="truncate text-xl font-semibold tracking-tight">{botica.name}</h2>
+                  <p className="mt-1 text-sm text-zinc-500">Elige cómo quieres ingresar.</p>
+                </div>
+                <button type="button" onClick={changeBotica} className="shrink-0 text-sm font-semibold text-brand underline underline-offset-2">
+                  Cambiar botica
+                </button>
+              </div>
+              <div className="mt-4">
+                <Segmented<Mode>
+                  label="Tipo de ingreso"
+                  full
+                  value={mode}
+                  onChange={(m) => {
+                    setMode(m);
                     setError(null);
                   }}
-                  className={cn(
-                    "flex items-center gap-3 rounded-2xl border p-3 text-left transition active:scale-[0.98]",
-                    active ? "border-transparent bg-brand text-white shadow-lg" : "border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50",
+                  options={[
+                    { id: "mostrador", label: "Mostrador" },
+                    { id: "dueno", label: "Dueño" },
+                  ]}
+                />
+              </div>
+              {mode === "dueno" ? (
+                <>
+                  <p className="mt-4 text-sm text-zinc-500">Ingresa con tu correo y contraseña.</p>
+                  {apiMode === "mock" && <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">Modo de prueba sin servidor. Correo: dueno@botica-huanuco.pe · Contraseña: Clave2026!</p>}
+                  <OwnerForm onSession={enterOwner} />
+                </>
+              ) : (
+                <>
+                  <p className="mt-4 text-sm text-zinc-500">Elige tu usuario e ingresa tu PIN de 4 dígitos.</p>
+                  {apiMode === "mock" && <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">Modo de prueba sin servidor. PIN: administrador 1234 · principal 1111 · sucursal 2222</p>}
+
+                <div className="mt-6 grid gap-2.5" role="radiogroup" aria-label="Usuario">
+                  {isLoading && [0, 1, 2].map((i) => <div key={i} className="h-16 animate-pulse rounded-2xl bg-zinc-100" />)}
+                  {isError && (
+                    <button type="button" onClick={() => void refetch()} className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-left text-sm text-rose-700">
+                      No se pudo cargar la lista de usuarios. Toca para reintentar.
+                    </button>
                   )}
-                >
-                  <span className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-semibold", active ? "bg-accent text-zinc-900" : "bg-zinc-100 text-zinc-600")}>{initials(u.name)}</span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold">{u.role === "admin" ? "Administrador general" : `Cuenta ${branchName(u.branchId)}`}</span>
-                    <span className={cn("block truncate text-xs", active ? "text-white/70" : "text-zinc-500")}>
-                      {u.name} · {branchName(u.branchId)}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+                  {staff?.map((u) => {
+                    const active = selId === u.id;
+                    return (
+                      <button
+                        key={u.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        onClick={() => {
+                          setSelId(u.id);
+                          setPin("");
+                          setError(null);
+                        }}
+                        className={cn(
+                          "flex items-center gap-3 rounded-2xl border p-3 text-left transition active:scale-[0.98]",
+                          active ? "border-transparent bg-brand text-white shadow-lg" : "border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50",
+                        )}
+                      >
+                        <span className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-semibold", active ? "bg-accent text-zinc-900" : "bg-zinc-100 text-zinc-600")}>{initials(u.name)}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-semibold">{u.role === "admin" ? "Administrador general" : `Cuenta ${branchName(u.branchId)}`}</span>
+                          <span className={cn("block truncate text-xs", active ? "text-white/70" : "text-zinc-500")}>
+                            {u.name} · {branchName(u.branchId)}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
 
-          <div className={cn("mt-6 transition", sel ? "opacity-100" : "pointer-events-none opacity-40")}>
-            <div className={cn("flex justify-center gap-3", error && "animate-[shake_.4s_ease-in-out]")} aria-live="polite" aria-label={`${pin.length} de 4 dígitos`}>
-              {[0, 1, 2, 3].map((i) => (
-                <span key={i} className={cn("h-3 w-3 rounded-full transition", i < pin.length ? (error ? "bg-rose-600" : "bg-brand") : "bg-zinc-200")} />
-              ))}
-            </div>
-            <p className="mt-2 h-4 text-center text-xs text-zinc-500">{error ?? (busy ? "Verificando…" : "")}</p>
-            <div className="mx-auto mt-3 grid max-w-[260px] grid-cols-3 gap-2">
-              {KEYS.map((k, i) =>
-                k === "" ? (
-                  <span key={i} />
-                ) : (
-                  <button key={i} type="button" onClick={() => press(k)} className="h-12 rounded-xl bg-zinc-100 text-lg font-medium tabular-nums text-zinc-800 transition hover:bg-zinc-200 active:scale-95" aria-label={k === "←" ? "Borrar" : k}>
-                    {k === "←" ? <ArrowLeft className="mx-auto h-5 w-5" /> : k}
-                  </button>
-                ),
+                <div className={cn("mt-6 transition", sel ? "opacity-100" : "pointer-events-none opacity-40")}>
+                  <div className={cn("flex justify-center gap-3", error && "animate-[shake_.4s_ease-in-out]")} aria-live="polite" aria-label={`${pin.length} de 4 dígitos`}>
+                    {[0, 1, 2, 3].map((i) => (
+                      <span key={i} className={cn("h-3 w-3 rounded-full transition", i < pin.length ? (error ? "bg-rose-600" : "bg-brand") : "bg-zinc-200")} />
+                    ))}
+                  </div>
+                  <p className="mt-2 h-4 text-center text-xs text-zinc-500">{error ?? (busy ? "Verificando…" : "")}</p>
+                  <div className="mx-auto mt-3 grid max-w-[260px] grid-cols-3 gap-2">
+                    {KEYS.map((k, i) =>
+                      k === "" ? (
+                        <span key={i} />
+                      ) : (
+                        <button key={i} type="button" onClick={() => press(k)} className="h-12 rounded-xl bg-zinc-100 text-lg font-medium tabular-nums text-zinc-800 transition hover:bg-zinc-200 active:scale-95" aria-label={k === "←" ? "Borrar" : k}>
+                          {k === "←" ? <ArrowLeft className="mx-auto h-5 w-5" /> : k}
+                        </button>
+                      ),
+                    )}
+                  </div>
+                </div>
+                </>
               )}
-            </div>
-          </div>
+            </>
+          )}
 
-          <button type="button" onClick={() => setKiosk(true)} className="mx-auto mt-8 flex items-center gap-2 rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50">
+          <p className="mt-8 text-center text-sm text-zinc-600">
+            ¿Aún no tienes botica?{" "}
+            <Link href="/registro" className="font-semibold text-brand underline underline-offset-2">
+              Crear mi botica
+            </Link>
+          </p>
+
+          <button type="button" onClick={() => setKiosk(true)} className="mx-auto mt-6 flex items-center gap-2 rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50">
             <Fingerprint className="h-4 w-4 text-brand" /> Marcar asistencia del personal
           </button>
 

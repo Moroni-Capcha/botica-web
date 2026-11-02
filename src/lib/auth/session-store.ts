@@ -3,6 +3,8 @@
 import { create } from "zustand";
 import type { BranchId, Session } from "@/lib/api/types";
 import { tokenStore } from "@/lib/api/token";
+import { tenantStore } from "@/lib/api/tenant";
+import { setMonitoringUser } from "@/lib/monitoring";
 import { useConfig } from "@/lib/queries";
 
 interface SessionState {
@@ -27,17 +29,27 @@ const readSession = (): Session | null => {
   }
 };
 
+/** Le dice al monitoreo quién está usando la app: botica, rol, local y el id interno de la cuenta (nunca el nombre). */
+const trackUser = (s: Session | null) =>
+  setMonitoringUser(s ? { tenant: tenantStore.get(), role: s.user.role, branchId: s.user.branchId, userId: s.user.id } : null);
+
 export const useSessionStore = create<SessionState>((set) => ({
   session: null,
   hydrated: false,
   adminBranch: "principal",
-  hydrate: () => set({ session: readSession(), hydrated: true }),
+  hydrate: () => {
+    const session = readSession();
+    trackUser(session);
+    set({ session, hydrated: true });
+  },
   signIn: (session) => {
     tokenStore.set(session);
+    trackUser(session);
     set({ session });
   },
   signOut: () => {
     tokenStore.clear();
+    trackUser(null);
     set({ session: null });
   },
   setAdminBranch: (adminBranch) => set({ adminBranch }),

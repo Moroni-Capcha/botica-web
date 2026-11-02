@@ -29,7 +29,7 @@ describe("totales y grupos", () => {
   const lines = [line("a", 1, 11.8, 5), line("a", 2, 23.6, 10), line("b", 1, 11.8, 5, { branchId: "sucursal", at: new Date(2026, 9, 27, 9).toISOString() })];
 
   it("calcula venta sin IGV, utilidad y margen", () => {
-    expect(totalsOf(lines)).toEqual({ total: 47.2, taxBase: 40, igv: 7.2, cost: 20, profit: 20, margin: 50, units: 6, tickets: 2, avgTicket: 23.6 });
+    expect(totalsOf(lines)).toEqual({ total: 47.2, gross: 47.2, returns: 0, taxBase: 40, igv: 7.2, cost: 20, profit: 20, margin: 50, units: 6, tickets: 2, avgTicket: 23.6 });
     expect(totalsOf([])).toMatchObject({ total: 0, margin: 0, avgTicket: 0 });
   });
 

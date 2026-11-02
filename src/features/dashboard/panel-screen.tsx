@@ -20,6 +20,7 @@ import { soles } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { allLabel, ScopeToggle, useBranchScope } from "@/features/shared/branch-scope";
 import { useExpiryData } from "@/features/expiry/use-expiry-data";
+import { SetupChecklist } from "@/features/onboarding/setup-checklist";
 
 const SERIES_DAYS = 14;
 const DOW = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
@@ -53,6 +54,8 @@ export function PanelScreen() {
   const series = dashboard.data?.series ?? [];
   const totalToday = round2(todayStats.reduce((a, t) => a + t.total, 0));
   const ticketsToday = todayStats.reduce((a, t) => a + t.tickets, 0);
+  const returnsToday = round2(todayStats.reduce((a, t) => a + t.returns, 0));
+  const grossToday = round2(todayStats.reduce((a, t) => a + t.gross, 0));
   const lastWeek = sameDayLastWeek(series, ids, now);
   const avg = averageDay(series, ids);
   const cashExpected = round2(cash.reduce((a, c) => a + (c.session.open ? c.expected : 0), 0));
@@ -136,6 +139,8 @@ export function PanelScreen() {
         )}
       </div>
 
+      <SetupChecklist />
+
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi
           icon={TrendingUp}
@@ -155,12 +160,18 @@ export function PanelScreen() {
         )}
       </div>
 
+      {returnsToday > 0 && (
+        <p className="rounded-xl bg-zinc-50 px-4 py-2 text-xs tabular-nums text-zinc-600" role="status">
+          Hoy: vendido {soles(grossToday)} − devoluciones / notas de crédito {soles(returnsToday)} = venta neta {soles(totalToday)}
+        </p>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
         <div className="grid min-w-0 content-start gap-4">
           <Card title="Venta por hora · hoy" subtitle={`Hasta las ${new Date().toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })}`}>
             {loading ? <ChartSkeleton /> : <ColumnChart {...foldBranches(seriesDef, hourData)} format={soles} formatTick={sol0} highlightKey={String(currentHour)} labelEvery={2} ariaLabel="Venta de hoy por hora" emptyText="Aún no hay ventas hoy" height={200} />}
           </Card>
-          <Card title={`Últimos ${SERIES_DAYS} días`} subtitle={`Venta cerrada por día${multi ? " y local" : ""}. Promedio: ${soles(avg)}`}>
+          <Card title={`Últimos ${SERIES_DAYS} días`} subtitle={`Venta neta por día${multi ? " y local" : ""}, ya sin devoluciones. Promedio: ${soles(avg)}`}>
             {loading ? <ChartSkeleton /> : <ColumnChart {...foldBranches(seriesDef, dayData)} format={soles} formatTick={sol0} highlightKey={today} labelEvery={2} ariaLabel={`Venta de los últimos ${SERIES_DAYS} días`} height={220} />}
           </Card>
         </div>
@@ -233,7 +244,8 @@ export function PanelScreen() {
               <thead>
                 <tr className="border-b border-zinc-200 text-left text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
                   <th scope="col" className="px-5 py-2.5">Local</th>
-                  <th scope="col" className="px-3 py-2.5 text-right">Venta hoy</th>
+                  <th scope="col" className="px-3 py-2.5 text-right">Venta hoy (neta)</th>
+                  <th scope="col" className="px-3 py-2.5 text-right">Devoluciones</th>
                   <th scope="col" className="px-3 py-2.5 text-right">Comprobantes</th>
                   <th scope="col" className="px-3 py-2.5 text-right">Promedio diario</th>
                   <th scope="col" className="px-3 py-2.5">Caja</th>
@@ -251,6 +263,7 @@ export function PanelScreen() {
                         {branchName(b)}
                       </th>
                       <td className="px-3 py-3 text-right font-semibold tabular-nums">{soles(t?.total ?? 0)}</td>
+                      <td className="px-3 py-3 text-right tabular-nums text-zinc-600">{t?.returns ? `−${soles(t.returns)}` : "—"}</td>
                       <td className="px-3 py-3 text-right tabular-nums">{t?.tickets ?? 0}</td>
                       <td className="px-3 py-3 text-right tabular-nums text-zinc-600">{soles(averageDay(series, [b]))}</td>
                       <td className="px-3 py-3">

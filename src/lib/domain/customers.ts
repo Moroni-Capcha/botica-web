@@ -107,3 +107,17 @@ export function suggestedCycle(product: Product, lastUnits: number, perDay = 1):
 
 /** Puntos: 1 por cada S/ 10. */
 export const pointsFor = (total: number) => Math.floor(total / 10);
+
+/* ------------------------------ Búsqueda y orden de la cartera ------------------------------ */
+
+/** Coincide por nombre (sin importar mayúsculas) o, si se escribieron números, por DNI, RUC o celular. Sin texto, coincide todo. */
+export function matchesCustomer(c: Pick<Customer, "name" | "dni" | "ruc" | "phone">, query: string): boolean {
+  const s = query.trim().toLowerCase();
+  if (!s) return true;
+  const digits = s.replace(/\D/g, "");
+  return c.name.toLowerCase().includes(s) || (digits !== "" && (c.dni.includes(digits) || c.ruc.includes(digits) || c.phone.replace(/\D/g, "").includes(digits)));
+}
+
+/** De la compra más reciente a la más antigua; los que nunca compraron van al final, por nombre. Es el orden de la lista de clientes. */
+export const byRecentPurchase = (a: { lastPurchaseAt: string | null; name: string }, b: { lastPurchaseAt: string | null; name: string }): number =>
+  (b.lastPurchaseAt ?? "").localeCompare(a.lastPurchaseAt ?? "") || a.name.localeCompare(b.name, "es");

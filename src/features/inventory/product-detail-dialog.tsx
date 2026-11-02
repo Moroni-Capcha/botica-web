@@ -3,13 +3,15 @@
 import { useMemo, useState } from "react";
 import { Boxes, FileSpreadsheet, History, Pencil, Snowflake } from "lucide-react";
 import type { Branch, BranchId, ExpiryThresholds, Lot, Pharmacy, Product } from "@/lib/api/types";
-import { errorMessage } from "@/lib/api";
-import { kardexBalances, kardexTotals, marginPct, minFor, MOVE_LABEL } from "@/lib/domain/inventory";
+import { api, errorMessage } from "@/lib/api";
+import { kardexBalances, kardexView, marginPct, minFor, MOVE_LABEL } from "@/lib/domain/inventory";
+import { pageCount } from "@/lib/domain/pagination";
 import { daysUntil, parseDay, presentationsOf, stockLabel } from "@/lib/domain/pharmacy";
 import { useKardex } from "@/lib/queries";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Empty } from "@/components/ui/empty";
+import { Pagination } from "@/components/ui/pagination";
 import { Segmented } from "@/components/ui/segmented";
 import { Table, td } from "@/components/ui/table";
 import { ExpiryBadge, RxBadge } from "@/components/ui/badges";
@@ -19,6 +21,8 @@ import { cn } from "@/lib/cn";
 import { exportKardex, RX_LABEL } from "./export";
 
 const KARDEX_DAYS = [7, 30, 90] as const;
+/** Movimientos por página del kardex: el servidor entrega solo estos. */
+const KARDEX_PAGE_SIZE = 20;
 const fmtInt = (n: number) => n.toLocaleString("es-PE");
 
 interface Props {
@@ -39,7 +43,10 @@ interface Props {
 export function ProductDetailDialog({ product: p, lots, branchIds, branches, scopeLabel, pharmacy, thresholds, now, canEdit, onEdit, onClose }: Props) {
   const [days, setDays] = useState<(typeof KARDEX_DAYS)[number]>(30);
   const multi = branchIds.length > 1;
-  const kardex = useKardex(p.id, multi ? null : (branchIds[0] ?? null), days);
+  const [kPage, setKPage] = useState(1);
+  const [exporting, setExporting] = useState(false);
+  const kardexBranch = multi ? null : (branchIds[0] ?? null);
+  const kardex = useKardex(p.id, kardexBranch, days, kPage, KARDEX_PAGE_SIZE);
   const name = (id: BranchId) => branches.find((b) => b.id === id)?.name ?? id;
 
   const productLots = useMemo(
@@ -48,12 +55,23 @@ export function ProductDetailDialog({ product: p, lots, branchIds, branches, sco
   );
   const vigente = (b: BranchId) => productLots.filter((l) => l.branchId === b && daysUntil(l.expiresOn, now) >= 0).reduce((s, l) => s + l.qty, 0);
 
-  const { lines, opening } = useMemo(() => (kardex.data ? kardexBalances(kardex.data.entries, kardex.data.closing) : { lines: [], opening: 0 }), [kardex.data]);
-  const totals = useMemo(() => kardexTotals(lines), [lines]);
+  const { lines, opening, totals } = useMemo(() => (kardex.data ? kardexView(kardex.data) : { lines: [], opening: 0, totals: { inUnits: 0, outUnits: 0, sold: 0, opening: 0 } }), [kardex.data]);
+  const total = kardex.data?.total ?? lines.length;
+  const lastPage = !kardex.data?.pageSize || (kardex.data.page ?? 1) >= pageCount(total, kardex.data.pageSize);
 
-  const doExport = () => {
-    exportKardex({ product: p, lines, opening, days, scopeLabel, branches, pharmacy });
-    notify("Kardex descargado");
+  /** El Excel lleva todo el periodo, no solo la página que se está viendo: se pide completo (sin `page`). */
+  const doExport = async () => {
+    setExporting(true);
+    try {
+      const full = await api.getKardex(p.id, { branchId: kardexBranch ?? undefined, days });
+      const view = kardexBalances(full.entries, full.closing);
+      exportKardex({ product: p, lines: view.lines, opening: view.opening, days, scopeLabel, branches, pharmacy });
+      notify("Kardex descargado");
+    } catch (e) {
+      notify(errorMessage(e), "warn");
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -64,7 +82,7 @@ export function ProductDetailDialog({ product: p, lots, branchIds, branches, sco
       size="xl"
       footer={
         <>
-          <Button onClick={doExport} disabled={!kardex.data || lines.length === 0}>
+          <Button onClick={() => void doExport()} loading={exporting} disabled={!kardex.data || total === 0}>
             <FileSpreadsheet className="h-4 w-4 text-emerald-600" /> Exportar kardex
           </Button>
           {canEdit && (
@@ -149,7 +167,7 @@ export function ProductDetailDialog({ product: p, lots, branchIds, branches, sco
         <section>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Kardex (unidades)</h3>
-            <Segmented label="Periodo del kardex" value={String(days)} onChange={(v) => setDays(Number(v) as (typeof KARDEX_DAYS)[number])} options={KARDEX_DAYS.map((d) => ({ id: String(d), label: `${d} días` }))} />
+            <Segmented label="Periodo del kardex" value={String(days)} onChange={(v) => { setDays(Number(v) as (typeof KARDEX_DAYS)[number]); setKPage(1); }} options={KARDEX_DAYS.map((d) => ({ id: String(d), label: `${d} días` }))} />
           </div>
           {kardex.data && (
             <p className="mb-2 text-xs text-zinc-500">
@@ -168,7 +186,7 @@ export function ProductDetailDialog({ product: p, lots, branchIds, branches, sco
               <Empty icon={History} title="No se pudo cargar el kardex">
                 {errorMessage(kardex.error)}
               </Empty>
-            ) : lines.length === 0 ? (
+            ) : total === 0 ? (
               <Empty icon={History} title={`Sin movimientos en ${days} días`} />
             ) : (
               <Table minWidth={760} head={["Fecha", "Movimiento", "Documento / motivo", "Lote", { label: "Entrada", align: "right" }, { label: "Salida", align: "right" }, { label: "Saldo", align: "right" }]}>
@@ -193,15 +211,18 @@ export function ProductDetailDialog({ product: p, lots, branchIds, branches, sco
                     <td className={cn(td, "text-right font-semibold tabular-nums")}>{fmtInt(r.balance)}</td>
                   </tr>
                 ))}
-                <tr className="bg-zinc-50">
-                  <td className={cn(td, "text-xs text-zinc-500")} colSpan={6}>
-                    Saldo inicial del periodo
-                  </td>
-                  <td className={cn(td, "text-right font-semibold tabular-nums")}>{fmtInt(opening)}</td>
-                </tr>
+                {lastPage && (
+                  <tr className="bg-zinc-50">
+                    <td className={cn(td, "text-xs text-zinc-500")} colSpan={6}>
+                      Saldo inicial del periodo
+                    </td>
+                    <td className={cn(td, "text-right font-semibold tabular-nums")}>{fmtInt(opening)}</td>
+                  </tr>
+                )}
               </Table>
             )}
           </div>
+          {kardex.data?.pageSize && <Pagination page={kardex.data.page ?? 1} pageSize={kardex.data.pageSize} total={total} onPage={setKPage} busy={kardex.isFetching} noun="movimientos" className="rounded-b-xl border-x border-b border-t-0" />}
         </section>
       </div>
     </Dialog>

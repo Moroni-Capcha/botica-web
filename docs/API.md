@@ -11,7 +11,25 @@ Los tipos exactos están en `src/lib/api/types.ts`. Si algo cambia, se actualiza
 - Dinero en soles con IGV incluido, número con 2 decimales. Costos sin IGV.
 - Fechas de vencimiento como `YYYY-MM-DD`. Fechas y horas como ISO 8601 con zona (`2026-10-27T15:20:00-05:00`).
 - Autenticación: `Authorization: Bearer <token>`. Un 401 hace que el front cierre la sesión.
-- CORS: permitir el dominio del front y el header `Authorization`.
+- Botica (multi-cliente): el front envía `X-Botica: <código>` (p. ej. `botica-huanuco`) en cada petición, una vez elegida la botica. El backend resuelve a qué cliente pertenecen los datos con ese header (o por subdominio).
+- CORS: permitir el dominio del front y los headers `Authorization` y `X-Botica`.
+
+### Paginación en el servidor
+
+Las listas que pueden crecer sin límite (auditoría, kardex, clientes) se pueden pedir **por páginas**. Convención común, aditiva y compatible hacia atrás:
+
+- Parámetros opcionales: `page` (desde 1) y `pageSize` (por defecto 25, máximo 100). Una página fuera de rango no es un error: se corrige a la última página con datos (o la 1 si no hay nada).
+- Un endpoint que **ya existía** sigue respondiendo lo mismo de siempre si no recibe `page`. Con `page`, responde la misma lista recortada y trae los totales (ver cada endpoint). Los endpoints nuevos de lista (p. ej. `/audit`) siempre responden por páginas.
+- La respuesta paginada de una lista simple es `Page<T>`:
+
+```json
+{ "items": [ ], "total": 187, "page": 2, "pageSize": 25 }
+```
+
+  `total` cuenta todo lo que cumple los filtros, no solo la página. Orden estable (el mismo en todas las páginas) para que no se repitan ni se salten filas.
+- Hoy usan esta convención: `GET /audit` y `GET /platform/tenants` (siempre por páginas), y `GET /kardex` y `GET /customers/all` (opcional, con `page`). **Todavía sin paginar a propósito:** `GET /vouchers` y `GET /credit-notes` (la pantalla filtra por estado y tipo y cuenta pendientes sobre todo el periodo, de hasta un año; paginarlos exige filtros en el servidor, `status`, `type` y `q`, y un conteo por estado) y los reportes (se calculan sobre el periodo completo). Cuando el volumen lo pida se paginan con esta misma convención.
+- Las reglas (`normalizePage`, `paginate`, `pageWindow`) están en `src/lib/domain/pagination.ts`, con pruebas; el backend puede aplicar los mismos casos.
+- Los filtros se envían al servidor junto con la página (p. ej. `q`, `userId`), porque el front ya no tiene la lista completa para filtrar.
 
 ### Errores
 
@@ -24,6 +42,9 @@ Cualquier respuesta 4xx o 5xx trae este cuerpo. El front muestra `message` tal c
 | HTTP | `code` | Cuándo |
 | --- | --- | --- |
 | 401 | `PIN_INVALIDO` | Usuario o PIN incorrectos |
+| 401 | `CREDENCIALES_INVALIDAS` | Correo o contraseña del dueño incorrectos |
+| 404 | `BOTICA_NO_ENCONTRADA` | El código de botica no existe |
+| 403 | `CUENTA_SUSPENDIDA` | La cuenta está suspendida (solo lectura): se rechaza toda escritura, salvo ingreso y salida |
 | 401 | `NO_AUTORIZADO` | Token vencido o inválido |
 | 403 | `SIN_PERMISO` | Una cuenta de local intenta operar en otro local |
 | 400 | `CAJA_CERRADA` | Venta con la caja del local cerrada |
@@ -31,6 +52,8 @@ Cualquier respuesta 4xx o 5xx trae este cuerpo. El front muestra `message` tal c
 | 400 | `DOCUMENTO_INVALIDO` | DNI o RUC no válido para el comprobante |
 | 400 | `PAGO_INSUFICIENTE` | Efectivo recibido menor al total |
 | 409 | `STOCK_INSUFICIENTE` | No alcanzan los lotes vigentes del local |
+| 409 | `CLAVE_REPETIDA` | La `clientSaleId` ya se usó con una venta de otros datos |
+| 5xx | `ERROR_INTERNO` | Falla pasajera del servidor; en `POST /sales/sync` va dentro de `results[].error` y el front reintenta |
 | 404 | `PRODUCTO_NO_EXISTE` | Producto eliminado o inexistente |
 | 404 | `LOTE_NO_EXISTE` | Lote inexistente o de otro local |
 | 400 | `DATOS_INVALIDOS` | Falta un dato o está fuera de rango (el `message` dice cuál) |
@@ -48,7 +71,9 @@ Cualquier respuesta 4xx o 5xx trae este cuerpo. El front muestra `message` tal c
 | 409 | `CAJA_ABIERTA` | Se intenta abrir una caja que ya está abierta |
 | 400 | `CAJA_SIN_EFECTIVO` | El egreso o retiro supera el efectivo que debe haber |
 | 400 | `DIFERENCIA_SIN_MOTIVO` | Cierre con diferencia de S/ 1 o más sin explicar |
-| 409 | `ESTADO_INVALIDO` | La acción no corresponde al estado del traslado (p. ej. recibir un pedido sin despachar) |
+| 409 | `ESTADO_INVALIDO` | La acción no corresponde al estado del traslado (p. ej. recibir un pedido sin despachar) o del comprobante (p. ej. reenviar uno ya aceptado) |
+| 404 | `COMPROBANTE_NO_EXISTE` | Comprobante o nota de crédito inexistente |
+| 409 | `PLAZO_VENCIDO` | Anulación de un comprobante emitido hace más de 7 días |
 
 ## Roles y locales
 
@@ -69,11 +94,56 @@ El backend valida el local en cada endpoint que recibe `branchId`; el front tamb
 
 `POST /auth/login` con `{ "userId": "u2", "pin": "1111" }` → `Session` (`{ token, user, expiresAt }`). Recomendado: bloquear 5 minutos tras 5 intentos fallidos por usuario.
 
+`GET /public/botica/:code` → `BoticaPublic` (`{ code, name, tagline, brand, accent }`: lo mínimo para mostrar la marca antes de ingresar, sin logo). `404 BOTICA_NO_ENCONTRADA` si el código no existe. El código se escribe en minúsculas, números y guiones (3 a 40 caracteres).
+
+`POST /auth/owner-login` con `{ "email": "dueno@botica-huanuco.pe", "password": "Clave2026!" }` → `Session` de un `admin`. `401 CREDENCIALES_INVALIDAS` si no coinciden (mismo mensaje para correo y contraseña, para no revelar cuál falló). Contraseña de mínimo 8 caracteres (`passwordError` en `src/lib/domain/auth.ts`). Guárdala con hash y bloquea tras varios intentos fallidos. El PIN (`/auth/login`) sigue siendo para el mostrador. Solo cuentas `admin` pueden ingresar por aquí.
+
+En el mock, el dueño de ejemplo es `dueno@botica-huanuco.pe` con contraseña `Clave2026!` y el código de botica es `botica-huanuco`.
+
+### Registro y primera configuración
+
+`GET /public/plans` (sin token) → `PlanOffer[]`, los planes que se pueden contratar:
+
+```json
+[{ "id": "inicio", "name": "Plan Inicio", "priceMonthly": 59, "maxBranches": 1, "modules": ["panel", "pos", "caja"] }]
+```
+
+- `priceMonthly`: soles por mes **con IGV** (18 %), con 2 decimales (`round2`). Se calcula desde el precio sin IGV (`PLAN_CATALOG` en `src/lib/domain/plans.ts`).
+
+`POST /public/signup` (sin token) con `{ "boticaName", "code", "ownerName", "email", "password", "plan" }` → `Session` del dueño (`admin`, ya con sesión iniciada). Crea la botica en **prueba de 14 días** (`status: "trial"`, `trialEndsAt` = hoy + 14, día de Lima), con el plan elegido (`plan` = `id` de `PlanOffer`), un local "Principal" (serie `001`) y al dueño como único usuario.
+
+- `code`: minúsculas, números y guiones (3 a 40), `isValidBoticaCode`. `409 CODIGO_EN_USO` si ya existe.
+- `email` válido (`isValidEmail`); `409 CORREO_EN_USO` si otra botica ya lo usa como dueño (el backend debe garantizarlo; el mock solo ve su propia botica). Contraseña con `passwordError`.
+- `400 DATOS_INVALIDOS` si falta el nombre (3 a 40 caracteres), el nombre del dueño o el plan no existe.
+- La contraseña se guarda con hash. Después del registro el front manda `X-Botica: <code>` como en cualquier ingreso.
+
+`GET /setup` (solo `admin`) → `Setup` `{ "done": ["botica", "local"] }`: pasos de la primera configuración ya hechos. Pasos, en orden: `botica` (RUC, dirección y colores), `local` (datos del primer local), `series` (series de comprobantes), `usuario` (primer usuario de mostrador con PIN), `productos` (importar productos o saltar).
+
+`POST /setup/steps/:step` (solo `admin`) → `Setup`. Marca el paso como hecho (idempotente). `400 DATOS_INVALIDOS` si el paso no existe. Una botica ya configurada (o creada antes de esta función) devuelve todos los pasos hechos.
+
+**Mock con varias boticas:** cada botica registrada vive en su propio dato `bh.mock.v1.<code>` (la de ejemplo sigue en `bh.mock.v1`). `createMockClient` elige la botica por el código de `tenant.ts` (el mismo que el front manda en `X-Botica`) en cada llamada. Las boticas registradas en el mock no se regeneran si sube `VERSION`: se descartan.
+
 ### Sesión
 
 `GET /auth/me` → `User`
 
 `POST /auth/logout` → `204`
+
+### Cuenta y plan
+
+`GET /account` (cualquier sesión, para que el aviso lo vea todo el personal) → `Account`:
+
+```json
+{ "status": "trial", "trialEndsAt": "2026-11-10", "renewsAt": null, "modules": ["panel", "pos", "caja"] }
+```
+
+- `status`: `trial` (prueba), `active`, `overdue` (vencida: avisa, pero se puede operar) o `suspended` (solo lectura).
+- `trialEndsAt` (solo `trial`) y `renewsAt` (solo `active`): días locales `YYYY-MM-DD` (America/Lima).
+- `modules`: ids de módulo del plan (los de `src/lib/nav.ts`). El front muestra solo los que están aquí y además en `user.permissions` (`allowedModules`). El backend debe rechazar también los endpoints de un módulo que el plan no incluye.
+- El backend devuelve el estado ya calculado: una prueba cuyo `trialEndsAt` quedó atrás llega como `overdue` (`effectiveStatus` en `src/lib/domain/account.ts`). El front aplica la misma regla por si el dato llega viejo.
+- Vive en un endpoint propio y no dentro de `PublicConfig.plan`, porque cambia con la facturación (no con la configuración) y no debe ser público.
+- **Solo lectura:** con `suspended`, todo `POST`, `PUT`, `PATCH` y `DELETE` responde `403 CUENTA_SUSPENDIDA`, excepto `/auth/login`, `/auth/owner-login` y `/auth/logout`. Los `GET` siguen funcionando.
+- Para probar en el mock: `setMockAccount({ status: "suspended" })` (exportada desde `src/lib/api/mock/client.ts`) o editar `account` dentro de `bh.mock.v1` en localStorage.
 
 ### Panel del día (octava entrega)
 
@@ -81,10 +151,10 @@ El backend valida el local en cada endpoint que recibe `branchId`; el front tamb
 
 ```json
 {
-  "series": [{ "date": "2026-10-21", "branchId": "principal", "total": 312.4, "tickets": 41 }],
+  "series": [{ "date": "2026-10-21", "branchId": "principal", "total": 302.4, "returns": 10, "tickets": 41 }],
   "today": [{
-    "branchId": "principal", "total": 72.8, "tickets": 6,
-    "byMethod": { "efectivo": 40.3, "yape": 29, "tarjeta": 3.5 },
+    "branchId": "principal", "total": 72.8, "gross": 82.8, "returns": 10, "tickets": 6,
+    "byMethod": { "efectivo": 30.3, "yape": 39, "tarjeta": 3.5 },
     "byHour": [0, 0, 0, 0, 0, 0, 0, 0, 22.5, 50.3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     "topProducts": [{ "productId": 1, "units": 30, "total": 6 }]
   }]
@@ -93,6 +163,7 @@ El backend valida el local en cada endpoint que recibe `branchId`; el front tamb
 
 - `series`: una fila por día **anterior a hoy** y local, del más antiguo al más reciente, **incluidos los días sin venta** (con 0) para que el gráfico no salte días. `date` en hora de Lima. `days` entre 1 y 60.
 - `today`: venta desde las 00:00 de hoy (Lima). `byHour` tiene 24 posiciones (0 = 00:00–00:59). `topProducts` son los 8 de mayor importe, usando `items[].total` de las ventas.
+- **Devoluciones (notas de crédito).** `total` es la venta **neta**: `gross − returns`. `gross` es lo vendido hoy y `returns` el importe (positivo) de las notas de crédito válidas emitidas hoy en ese local, aunque la venta original sea de otro día. En `series`, `total` ya viene neto y `returns` dice cuánto se devolvió ese día (la suma de `returns` de los cierres de caja del día). `byMethod`, `byHour` y `topProducts` también son netos: cada nota resta en el método de pago de la venta original, en la hora en que se emitió y en los productos devueltos (un descuento global se reparte entre los productos de la venta según su importe). Una nota rechazada o anulada por SUNAT no cuenta. `tickets` cuenta solo ventas, no notas.
 - El administrador recibe todos los locales; el encargado, solo el suyo.
 - Lo demás del panel (pendientes de vencimiento, stock, traslados, caja y asistencia) se arma en el front con los endpoints de cada módulo (`buildAlerts` en `src/lib/domain/dashboard.ts`).
 
@@ -161,6 +232,18 @@ El inventario valorizado se arma en el front con `GET /products` y `GET /lots` (
 - `closing` es el stock actual del producto en el alcance pedido, **incluidos los lotes vencidos**. El front calcula el saldo de cada línea hacia atrás desde ese número (`kardexBalances`), así que `closing` y los movimientos tienen que cuadrar.
 - Las ventas salen de `POST /sales` (una línea por ítem, con los lotes usados en `lotCode` separados por coma). Los ingresos, bajas y devoluciones salen de la tabla de movimientos.
 - Sin `branchId`: todos los locales, solo `admin`. Un encargado debe mandar el suyo, si no `403 SIN_PERMISO`. `days` entre 1 y 365.
+- **Por páginas (opcional):** `GET /kardex?productId=7&days=90&page=2&pageSize=20`. Sin `page` responde como se describió arriba. Con `page`, `entries` trae solo esa página (mismo orden, del más reciente al más antiguo) y la respuesta suma estos campos:
+
+```json
+{
+  "closing": 680, "entries": [ ],
+  "total": 143, "page": 2, "pageSize": 20,
+  "pageClosing": 512,
+  "summary": { "inUnits": 900, "outUnits": 220, "sold": 180, "opening": 0 }
+}
+```
+
+  `total` cuenta todos los movimientos del periodo; `closing` sigue siendo el stock actual; `pageClosing` es el saldo **después del movimiento más reciente de la página** (en la página 1 es igual a `closing`; en las siguientes, `closing` menos la suma de `delta` de las páginas anteriores): con él el front calcula el saldo de cada línea de la página (`kardexView` en `src/lib/domain/inventory.ts`). `summary` trae las cifras de **todo el periodo**: entradas, salidas, unidades vendidas y saldo inicial (`opening`), para no tener que bajar todos los movimientos solo para sumarlos. El Excel del kardex se pide sin `page` (completo).
 
 ### Compras (cuarta entrega)
 
@@ -222,11 +305,13 @@ Código del traslado: `T-` y el id con 4 dígitos (`T-0012`). El administrador p
 
 `Customer` ahora trae `treatments: [{ productId, everyDays }]` (medicamentos de uso continuo con su ciclo), `contactConsent` (aceptó recibir avisos), `notes` y `createdAt`. Reemplaza a `chronicProductIds`. Validación (la misma de `validateCustomer`): nombre de 3 letras o más; DNI de 8 dígitos y RUC válido, ambos sin repetir; para marcar `contactConsent` hace falta un celular peruano (9 dígitos que empiezan en 9); medicamentos sin repetir y ciclo de 1 a 365 días.
 
-`GET /customers/all` → `CustomerSummary[]`: todos los clientes con `purchases`, `totalSpent` y `lastPurchaseAt`. Declárala antes de `/customers/:id`.
+`GET /customers/all` → `CustomerSummary[]`: todos los clientes con `purchases`, `totalSpent`, `totalReturned` y `lastPurchaseAt`. `totalSpent` es **neto**: ya descuenta lo devuelto con notas de crédito (`totalReturned`, que es positivo). Una compra devuelta por completo no cuenta en `purchases`. Declárala antes de `/customers/:id`.
+
+`GET /customers/all?q=rosa&page=1&pageSize=25` → `Page<CustomerSummary>` (ver "Paginación en el servidor"). Con `page`, la misma cartera pero recortada y con la búsqueda hecha en el servidor: `q` coincide con el nombre (sin importar mayúsculas) o, si trae números, con los dígitos del DNI, RUC o celular (`matchesCustomer` en `src/lib/domain/customers.ts`). Orden: compra más reciente primero y, al final, quienes nunca compraron, por nombre (`byRecentPurchase`). Sin `page` responde el arreglo completo de siempre, que las recompras siguen usando.
 
 `PUT /customers/:id` con `CustomerInput` → `Customer`. Los puntos no se editan aquí: los suma la venta (1 por cada S/ 10).
 
-`GET /customers/:id/purchases` → `CustomerPurchase[]`: las ventas con ese cliente, de la más reciente a la más antigua, máximo 50.
+`GET /customers/:id/purchases` → `CustomerPurchase[]`: las ventas con ese cliente, de la más reciente a la más antigua, máximo 50. Con notas de crédito válidas, `total` e `items` ya vienen sin lo devuelto y `returned` trae el importe devuelto (se omite si no hubo notas). Una venta devuelta por completo no aparece. Estas mismas compras alimentan `GET /customers/refills`: lo devuelto no cuenta como última compra del producto. Lo que se devolvió por un descuento global baja `total`, pero no cambia `items`.
 
 `GET /customers/refills` → `RefillInfo[]`: una fila por cliente y tratamiento, con la fecha de la última venta que incluyó ese producto (`lastPurchaseAt`, `null` si nunca), las unidades de esa compra y el último aviso registrado. El estado (atrasado, hoy, pronto, al día) lo calcula el front con `refillRows`.
 
@@ -247,14 +332,19 @@ Un turno de caja por local: se abre con un fondo, acumula ventas y movimientos, 
   "session": { "branchId": "principal", "open": true, "openedAt": "2026-10-27T08:00:00-05:00", "openedBy": "Q.F. Daniel Rojas", "openingAmount": 150 },
   "sales": [{ "id": "s_91", "number": "B001-003141", "createdAt": "2026-10-27T10:42:00-05:00", "total": 18.5, "method": "efectivo", "sellerName": "Q.F. Daniel Rojas", "hasPrescription": false }],
   "totals": { "efectivo": 93.4, "yape": 29.4, "tarjeta": 3.5, "tickets": 20 },
+  "returns": { "efectivo": 6.5, "yape": 0, "tarjeta": 0, "count": 1 },
+  "returnRows": [{ "id": "nc_1", "number": "BC01-000001", "voucherNumber": "B001-003141", "issuedAt": "2026-10-27T12:10:00-05:00", "total": 6.5, "method": "efectivo", "userName": "Q.F. Daniel Rojas" }],
   "movements": [{ "id": 1, "at": "2026-10-27T11:00:00-05:00", "type": "egreso", "amount": 12, "note": "Movilidad", "userName": "Q.F. Daniel Rojas" }],
-  "expected": 231.4
+  "expected": 224.9
 }
 ```
 
 - `sales`: ventas del local desde `openedAt`, de la más reciente a la más antigua.
-- `expected` = fondo + ventas en efectivo + ingresos − egresos − retiros. El efectivo de la venta es su `total`, porque el vuelto ya se entregó.
-- Con la caja cerrada: `session.open = false`, listas vacías y `expected = 0`.
+- `expected` = fondo + ventas en efectivo − devoluciones en efectivo + ingresos − egresos − retiros. El efectivo de la venta es su `total`, porque el vuelto ya se entregó.
+- `totals` es lo **vendido** (bruto) por método. `returns` son las notas de crédito válidas emitidas **durante este turno** (`issuedAt` desde `openedAt`, en este local), sumadas por el método de pago de la **venta original**, y `count` cuántas son. `returnRows` las lista, la más reciente primero. Venta neta del turno = `totals − returns`.
+- Solo `returns.efectivo` baja `expected`: el reembolso en efectivo sale de la caja del turno en que se emite la nota (no importa la fecha de la venta). Lo devuelto por Yape o tarjeta no toca el efectivo, pero se muestra como devolución en el resumen y en el cierre.
+- Una nota rechazada o anulada por SUNAT no cuenta. Si la caja está cerrada cuando se emite la nota, no resta de ningún turno (conviene abrir caja antes de devolver efectivo).
+- Con la caja cerrada: `session.open = false`, listas vacías, `returns` en 0 y `expected = 0`.
 
 `POST /cash/:branchId/movements` con `{ "type": "egreso", "amount": 7.5, "note": "Agua para el local" }` → `CashMovement` (201)
 
@@ -270,7 +360,7 @@ Un turno de caja por local: se abre con un fondo, acumula ventas y movimientos, 
 
 - Si llegan `denominations`, el servidor recalcula `counted` con ellas.
 - `difference = counted − expected` (negativo: faltante; positivo: sobrante). Con una diferencia de S/ 1 o más en valor absoluto, `note` es obligatoria (mínimo 5 caracteres); si falta, `400 DIFERENCIA_SIN_MOTIVO`.
-- Guarda el cierre con totales por método, egresos, retiros, ingresos, arqueo y movimientos, y deja la caja cerrada. Desde ahí `POST /sales` responde `CAJA_CERRADA` hasta que se vuelva a abrir.
+- Guarda el cierre con totales por método (`sales`, lo vendido), `returns` (devoluciones del turno por método, con `count`; mismo cálculo que en el resumen), egresos, retiros, ingresos, arqueo y movimientos, y deja la caja cerrada. `expected` ya descuenta las devoluciones en efectivo. Desde ahí `POST /sales` responde `CAJA_CERRADA` hasta que se vuelva a abrir.
 
 `GET /cash/closings?days=30&branchId=principal` → `CashClosing[]`, del más reciente al más antiguo. Sin `branchId`, todos los locales (solo `admin`).
 
@@ -351,6 +441,63 @@ Lo que el backend hace al registrar la venta, en una transacción:
 
 Las reglas de los pasos 2, 3 y 5 están en `src/lib/domain/pharmacy.ts` con pruebas en `pharmacy.test.ts`. Conviene que el backend use los mismos casos de prueba.
 
+#### Clave de idempotencia (`clientSaleId`) y ventas sin conexión
+
+El punto de venta puede quedarse sin internet. Para no perder ni duplicar ventas, el front genera una **clave por venta** y la envía en el cuerpo de `POST /sales`:
+
+| Campo | Tipo | Cuándo viene | Qué hace el backend |
+| --- | --- | --- | --- |
+| `clientSaleId` | string (UUID; 8 a 64 caracteres `A-Za-z0-9_-`) | Siempre en ventas nuevas del front | Guarda la clave con la venta (`unique` por botica). Si llega otra vez, **devuelve la venta original** (mismo `id` y `number`) sin tocar stock, caja ni correlativo. |
+| `soldAt` | ISO 8601 | Solo en ventas cobradas sin conexión | Es la hora real del cobro: va en `createdAt` de la venta. Se rechaza con `400 DATOS_INVALIDOS` si no es una fecha o está más de 5 minutos en el futuro. Sin este campo vale la hora del servidor. |
+| `offlineTicket` | string (`OFF-0001`) | Solo en ventas cobradas sin conexión | Es el número provisional del ticket que se entregó al cliente. Se guarda en la venta (`Sale.offlineTicket`) para poder relacionarlo con el comprobante oficial. No reemplaza al correlativo: el número oficial (`B001-000123`) lo asigna el backend al registrar. |
+
+Reglas de idempotencia:
+
+1. Repetir `POST /sales` con la misma `clientSaleId` y los mismos datos (local e ítems: producto, presentación y cantidad) devuelve la venta original. Respuesta `200` (la primera vez es `201`).
+2. La misma clave con otros datos es `409 CLAVE_REPETIDA`: no se registra nada.
+3. La búsqueda por clave va **antes** de validar caja y stock: una venta ya registrada se puede reenviar aunque la caja ya se haya cerrado o el stock haya cambiado.
+4. `Sale.clientSaleId` y `Sale.offlineTicket` vuelven en la respuesta (`null` si la venta no los traía).
+5. El front reutiliza la misma clave si un intento quedó sin respuesta (corte de internet o tiempo agotado), así el reintento no duplica la venta aunque el servidor sí la haya recibido.
+
+#### `POST /sales/sync` · envío en lote de ventas sin conexión
+
+Cuando vuelve la conexión, el front envía en orden de cobro (FIFO) las ventas guardadas, hasta 50 por llamada.
+
+```json
+{
+  "sales": [
+    { "clientSaleId": "7f0c2e6e-6a3e-4f43-9d9a-2f7f9f8b1a10", "soldAt": "2026-11-02T10:15:00-05:00", "offlineTicket": "OFF-0001",
+      "branchId": "principal", "items": [{ "productId": 1, "presentation": "unidad", "qty": 2 }],
+      "payment": { "method": "efectivo", "received": 10 }, "document": { "type": "boleta" } }
+  ]
+}
+```
+
+Respuesta `200` con **un resultado por venta, en el mismo orden** (`SaleSyncResponse`):
+
+```json
+{
+  "results": [
+    { "clientSaleId": "7f0c2e6e-…", "status": "created", "sale": { "id": "s_…", "number": "B001-000124", "offlineTicket": "OFF-0001" } },
+    { "clientSaleId": "a1b2c3d4-…", "status": "replayed", "sale": { "id": "s_…", "number": "B001-000120" } },
+    { "clientSaleId": "9e8d7c6b-…", "status": "failed", "error": { "code": "STOCK_INSUFICIENTE", "message": "No hay stock suficiente de Amoxicilina 500 mg en este local." } }
+  ]
+}
+```
+
+- `created`: se registró ahora. `replayed`: la clave ya existía y se devuelve la venta original (no se descontó nada). `failed`: rechazada por una regla; trae el mismo `error` que daría `POST /sales` (`STOCK_INSUFICIENTE`, `CAJA_CERRADA`, `RECETA_REQUERIDA`, `DOCUMENTO_INVALIDO`, `PAGO_INSUFICIENTE`, `PRODUCTO_NO_EXISTE`, `SIN_PERMISO`, `CLAVE_REPETIDA`, `DATOS_INVALIDOS`).
+- Se procesan **de una en una y en el orden recibido**, cada una en su propia transacción (los correlativos salen en ese orden). Una venta rechazada **no frena ni revierte** a las demás.
+- Las validaciones son las de `POST /sales` (pasos 1 a 7 de arriba). Si una venta falla por un error pasajero del servidor, devolver `status: "failed"` con `code: "ERROR_INTERNO"`: el front la reintenta sola. Cualquier otro código lo toma como rechazo definitivo y la deja a la vista para que el administrador la reintente o la descarte.
+- Errores que afectan a **todo** el lote (respuesta HTTP sin `results`): `401 NO_AUTORIZADO` y `403 CUENTA_SUSPENDIDA` (el front espera sin perder las ventas), `400 DATOS_INVALIDOS` (lote vacío, de más de 50 ventas o con formato inválido) y 5xx (el front reintenta con espera creciente: 5 s, 10 s, 20 s… hasta 5 min). El lote sigue siendo seguro de repetir entero gracias a `clientSaleId`.
+- Una venta del lote que no aparezca en `results` se considera no confirmada y se vuelve a enviar.
+
+**Qué hace el front** (`src/lib/domain/offline-sales.ts`, con pruebas):
+
+- Sin conexión (o si falla la red al cobrar) guarda la venta en una cola persistente del equipo (IndexedDB; si no hay, localStorage), con la clave, `soldAt` y un ticket provisional `OFF-0001`, `OFF-0002`… (serie por equipo y botica, nunca se reutiliza). El ticket impreso dice "Ticket provisional · sin valor tributario".
+- Envía solo al volver la conexión (evento `online` y reintento cada 20 s) o con **Sincronizar ahora**, en orden FIFO. Una venta solo sale de la cola cuando el backend la confirmó.
+- Descuenta localmente del stock lo vendido sin conexión (FEFO) para no vender dos veces el mismo lote mientras tanto.
+- Con la cuenta en solo lectura (`CUENTA_SUSPENDIDA`) no envía y conserva las ventas hasta que se reactive.
+
 ### Reportes
 
 La pantalla es del administrador. El endpoint acepta también a una cuenta de local, pero solo para su propio local (otro `branchId` → `403 SIN_PERMISO`; sin `branchId` → su local).
@@ -369,9 +516,11 @@ La pantalla es del administrador. El endpoint acepta también a una cuenta de lo
 
 - `total` es lo cobrado por la línea, con IGV y después del descuento. `cost` es el costo sin IGV de los lotes que salieron (FEFO), no el costo de lista.
 - `discount` es el descuento promedio aplicado (0..1). `prescription` va en todas las líneas de una venta con receta; el front arma el libro de recetas solo con los productos que la requieren.
-- Las anuladas no se incluyen.
+- Las anuladas (comunicación de baja) no se incluyen.
+- `kind` (opcional): `"venta"` (si falta, es una venta) o `"devolucion"`. El servidor agrega **una fila `devolucion` por cada línea de cada nota de crédito válida** (no rechazada ni anulada) cuyo `at` (fecha de **emisión de la nota**, no de la venta) cae en el rango. Ahí `number` es el de la nota, `saleId`, `method`, `sellerName`, `documentType` y `customerId` son los de la venta original, `prescription` es `null`, y `qty`, `units`, `total` y `cost` van en **negativo**.
+- Nota por ítem (07) y total (01, 06): una fila por producto devuelto con su `total`. Con devolución de stock (`returnedToStock`), `cost` es el costo de las unidades devueltas **a precio del lote de origen** (las unidades vuelven a los lotes en el orden en que salieron); sin devolución de stock, `cost` es 0 (resta venta, no costo). Descuento global o disminución (04, 09): sin productos; el importe se reparte entre las líneas de la venta según su `total` (en céntimos, sin perder ni inventar centavos), con `qty`, `units` y `cost` en 0.
 
-El front calcula todo lo demás con `src/lib/domain/reports.ts` (pruebas en `reports.test.ts`): venta sin IGV = total / 1,18; utilidad = venta sin IGV − costo; margen = utilidad / venta sin IGV; agrupación por producto, laboratorio, tipo, local, vendedor y pago; venta por día; productos con stock sin venta en el periodo (usa `GET /lots`); libro de recetas; comparación con el periodo anterior de la misma duración. Si el volumen crece, el backend puede ofrecer después los mismos cortes ya agrupados sin cambiar la pantalla.
+El front calcula todo lo demás con `src/lib/domain/reports.ts` (pruebas en `reports.test.ts`): venta sin IGV = total / 1,18; utilidad = venta sin IGV − costo; margen = utilidad / venta sin IGV; agrupación por producto, laboratorio, tipo, local, vendedor y pago; venta por día; productos con stock sin venta en el periodo (usa `GET /lots`); libro de recetas; comparación con el periodo anterior de la misma duración. Como las devoluciones vienen en negativo, `totalsOf` y todas las agrupaciones ya dan cifras **netas**; además `totalsOf` entrega `gross` (lo vendido), `returns` (lo devuelto, positivo) y `total = gross − returns`. `tickets` cuenta solo ventas; las devoluciones no entran al libro de recetas ni cuentan como venta de un producto para "sin movimiento". Reglas en `src/lib/domain/returns.ts` (pruebas en `returns.test.ts`). Si el volumen crece, el backend puede ofrecer después los mismos cortes ya agrupados sin cambiar la pantalla.
 
 ### Ajustes
 
@@ -420,6 +569,137 @@ Todo es solo para el administrador (`403 SIN_PERMISO`). Los datos de la botica, 
 - `409 CUENTA_PROTEGIDA` si el cambio dejaría sin administrador activo, o si el administrador intenta desactivarse o quitarse el rol a sí mismo.
 - Al cambiar el PIN, el rol o el local de otra cuenta, o al desactivarla, se invalidan sus sesiones abiertas.
 - Las cuentas desactivadas no salen en `GET /auth/staff` y no pueden ingresar. No se borran.
+
+### Comprobantes electrónicos (SUNAT)
+
+Pantalla `Comprobantes` (módulo `comprobantes`, incluido en todos los planes). El administrador ve todos los locales; una cuenta de local, solo el suyo (otro `branchId` → `403 SIN_PERMISO`; sin `branchId` → su local). Las escrituras respetan la cuenta suspendida (`403 CUENTA_SUSPENDIDA`). Las reglas están en `src/lib/domain/vouchers.ts` con pruebas en `vouchers.test.ts`; conviene que el backend use los mismos casos.
+
+**Estados** (`status`): `pendiente` (enviado, SUNAT aún no responde o no hubo conexión), `aceptado`, `rechazado` (SUNAT lo devolvió con error) y `anulado` (dado de baja). `sunat` trae la última respuesta `{ code, message, at }` (`code` `"0"` = aceptado) o `null` si no hubo respuesta. `attempts` cuenta los envíos a SUNAT, el original incluido. Toda venta (`POST /sales`) nace `pendiente` y pasa a `aceptado` o `rechazado` cuando el proveedor de facturación responde; el front solo lee y reenvía, no recalcula nada.
+
+`GET /vouchers?from=2026-10-01&to=2026-10-27&branchId=principal` → `Voucher[]`. Una fila por boleta o factura, fechas locales (America/Lima) y ambas incluidas, máximo 370 días (`400 DATOS_INVALIDOS`). Sin `branchId`, todos los locales. Del más reciente al más antiguo.
+
+```json
+{
+  "id": "s-1042", "number": "B001-000123", "type": "boleta", "branchId": "principal",
+  "issuedAt": "2026-10-26T10:15:00-05:00", "customerName": "Rosa Huamán", "customerDocId": "40125588",
+  "total": 9.6, "taxBase": 8.14, "igv": 1.46,
+  "status": "aceptado",
+  "sunat": { "code": "0", "message": "La Boleta numero B001-000123, ha sido aceptada", "at": "2026-10-26T10:15:04-05:00" },
+  "attempts": 1, "voided": null, "creditedTotal": 0,
+  "sale": { "...": "la Sale completa, con items y lotes" }
+}
+```
+
+- `id` es el mismo de la venta. `creditedTotal` suma las notas de crédito que no fueron rechazadas y `creditNotes` trae todas las notas emitidas sobre el comprobante (de cualquier fecha), la más antigua primero: con eso el front calcula lo que aún se puede devolver.
+- `voided` es `null` o `{ at, by, reason, ticket }` (el `ticket` de la comunicación de baja).
+
+`GET /credit-notes?from=&to=&branchId=` → `CreditNote[]`, mismas reglas de fechas y local.
+
+`POST /vouchers/:id/resend` → `Voucher` actualizado. Solo si está `pendiente` o `rechazado` (`409 ESTADO_INVALIDO` en otro caso). Suma un envío (`attempts`) y deja la nueva respuesta de SUNAT. `POST /credit-notes/:id/resend` hace lo mismo con una nota.
+
+`POST /vouchers/:id/void` con `{ "reason": "Se facturó al cliente equivocado", "returnStock": true }` → `Voucher` con `status: "anulado"` y `voided`. Es la comunicación de baja:
+
+- Solo `aceptado`. `pendiente` y `rechazado` no se anulan (`409 ESTADO_INVALIDO`); tampoco uno que ya tiene notas de crédito.
+- Plazo de **7 días calendario** desde el día de emisión, hora de Lima, tanto para boletas como para facturas; pasado ese plazo, `409 PLAZO_VENCIDO` y corresponde una nota de crédito.
+- `reason` de 5 a 160 caracteres. Un local desactivado no admite anular ni emitir notas (`409 LOCAL_INACTIVO`).
+- `returnStock: true` devuelve la mercadería a los mismos lotes de la venta y la deja en el kardex como `devolucion` (entra). Con `false` el stock no cambia (la mercadería no volvió a la botica).
+- Una venta anulada deja de contar en reportes, caja, panel y compras del cliente; el kardex conserva la salida y la devolución.
+
+`POST /vouchers/:id/credit-notes` con `CreditNoteRequest` → `CreditNote` (201). Solo sobre un comprobante `aceptado` (`409 ESTADO_INVALIDO`).
+
+```json
+{ "reasonCode": "07", "note": "El cliente devolvió un blíster", "items": [{ "lineIndex": 0, "qty": 1 }], "returnStock": true }
+```
+
+| Código (catálogo 09) | Motivo | Qué se indica | Stock |
+| --- | --- | --- | --- |
+| `01` | Anulación de la operación | nada: se acredita todo | puede volver |
+| `06` | Devolución total | nada: se acredita todo | puede volver |
+| `07` | Devolución por ítem | `items` (`lineIndex` de `sale.items` y `qty` de la presentación vendida) | puede volver |
+| `04` | Descuento global | `amount` | no |
+| `09` | Disminución en el valor | `amount` | no |
+
+- `note` (detalle del motivo) de 3 a 160 caracteres. `returnStock` es `true` por defecto y solo cuenta en `01`, `06` y `07`; los motivos de importe nunca mueven stock.
+- Los motivos `01` y `06` solo se pueden emitir si no hay otra nota válida sobre la venta. Nunca se acredita más que el total del comprobante ni más cantidad de la vendida (`400 DATOS_INVALIDOS`, con el máximo en el `message`).
+- El importe de una línea es `line.total × qty / line.qty`; al acreditar lo que falta de la línea se toma el saldo exacto. Siempre con IGV incluido; `taxBase` e `igv` se calculan sobre el total de la nota.
+- Numeración: `BC01-000001` para boletas y `FC01-000001` para facturas (`B`/`F` + `C` + las dos últimas cifras de la serie del local), correlativo propio por serie. Solo se envía a SUNAT una nota sobre un comprobante ya aceptado.
+- Las unidades que vuelven al stock regresan a los lotes de la venta en el orden en que salieron y entran al kardex como `devolucion` con la referencia `Nota de crédito BC01-000001`.
+- **Dinero.** Una nota de crédito válida (no rechazada ni anulada) resta de la venta neta, con IGV, en el día y el turno en que se **emitió**, no en los de la venta. Las notas parciales restan solo lo acreditado. Con devolución de stock, el costo se revierte al costo del lote de origen para que el margen siga bien; sin devolución, resta venta pero no costo. Aplica a: cierre de caja y efectivo esperado (solo lo pagado en efectivo; Yape y tarjeta se muestran como devoluciones por método), panel, reportes, compras del cliente y velocidad de venta (`GET /sales/velocity`: lo devuelto baja las unidades). Detalle de los campos en Caja, Panel del día, Reportes y Clientes. Un comprobante anulado no admite notas y uno con nota no se anula, así que nunca se resta dos veces.
+
+**Ticket de 80 mm.** La impresión se hace en el front (`@media print`, 80 mm de ancho) para la venta y la nota de crédito; el backend no genera PDF. El código QR y el hash de la representación impresa los entrega el proveedor de facturación y se agregarán al ticket cuando el contrato los incluya.
+
+### Auditoría (décima entrega)
+
+Pantalla `Auditoría` (módulo `auditoria`, solo `admin`, incluido desde el Plan Crece). Registra **quién hizo qué y cuándo**. El backend escribe cada entrada en el mismo lugar donde ejecuta la acción (un solo punto, no repartido por cada endpoint) y nunca la edita ni la borra. El mock lo hace con un envoltorio único (`src/lib/api/mock/audit.ts`).
+
+`GET /audit?from=2026-10-01&to=2026-10-27&userId=u2&action=precio_cambiado&entity=producto&page=1&pageSize=25` → `Page<AuditEntry>`
+
+- Solo `admin` (`403 SIN_PERMISO` para un encargado). `from` y `to` son días locales (America/Lima), ambos incluidos, máximo 370 días (`400 DATOS_INVALIDOS`). `userId`, `action` y `entity` son opcionales. Del más reciente al más antiguo. Leer la auditoría no deja registro.
+
+```json
+{
+  "id": "a412", "at": "2026-10-26T10:15:00-05:00",
+  "userId": "u1", "userName": "Carmen Salazar", "role": "admin", "branchId": null,
+  "action": "precio_cambiado", "entity": "producto", "entityId": "17", "entityLabel": "Losartán 50 mg",
+  "before": { "priceUnit": 0.5, "priceBox": 12 },
+  "after": { "priceUnit": 0.6, "priceBox": 15 }
+}
+```
+
+- `before` / `after`: resumen corto con valores simples (texto, número, sí/no, `null`) o `null` si no aplica (una venta solo trae `after`). Las claves se traducen en el front (`FIELD_LABELS` de `src/lib/domain/audit.ts`); una clave desconocida se muestra tal cual. **Nunca** se guardan DNI, RUC de clientes, nombres de clientes, PIN ni contraseñas: de un cambio de PIN solo queda `pinChanged: true`.
+- `userId` es `null` cuando no hay cuenta: un intento de ingreso con un usuario que no existe, o una acción de Digi!HME (`role: null`, `userName: "Digi!HME"`).
+- `entity`: `sesion`, `venta`, `comprobante`, `nota_credito`, `producto`, `lote`, `compra`, `traslado`, `caja`, `cuenta`, `local`, `botica`, `reglas`, `plan`.
+- `action` (el front muestra la etiqueta en español; un código nuevo se muestra tal cual):
+
+| Grupo | `action` |
+| --- | --- |
+| Acceso | `sesion_iniciada`, `sesion_fallida` |
+| Ventas | `venta_registrada`, `comprobante_anulado`, `nota_credito_emitida`, `comprobante_reenviado`, `nota_credito_reenviada` |
+| Precios y catálogo | `producto_creado`, `producto_editado`, `precio_cambiado`, `costo_cambiado` |
+| Stock | `compra_registrada`, `baja_registrada`, `descuento_lote`, `traslado_enviado`, `traslado_pedido`, `traslado_despachado`, `traslado_recibido`, `traslado_anulado` |
+| Caja | `caja_abierta`, `caja_cerrada`, `movimiento_caja` |
+| Cuentas | `cuenta_creada`, `cuenta_editada` (incluye cambios de rol, local, estado y PIN) |
+| Ajustes | `botica_editada`, `reglas_editadas`, `local_creado`, `local_editado`, `local_desactivado`, `local_activado` |
+| Digi!HME | `plan_cambiado`, `prueba_extendida`, `cuenta_suspendida`, `cuenta_reactivada` (con el motivo en `after.reason`) |
+
+- Solo se registran las acciones que **se completaron**; la excepción es `sesion_fallida`. Una escritura rechazada (por ejemplo `CUENTA_SUSPENDIDA`) no deja entrada.
+
+### Consola interna de Digi!HME (décima entrega)
+
+Pantalla `/consola` para el equipo de Digi!HME (el operador de la plataforma). **No es parte de ninguna botica**: tiene su propio ingreso, su propio token y no envía `X-Botica`. Una sesión de botica no sirve aquí y la del operador no sirve en las rutas de una botica (el backend debe rechazarla con `401 NO_AUTORIZADO`). Ninguna pantalla de la botica enlaza a la consola. Tipos en `src/lib/api/types.ts` (`PlatformSession`, `TenantSummary`, `TenantAction`, `TenantPage`) y contrato en `PlatformClient` (`src/lib/api/contract.ts`). Las reglas de las acciones están en `src/lib/domain/platform.ts`, con pruebas; reutilizan el estado de cuenta de `account.ts`.
+
+`POST /platform/login` con `{ "email": "soporte@digi-hme.pe", "password": "…" }` → `PlatformSession` `{ token, operator: { id, name, email }, expiresAt }`. `401 CREDENCIALES_INVALIDAS` si no coinciden. Las cuentas de operador son distintas de las de las boticas (otra tabla o realm); un correo de dueño de botica no entra aquí.
+
+`POST /platform/logout` → `204`. Invalida el token del operador.
+
+`GET /platform/tenants?q=sol&status=trial&page=1&pageSize=25` → `TenantPage`: una `Page<TenantSummary>` (ver "Paginación en el servidor") más `counts` por estado.
+
+```json
+{
+  "items": [{
+    "code": "botica-huanuco", "name": "Botica Huánuco", "planId": "crece", "planName": "Plan Crece", "maxBranches": 3,
+    "status": "active", "renewsAt": "2026-12-01", "createdAt": "2026-07-05T09:00:00-05:00",
+    "lastActivityAt": "2026-11-02T08:41:00-05:00", "branches": 2, "users": 3
+  }],
+  "total": 1, "page": 1, "pageSize": 25,
+  "counts": { "trial": 0, "active": 1, "overdue": 0, "suspended": 0 }
+}
+```
+
+- `q` busca en el nombre y el código sin importar mayúsculas ni tildes. `status` filtra la lista; `counts` cuenta por estado todas las que cumplen `q` (no solo la página ni el `status`), para las tarjetas de arriba. Orden por nombre.
+- `status` llega ya calculado (`effectiveStatus`): una prueba pasada de su último día es `overdue`. `lastActivityAt` es la última acción de una persona de la botica (no cuenta los intentos fallidos ni las acciones de Digi!HME), `null` si nunca. `branches` son los locales activos y `users` las cuentas activas.
+
+`PATCH /platform/tenants/:code` con una `TenantAction` → `TenantSummary` actualizado. Todas llevan `reason` (5 a 200 caracteres, `400 DATOS_INVALIDOS`), que el backend guarda en la auditoría de esa botica (entrada con `userId: null`, `userName: "Digi!HME"`, `entity: "plan"` y el motivo en `after.reason`):
+
+| `action` | Cuerpo | Efecto y errores |
+| --- | --- | --- |
+| `change_plan` | `{ "planId": "cadena", "reason": "…" }` | Cambia el plan, el límite de locales y los módulos (`Account.modules`) al plan nuevo. `400` si el plan no existe; `409 ESTADO_INVALIDO` si ya lo tiene; `409 LIMITE_DEL_PLAN` si tiene más locales activos de los que permite el plan nuevo (debe desactivarlos antes). Auditoría: `plan_cambiado`. |
+| `extend_trial` | `{ "days": 7, "reason": "…" }` | Solo una botica en prueba (también si ya venció): suma de 1 a 60 días desde el fin de la prueba, o desde hoy si ya pasó, y vuelve a `trial`. `409 ESTADO_INVALIDO` en otro estado (si está suspendida, reactivarla primero). Auditoría: `prueba_extendida`. |
+| `suspend` | `{ "reason": "…" }` | Pasa a `suspended` (solo lectura: toda escritura de la botica responde `403 CUENTA_SUSPENDIDA`). Conserva las fechas. `409 ESTADO_INVALIDO` si ya lo está. Auditoría: `cuenta_suspendida`. |
+| `reactivate` | `{ "reason": "…" }` | Solo desde `suspended`. Vuelve a `trial` si tenía fecha de prueba (si ya pasó, se ve como `overdue`) y, si no, a `active` (con `renewsAt` a 30 días si no tenía). Auditoría: `cuenta_reactivada`. |
+
+- `404 BOTICA_NO_ENCONTRADA` si el código no existe.
+- **Operador de prueba del mock (no existe en producción):** `soporte@digi-hme.pe` · `Consola2026!`. El token vive en `sessionStorage` bajo `bh.platform.session`, aparte de `bh.session` (la botica).
 
 ## Próximas entregas
 

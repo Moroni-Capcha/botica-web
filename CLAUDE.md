@@ -75,15 +75,22 @@ PIN de prueba: admin 1234 · principal 1111 · sucursal 2222 · marcación 4101�
 - Gráficos: máximo 4 series de color. Con más locales, `foldBranches` muestra el total. El texto nunca va en el color de la serie.
 - No agregues dependencias si se puede resolver con lo que hay. El Excel y los gráficos son propios a propósito.
 
-## Pendiente (hoja de ruta SaaS)
+## Hoja de ruta SaaS
 
-Ver el avance completo en `README.md`. Lo siguiente, en orden:
+El front de los seis puntos está hecho contra el contrato (`docs/API.md`) y el modo de prueba; el avance y lo que falta del backend están en `README.md` ("Hoja de ruta SaaS · estado"):
 
-1. Varias boticas en una instalación (subdominio o código de botica) e ingreso del dueño con correo y contraseña. El PIN se queda para el mostrador.
-2. Plan y facturación en Ajustes, estados de cuenta (prueba, vencida, suspendida en solo lectura) y módulos según el plan.
-3. Registro y configuración inicial guiados.
-4. Comprobantes con SUNAT: estado, reenvío, anulación y nota de crédito, impresión en ticketera de 80 mm.
-5. POS sin internet (PWA con cola de ventas).
-6. Auditoría, consola interna de Digi!HME, monitoreo (Sentry) y paginación en el servidor.
+1. Varias boticas (código de botica, `X-Botica`) e ingreso del dueño con correo y contraseña. El PIN se queda para el mostrador. Hecho.
+2. Plan y facturación en Ajustes, estados de cuenta (prueba, vencida, suspendida en solo lectura) y módulos según el plan. Hecho.
+3. Registro y configuración inicial guiados. Hecho.
+4. Comprobantes con SUNAT: estado, reenvío, anulación y nota de crédito, ticket de 80 mm. Hecho en el front; falta el envío real (backend).
+5. POS sin internet (PWA con cola de ventas). Hecho.
+6. Auditoría (`/auditoria`), consola interna de Digi!HME (`/consola`, sesión aparte), monitoreo (`src/lib/monitoring.ts`, sin el SDK) y paginación en el servidor (`Page<T>`, `Pagination`). Hecho en el front.
 
-Detalles menores: copiar los stock mínimos de otro local al crear uno, sugerir en el POS lo que el cliente "suele llevar", quitar la ruta `[module]`.
+Reglas nuevas al tocar estas piezas:
+
+- **Auditoría:** el mock registra en un solo lugar (`src/lib/api/mock/audit.ts`, reglas por endpoint); un endpoint nuevo que cambie algo importante agrega su regla ahí, no un registro suelto. Nunca DNI, nombres de clientes ni PIN.
+- **Consola de Digi!HME:** otra sesión (`platformApi`, `bh.platform.session`); ninguna pantalla de la botica la enlaza ni la usa. Operador de prueba del mock: `soporte@digi-hme.pe` · `Consola2026!`.
+- **Monitoreo:** todo lo que sale hacia Sentry pasa por `src/lib/domain/privacy.ts`; usa `captureException` / `captureMessage` de `src/lib/monitoring.ts`, nunca el SDK directo.
+- **Listas largas:** `page` y `pageSize` según "Paginación en el servidor" de `docs/API.md`; en endpoints existentes, opcional y compatible hacia atrás.
+
+Detalles menores pendientes: copiar los stock mínimos de otro local al crear uno, sugerir en el POS lo que el cliente "suele llevar", quitar la ruta `[module]`.

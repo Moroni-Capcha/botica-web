@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import { CircleAlert, KeyRound, Lock, Pencil, Plus, Power, RotateCcw, Save, Store, TriangleAlert, UserRound } from "lucide-react";
 import type { Branch, BranchInput, BranchSeries, Pharmacy, StaffAccount } from "@/lib/api/types";
@@ -19,10 +19,11 @@ import { Table, td } from "@/components/ui/table";
 import { notify } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
 import { useBranchLots } from "@/features/shared/branch-scope";
+import { PlanBilling } from "./plan-billing";
 import { AccountDialog } from "./account-dialog";
 import { CloseBranchDialog, NewBranchDialog } from "./branch-dialogs";
 
-type Tab = "botica" | "locales" | "cuentas" | "reglas";
+type Tab = "botica" | "locales" | "cuentas" | "reglas" | "plan";
 const card = "rounded-2xl border border-zinc-200 bg-white";
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -30,6 +31,11 @@ export function SettingsScreen() {
   const isAdmin = useSessionStore((s) => s.session?.user.role === "admin");
   const config = useConfig();
   const [tab, setTab] = useState<Tab>("botica");
+  // Enlaces desde el aviso de cuenta y la primera configuración: /ajustes?tab=plan, ?tab=locales… (se lee en el cliente para no exigir Suspense).
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t === "plan" || t === "botica" || t === "locales" || t === "cuentas" || t === "reglas") setTab(t);
+  }, []);
 
   if (!isAdmin) {
     return (
@@ -58,6 +64,7 @@ export function SettingsScreen() {
           { id: "locales", label: "Locales y comprobantes" },
           { id: "cuentas", label: "Cuentas y PIN" },
           { id: "reglas", label: "Reglas" },
+          { id: "plan", label: "Plan y facturación" },
         ]}
       />
       {!c ? (
@@ -68,6 +75,8 @@ export function SettingsScreen() {
         <Branches config={c} />
       ) : tab === "cuentas" ? (
         <Accounts branches={c.branches} closed={c.closedBranches} />
+      ) : tab === "plan" ? (
+        <PlanBilling config={c} />
       ) : (
         <RulesForm key={JSON.stringify([c.expiry, c.purchasing, c.attendance])} config={c} />
       )}

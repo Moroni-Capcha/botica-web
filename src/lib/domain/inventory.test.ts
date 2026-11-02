@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { KardexEntry, Lot, Product } from "@/lib/api/types";
 import { SEED_PRODUCTS } from "@/lib/api/mock/seed-data";
-import { groupInventory, inventoryRows, kardexBalances, kardexTotals, marginPct, minFor, validateProduct } from "./inventory";
+import { groupInventory, inventoryRows, kardexBalances, kardexSummary, kardexTotals, kardexView, marginPct, minFor, validateProduct } from "./inventory";
 
 const NOW = new Date(2026, 9, 27, 10, 0).getTime(); // 27/10/2026
 
@@ -70,6 +70,30 @@ describe("kardex", () => {
     expect(lines.map((l) => [l.id, l.balance])).toEqual([["venta2", 125], ["venta1", 145], ["ingreso", 150]]);
     expect(opening).toBe(50);
     expect(kardexTotals(entries)).toEqual({ inUnits: 100, outUnits: 25, sold: 25 });
+  });
+
+  it("una página de kardex parte del saldo de la página y las cifras salen del periodo completo", () => {
+    const all = [e("v3", "2026-10-26T10:00:00-05:00", "venta", -20), e("v2", "2026-10-25T10:00:00-05:00", "venta", -5), e("v1", "2026-10-22T10:00:00-05:00", "venta", -10), e("c1", "2026-10-21T10:00:00-05:00", "ingreso", 100)];
+    const closing = 65;
+    const summary = kardexSummary(all, closing);
+    expect(summary).toEqual({ inUnits: 100, outUnits: 35, sold: 35, opening: 0 });
+
+    // Página 1 (2 movimientos) y página 2 (los 2 siguientes), como las entregaría el servidor
+    const p1 = kardexView({ entries: all.slice(0, 2), closing, pageClosing: closing, summary });
+    const p2 = kardexView({ entries: all.slice(2), closing, pageClosing: 90, summary });
+    expect(p1.lines.map((l) => [l.id, l.balance])).toEqual([["v3", 65], ["v2", 85]]);
+    expect(p2.lines.map((l) => [l.id, l.balance])).toEqual([["v1", 90], ["c1", 100]]);
+    expect([...p1.lines, ...p2.lines]).toEqual(kardexView({ entries: all, closing }).lines);
+    expect(p2.opening).toBe(0);
+    expect(p1.totals).toEqual(summary);
+  });
+
+  it("sin paginar, las cifras salen de los movimientos recibidos", () => {
+    const entries = [e("v", "2026-10-26T10:00:00-05:00", "venta", -20), e("i", "2026-10-20T09:00:00-05:00", "ingreso", 100)];
+    const v = kardexView({ entries, closing: 80 });
+    expect(v.opening).toBe(0);
+    expect(v.totals).toEqual({ inUnits: 100, outUnits: 20, sold: 20, opening: 0 });
+    expect(v.lines.map((l) => l.balance)).toEqual([80, 100]);
   });
 });
 

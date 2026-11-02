@@ -146,11 +146,17 @@ export function ReportsScreen() {
       </p>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi icon={Banknote} label="Venta con IGV" value={soles(totals.total)} hint={`Sin IGV ${soles(totals.taxBase)}`} delta={delta(totals.total, "total")} loading={loading} strong />
+        <Kpi icon={Banknote} label={totals.returns > 0 ? "Venta neta con IGV" : "Venta con IGV"} value={soles(totals.total)} hint={`Sin IGV ${soles(totals.taxBase)}`} delta={delta(totals.total, "total")} loading={loading} strong />
         <Kpi icon={Percent} label="Utilidad bruta" value={soles(totals.profit)} hint={`Margen ${totals.margin.toLocaleString("es-PE", { maximumFractionDigits: 1 })} % · costo ${sol0(totals.cost)}`} delta={delta(totals.profit, "profit")} loading={loading} />
         <Kpi icon={Receipt} label="Comprobantes" value={fmtInt(totals.tickets)} hint={`Ticket promedio ${soles(totals.avgTicket)}`} delta={delta(totals.tickets, "tickets")} loading={loading} />
         <Kpi icon={Package} label="Unidades vendidas" value={fmtInt(totals.units)} hint={`${new Set(lines.map((l) => l.productId)).size} productos distintos`} loading={loading} />
       </div>
+
+      {!loading && totals.returns > 0 && (
+        <p className="rounded-xl bg-zinc-50 px-4 py-2 text-xs tabular-nums text-zinc-600" role="status">
+          Vendido {soles(totals.gross)} − devoluciones / notas de crédito {soles(totals.returns)} = venta neta {soles(totals.total)}. Cada nota resta en el día en que se emitió.
+        </p>
+      )}
 
       <section className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5" aria-label={oneDay ? "Venta por hora" : "Venta por día"}>
         <h2 className="mb-1 font-semibold tracking-tight">{oneDay ? "Venta por hora" : "Venta por día"}</h2>
@@ -199,12 +205,13 @@ function GroupTable({ rows, first }: { rows: GroupRow[]; first: string }) {
   const max = Math.max(...rows.map((r) => r.share), 0.0001);
   return (
     <div className="max-h-[560px] overflow-y-auto">
-      <Table minWidth={860} head={[first, { label: "Unidades", align: "right" }, { label: "Comprob.", align: "right" }, { label: "Venta", align: "right" }, { label: "Utilidad", align: "right" }, { label: "Margen", align: "right" }, "Participación"]}>
+      <Table minWidth={940} head={[first, { label: "Unidades", align: "right" }, { label: "Comprob.", align: "right" }, { label: "Devuelto", align: "right" }, { label: "Venta neta", align: "right" }, { label: "Utilidad", align: "right" }, { label: "Margen", align: "right" }, "Participación"]}>
         {rows.map((r) => (
           <tr key={r.key}>
             <td className={cn(td, "font-medium")}>{r.label}</td>
             <td className={cn(td, "text-right tabular-nums")}>{fmtInt(r.units)}</td>
             <td className={cn(td, "text-right tabular-nums text-zinc-600")}>{fmtInt(r.tickets)}</td>
+            <td className={cn(td, "whitespace-nowrap text-right tabular-nums text-zinc-600")}>{r.returns > 0 ? `−${soles(r.returns)}` : "—"}</td>
             <td className={cn(td, "whitespace-nowrap text-right font-semibold tabular-nums")}>{soles(r.total)}</td>
             <td className={cn(td, "whitespace-nowrap text-right tabular-nums")}>{soles(r.profit)}</td>
             <td className={cn(td, "text-right tabular-nums", r.margin < 15 ? "font-semibold text-rose-600" : "text-zinc-600")}>{r.margin.toLocaleString("es-PE", { maximumFractionDigits: 1 })} %</td>

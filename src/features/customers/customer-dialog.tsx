@@ -67,7 +67,7 @@ export function CustomerDialog({ customer, customers, products, branches, onClos
   return (
     <Dialog
       title={customer ? customer.name : "Nuevo cliente"}
-      description={customer ? `${customer.ruc ? `RUC ${customer.ruc}` : customer.dni ? `DNI ${customer.dni}` : "Sin documento"} · ${customer.points} puntos · ${customer.purchases} compras · ${soles(customer.totalSpent)}` : "Los datos sirven para boletas, puntos y recordatorios de recompra."}
+      description={customer ? `${customer.ruc ? `RUC ${customer.ruc}` : customer.dni ? `DNI ${customer.dni}` : "Sin documento"} · ${customer.points} puntos · ${customer.purchases} compras · ${soles(customer.totalSpent)}${customer.totalReturned > 0 ? ` (ya sin ${soles(customer.totalReturned)} devueltos)` : ""}` : "Los datos sirven para boletas, puntos y recordatorios de recompra."}
       onClose={onClose}
       size="lg"
       footer={
@@ -177,6 +177,7 @@ export function CustomerDialog({ customer, customers, products, branches, onClos
                 <span className="rounded bg-brand/10 px-1.5 py-px text-[10.5px] font-semibold text-brand">{branchName(s.branchId)}</span>
                 <span className="ml-auto font-semibold tabular-nums">{soles(s.total)}</span>
               </div>
+              {s.returned ? <p className="mt-0.5 text-xs text-rose-600">Devolvió {soles(s.returned)} con nota de crédito; el total ya lo descuenta.</p> : null}
               <p className={cn("mt-0.5 text-xs text-zinc-500")}>
                 {s.items.map((it) => `${it.qty} ${it.presentationLabel.toLowerCase()} ${productById.get(it.productId)?.name ?? ""}`).join(" · ")}
               </p>

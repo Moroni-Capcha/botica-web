@@ -42,3 +42,43 @@ body {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* Ticket de 80 mm (impresora térmica). Se imprime solo el contenido de .print-root; el resto de la pantalla se oculta. */
+.ticket {
+  width: 80mm;
+  padding: 4mm;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #18181b;
+  background: #fff;
+}
+.print-root {
+  display: none;
+}
+@page {
+  size: 80mm auto;
+  margin: 0;
+}
+@media print {
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  body > *:not(.print-root) {
+    display: none !important;
+  }
+  .print-root {
+    display: block !important;
+  }
+  .print-root .ticket {
+    padding: 2mm 3mm;
+    color: #000 !important;
+    break-inside: avoid;
+  }
+  .print-root .ticket * {
+    color: #000 !important;
+  }
+}
