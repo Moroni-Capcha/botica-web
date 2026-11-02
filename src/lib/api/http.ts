@@ -1,6 +1,6 @@
 /** Implementación del contrato contra la API REST del backend. Endpoints: docs/API.md */
 import type { ApiClient, BranchStock, NewCustomer, PlatformClient, PublicConfig } from "./contract";
-import { ApiError } from "./errors";
+import { ApiError, isSessionExpiry } from "./errors";
 import type { PlanOffer, SignUpInput, Setup, SetupStep, Account, AccountInput, BoticaPublic, Branch, BranchCreateInput, BranchCreated, BranchInput, BranchSeries, Pharmacy, RulesInput, StaffAccount, SalesReportLine, ContactRequest, CustomerInput, CustomerPurchase, CustomerSummary, RefillInfo, Dashboard, AttendanceMark, ClockRequest, KioskWorker, ManualMarkRequest, Worker, WorkerInput } from "./types";
 import type { ApiErrorBody, BranchId, CashCloseRequest, CashClosing, CashMovement, CashMovementRequest, CashSession, CashSummary, Customer, Kardex, Lot, Product, ProductInput, ProductVelocity, Purchase, PurchaseRequest, Supplier, SupplierInput, Transfer, TransferAskRequest, TransferSendRequest, Sale, SaleRequest, Session, StaffSummary, User, WriteOffRequest } from "./types";
 import type { CreditNote, CreditNoteRequest, Voucher, VoidRequest, SaleSyncRequest, SaleSyncResponse, AuditEntry, AuditQuery, CustomersQuery, Page, PlatformSession, TenantAction, TenantPage, TenantSummary, TenantsQuery } from "./types";
@@ -34,13 +34,13 @@ function makeRequester(base: string, { tenant, store }: { tenant: boolean; store
     }
 
     if (tenant) connection.reportReachable();
-    if (res.status === 401) {
-      store.clear();
-      store.notifyExpired();
-    }
     if (res.status === 204) return undefined as T;
 
     const data: unknown = await res.json().catch(() => null);
+    if (isSessionExpiry(res.status, (data as Partial<ApiErrorBody> | null)?.code)) {
+      store.clear();
+      store.notifyExpired();
+    }
     if (!res.ok) {
       const err = (data ?? {}) as Partial<ApiErrorBody>;
       throw new ApiError({ code: err.code ?? `HTTP_${res.status}`, message: err.message ?? "El servidor no pudo completar la operación.", details: err.details }, res.status);
