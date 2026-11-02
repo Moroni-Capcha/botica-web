@@ -20,7 +20,7 @@ Improve look, order and motion of the POS and cash screens (the most used by the
 
 ## Tasks
 - [x] F1 Base (commit 08a7749): semantic tokens (success, danger, warning, muted text, radius, shadow, type scale), `Card`, `Chip`, `IconButton`, visible `focus-visible` everywhere, contrast fixes, 44 px hit areas, shared motion tokens (durations, easing).
-- [ ] F2 POS: product card hierarchy, cart line enter/exit and total transition, change (vuelto) emphasis, keyboard flow (F2 focus search, Esc, refocus after add/close), accessible mobile cart sheet (Escape, focus trap, animation), payment dialog polish.
+- [x] F2 POS (commit 60bb806): product card hierarchy, cart line enter/exit and total transition, change (vuelto) emphasis, keyboard flow (F2 focus search, Esc, refocus after add/close), accessible mobile cart sheet (Escape, focus trap, animation), payment dialog polish.
 - [ ] F3 Cash: single primary button style, KPI hierarchy, table density and order, number transitions, close dialog flow.
 - [ ] F4 Motion system: exit animations for Dialog and Toast, reduced-motion in JS animations, list stagger, shared helpers.
 
@@ -31,5 +31,7 @@ Each phase: one delegated writer (2+ non-trivial files; reading that prepares th
 (branch created from master @ d8882e9; typecheck + 298 tests green at start)
 - F1 (delegated writer, commit 08a7749): tokens in globals.css (text/surface/line, success/danger/warning/info/special with -fg/-bg/-border, radius, shadow, type scale micro/caption/small, motion, focus ring), new ui/card, chip, icon-button (hitArea 44 px), section-label, tone map, rowButtonClass; cn extended for custom names. Checks: `rm -rf .next && npm run build` OK, typecheck OK, `npm test` 301/301 (298 + 3 new). Leftovers in pos/cash: text-zinc-400 0, text-[11px]/[12px] 0, raw emerald/rose/amber/sky/violet/zinc 0. Browser check pending (parent).
 
+- F2 (delegated writer, commit 60bb806): product card hierarchy (primary presentation via pickPrimaryPresentation), F2 hint chip, animated cart lines and total pulse, payment dialog focal amount + big change, use-pos-shortcuts (F2, Esc, Ctrl+Enter, refocus), accessible CartSheet via shared useFocusTrap (stacked modals, scroll lock counter), src/lib/motion.ts (prefersReducedMotion, animateIn). Checks: `rm -rf .next && npm run build` OK, typecheck OK, `npm test` 320/320 (301 + 19 new). Leftovers in src/features/pos: raw colors 0, text-[Npx] 0; only arbitrary px is the pre-existing aside `w-[380px]`. Nothing verified in a browser (parent pending).
+
 ## Next step
-F2 (POS). Browser check of F1 first.
+Browser check of F1 and F2 (keyboard flow, mobile sheet, reduced motion), then F3 (Cash).
