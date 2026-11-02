@@ -36,6 +36,7 @@ PIN de prueba: admin 1234 · principal 1111 · sucursal 2222 · marcación 4101�
 - `src/lib/excel/`: generador y lector `.xlsx` propios, sin dependencias.
 - `src/components/charts/column-chart.tsx`: gráfico propio; colores en `src/lib/chart-colors.ts`.
 - `docs/API.md`: contrato con el backend. Es la fuente de verdad.
+- `docs/BACKEND.md`: guía de entrada para quien construye el backend (orden, reglas, trampas, dudas abiertas).
 
 ## Cómo se agrega o cambia una función
 
