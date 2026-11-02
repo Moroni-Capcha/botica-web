@@ -9,6 +9,7 @@ import { ExpiryBadge, RxBadge } from "@/components/ui/badges";
 import { Card } from "@/components/ui/card";
 import { Chip, chipClass } from "@/components/ui/chip";
 import { hitArea } from "@/components/ui/icon-button";
+import { pickPrimaryPresentation } from "./primary-presentation";
 import { soles } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
@@ -28,6 +29,8 @@ export interface ProductCardProps {
 export const ProductCard = memo(function ProductCard({ product: p, stock, minStock, nextLot, hasExpiredOnly, otherBranch, sellFirst, now, onAdd }: ProductCardProps) {
   const days = nextLot ? daysUntil(nextLot.expiresOn, now) : null;
   const low = stock > 0 && stock <= minStock;
+  const presentations = presentationsOf(p);
+  const main = pickPrimaryPresentation(presentations);
   return (
     <Card as="article" padding="sm" className={cn(sellFirst && "border-danger-border")}>
       <div className="flex items-start gap-3">
@@ -36,11 +39,11 @@ export const ProductCard = memo(function ProductCard({ product: p, stock, minSto
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            <h3 className="text-sm font-semibold leading-tight">{p.name}</h3>
-            <span className="text-sm text-muted">{p.conc}</span>
+            <h3 className="text-base font-semibold leading-tight">{p.name}</h3>
+            <span className="text-sm font-medium text-fg-2">{p.conc}</span>
             <RxBadge rx={p.rx} />
           </div>
-          <p className="mt-0.5 truncate text-xs text-muted">
+          <p className="mt-0.5 truncate text-caption text-muted">
             {p.active !== "—" ? `${p.active} · ` : ""}
             {p.form} · {p.lab} · Ubic. {p.location}
           </p>
@@ -65,20 +68,32 @@ export const ProductCard = memo(function ProductCard({ product: p, stock, minSto
           </div>
         </div>
       </div>
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {presentationsOf(p).map((ps) => (
-          <button
-            key={ps.id}
-            type="button"
-            disabled={stock < ps.units}
-            onClick={(e) => onAdd(p, ps.id, e.currentTarget)}
-            className="flex min-w-[96px] flex-1 flex-col items-start rounded-xl border border-line px-3 py-1.5 text-left transition hover:border-line-strong hover:bg-subtle active:scale-[0.98] disabled:opacity-40"
-            aria-label={`Agregar ${ps.label} de ${p.name} a ${soles(ps.price)}`}
-          >
-            <span className="text-micro font-medium text-muted">{ps.label}</span>
-            <span className="text-sm font-semibold tabular-nums">{soles(ps.price)}</span>
-          </button>
-        ))}
+      <div className="mt-3 flex flex-wrap items-stretch gap-1.5">
+        {presentations.map((ps) => {
+          const primary = ps.id === main?.id;
+          const blocked = stock < ps.units;
+          const why = stock === 0 ? "Sin stock vigente en este local" : `Solo quedan ${stockLabel(p, stock)}: no alcanza para ${ps.label}`;
+          return (
+            <button
+              key={ps.id}
+              type="button"
+              disabled={blocked}
+              onClick={(e) => onAdd(p, ps.id, e.currentTarget)}
+              title={blocked ? why : undefined}
+              className={cn(
+                "flex flex-col items-start justify-center rounded-xl border text-left transition-[transform,opacity,border-color,background-color] duration-[var(--dur-fast)] ease-[var(--ease-out)] active:scale-[0.97]",
+                "disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100",
+                primary
+                  ? "min-h-14 min-w-[9rem] flex-[2_1_9rem] border-brand/25 bg-brand/5 px-3.5 py-2 enabled:hover:border-brand/60 enabled:hover:bg-brand/10"
+                  : "min-h-12 min-w-24 flex-1 self-end border-line px-3 py-1.5 enabled:hover:border-brand/40 enabled:hover:bg-subtle",
+              )}
+              aria-label={blocked ? `${ps.label} de ${p.name}: ${why}` : `Agregar ${ps.label} de ${p.name} a ${soles(ps.price)}`}
+            >
+              <span className={cn("text-micro font-medium", primary ? "text-fg-2" : "text-muted")}>{ps.label}</span>
+              <span className={cn("tabular-nums", primary ? "text-lg font-semibold leading-tight text-fg" : "text-sm font-medium text-fg-2")}>{soles(ps.price)}</span>
+            </button>
+          );
+        })}
       </div>
     </Card>
   );

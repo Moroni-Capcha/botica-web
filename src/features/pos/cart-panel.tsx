@@ -11,6 +11,8 @@ import { hitArea, IconButton } from "@/components/ui/icon-button";
 import { CustomerPicker } from "./customer-picker";
 import { dateShort, soles } from "@/lib/format";
 import { cn } from "@/lib/cn";
+import { useAnimatedList } from "./use-animated-list";
+import { useValuePulse } from "./use-pulse";
 
 interface CartPanelProps {
   lines: CartLine[];
@@ -26,21 +28,26 @@ interface CartPanelProps {
   equivalents: { base: Product; options: Product[] } | null;
   onAddEquivalent: (p: Product) => void;
   onClose?: () => void;
+  /** Id para el título cuando el panel va dentro de la hoja (la nombra como diálogo). */
+  titleId?: string;
 }
 
-export function CartPanel({ lines, totals, customer, onCustomer, onQty, onClear, onCharge, canCharge, writable = true, cashOpen, equivalents, onAddEquivalent, onClose }: CartPanelProps) {
+export function CartPanel({ lines, totals, customer, onCustomer, onQty, onClear, onCharge, canCharge, writable = true, cashOpen, equivalents, onAddEquivalent, onClose, titleId }: CartPanelProps) {
+  const rows = useAnimatedList(lines);
+  const totalRef = useValuePulse<HTMLSpanElement>(totals.total);
+  const chargeRef = useValuePulse<HTMLSpanElement>(totals.total);
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-center gap-2 border-b border-line-soft px-4 py-3">
         <ShoppingCart className="h-4 w-4 text-muted" aria-hidden />
-        <p className="flex-1 text-sm font-semibold">Venta actual</p>
+        <p id={titleId} className="flex-1 text-sm font-semibold">Venta actual</p>
         {lines.length > 0 && (
           <button type="button" onClick={onClear} className={cn(hitArea, "rounded text-xs font-medium text-muted transition-colors duration-[var(--dur-fast)] hover:text-danger-fg")}>
             Vaciar
           </button>
         )}
         {onClose && (
-          <IconButton size="xs" onClick={onClose} className="lg:hidden" aria-label="Cerrar venta">
+          <IconButton size="xs" data-autofocus onClick={onClose} className="lg:hidden" aria-label="Cerrar venta">
             <X className="h-4 w-4" aria-hidden />
           </IconButton>
         )}
@@ -51,51 +58,67 @@ export function CartPanel({ lines, totals, customer, onCustomer, onQty, onClear,
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {lines.length === 0 ? (
-          <Empty icon={ScanBarcode} title="Escanea o busca un producto">
-            Busca por nombre, principio activo, laboratorio o código de barras. Enter agrega una unidad.
-          </Empty>
+        {rows.length === 0 ? (
+          <>
+            <Empty icon={ScanBarcode} title="Escanea o busca un producto">
+              Busca por nombre, principio activo, laboratorio o código de barras.
+            </Empty>
+            <p className="-mt-6 pb-8 text-center text-caption text-muted">F2 para buscar · Enter para agregar</p>
+          </>
         ) : (
           <ul className="divide-y divide-line-soft">
-            {lines.map((l) => (
-              <li key={l.key} className="px-4 py-3">
-                <div className="flex items-start gap-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold leading-tight">
-                      {l.product.name} <span className="font-normal text-muted">{l.product.conc}</span>
-                    </p>
-                    <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted">
-                      {l.pres.label} · {soles(l.pres.price)} <RxBadge rx={l.product.rx} />
-                    </p>
+            {rows.map(({ key, item: l, exiting, isNew }) => (
+              <li
+                key={key}
+                inert={exiting}
+                aria-hidden={exiting || undefined}
+                className={cn(
+                  "grid transition-[grid-template-rows,opacity,transform] duration-[var(--dur-fast)] ease-[var(--ease-out)]",
+                  exiting ? "-translate-x-3 grid-rows-[0fr] opacity-0" : "grid-rows-[1fr]",
+                  isNew && "animate-line-in",
+                )}
+              >
+                <div className="min-h-0 overflow-hidden">
+                  <div className="px-4 py-3">
+                    <div className="flex items-start gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold leading-tight">
+                          {l.product.name} <span className="font-normal text-muted">{l.product.conc}</span>
+                        </p>
+                        <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted">
+                          {l.pres.label} · {soles(l.pres.price)} <RxBadge rx={l.product.rx} />
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold tabular-nums">{soles(l.total)}</p>
+                        {l.discount > 0 && <p className="text-micro tabular-nums text-muted line-through">{soles(l.gross)}</p>}
+                      </div>
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="flex items-center rounded-lg border border-line">
+                        <IconButton size="sm" onClick={() => onQty(l.key, l.qty - 1)} className="rounded-r-none text-fg-2" aria-label="Quitar uno">
+                          <Minus className="h-3.5 w-3.5" aria-hidden />
+                        </IconButton>
+                        <span className="w-8 text-center text-sm font-semibold tabular-nums" aria-live="polite">{l.qty}</span>
+                        <IconButton size="sm" onClick={() => onQty(l.key, l.qty + 1)} className="rounded-l-none text-fg-2" aria-label="Agregar uno">
+                          <Plus className="h-3.5 w-3.5" aria-hidden />
+                        </IconButton>
+                      </div>
+                      <span className="text-micro text-muted">{l.units} unid.</span>
+                      <IconButton size="sm" tone="danger" onClick={() => onQty(l.key, 0)} className="ml-auto" aria-label={`Quitar ${l.product.name}`}>
+                        <Trash2 className="h-4 w-4" aria-hidden />
+                      </IconButton>
+                    </div>
+                    <div className="mt-2 grid gap-1">
+                      {l.alloc.map((a) => (
+                        <p key={a.lotId} className="flex items-center gap-1.5 text-micro text-muted">
+                          <Box className="h-3 w-3" aria-hidden /> Lote {a.code} · vence {dateShort(a.expiresOn)} · {a.units} u
+                          {a.discount > 0 && <Chip tone="danger" className="rounded px-1 py-0">-{Math.round(a.discount * 100)} %</Chip>}
+                        </p>
+                      ))}
+                      {l.missing > 0 && <p className="text-micro font-semibold text-danger-fg">Faltan {l.missing} unidades en este local</p>}
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold tabular-nums">{soles(l.total)}</p>
-                    {l.discount > 0 && <p className="text-micro tabular-nums text-muted line-through">{soles(l.gross)}</p>}
-                  </div>
-                </div>
-                <div className="mt-2 flex items-center gap-2">
-                  <div className="flex items-center rounded-lg border border-line">
-                    <IconButton size="sm" onClick={() => onQty(l.key, l.qty - 1)} className="rounded-r-none text-fg-2" aria-label="Quitar uno">
-                      <Minus className="h-3.5 w-3.5" aria-hidden />
-                    </IconButton>
-                    <span className="w-8 text-center text-sm font-semibold tabular-nums" aria-live="polite">{l.qty}</span>
-                    <IconButton size="sm" onClick={() => onQty(l.key, l.qty + 1)} className="rounded-l-none text-fg-2" aria-label="Agregar uno">
-                      <Plus className="h-3.5 w-3.5" aria-hidden />
-                    </IconButton>
-                  </div>
-                  <span className="text-micro text-muted">{l.units} unid.</span>
-                  <IconButton size="sm" tone="danger" onClick={() => onQty(l.key, 0)} className="ml-auto" aria-label={`Quitar ${l.product.name}`}>
-                    <Trash2 className="h-4 w-4" aria-hidden />
-                  </IconButton>
-                </div>
-                <div className="mt-2 grid gap-1">
-                  {l.alloc.map((a) => (
-                    <p key={a.lotId} className="flex items-center gap-1.5 text-micro text-muted">
-                      <Box className="h-3 w-3" aria-hidden /> Lote {a.code} · vence {dateShort(a.expiresOn)} · {a.units} u
-                      {a.discount > 0 && <Chip tone="danger" className="rounded px-1 py-0">-{Math.round(a.discount * 100)} %</Chip>}
-                    </p>
-                  ))}
-                  {l.missing > 0 && <p className="text-micro font-semibold text-danger-fg">Faltan {l.missing} unidades en este local</p>}
                 </div>
               </li>
             ))}
@@ -147,11 +170,14 @@ export function CartPanel({ lines, totals, customer, onCustomer, onQty, onClear,
           </div>
           <div className="mt-1 flex items-end justify-between">
             <dt className="text-sm font-semibold">Total</dt>
-            <dd className="text-2xl font-semibold tracking-tight tabular-nums">{soles(totals.total)}</dd>
+            <dd className="text-2xl font-semibold tracking-tight tabular-nums">
+              <span ref={totalRef} className="inline-block origin-right">{soles(totals.total)}</span>
+            </dd>
           </div>
         </dl>
         <Button variant="primary" size="lg" className="mt-3 w-full" disabled={!canCharge} onClick={onCharge}>
-          <Banknote className="h-5 w-5" aria-hidden /> Cobrar {lines.length ? soles(totals.total) : ""}
+          <Banknote className="h-5 w-5" aria-hidden /> Cobrar{" "}
+          {lines.length > 0 && <span ref={chargeRef} className="inline-block tabular-nums">{soles(totals.total)}</span>}
         </Button>
         {!writable && <p className="mt-2 text-center text-micro text-danger-fg">Tu cuenta está en solo lectura. No se puede cobrar.</p>}
         {!cashOpen && <p className="mt-2 text-center text-micro text-warning-fg">La caja está cerrada. Ábrela arriba para poder cobrar.</p>}

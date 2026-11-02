@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Search, TriangleAlert, Wallet, WifiOff, X } from "lucide-react";
 import type { Lot, Product, Sale, SaleRequest } from "@/lib/api/types";
 import { errorMessage } from "@/lib/api";
@@ -20,9 +20,12 @@ import { Input, Select, inputClass } from "@/components/ui/field";
 import { notify } from "@/components/ui/toast";
 import { soles } from "@/lib/format";
 import { cn } from "@/lib/cn";
+import { animateIn } from "@/lib/motion";
 import { useBranchCart, useCartStore } from "./cart-store";
 import { ProductCard } from "./product-card";
 import { CartPanel } from "./cart-panel";
+import { CartSheet } from "./cart-sheet";
+import { searchEscapeAction, usePosShortcuts } from "./use-pos-shortcuts";
 import { PaymentDialog } from "./payment-dialog";
 import { ReceiptDialog } from "./receipt-dialog";
 
@@ -54,6 +57,9 @@ export function PosScreen() {
   const [receipt, setReceipt] = useState<Sale | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [opening, setOpening] = useState("150");
+  const searchRef = useRef<HTMLInputElement>(null);
+  const fabRef = useRef<HTMLButtonElement>(null);
+  const cartTitleId = useId();
 
   /* Búsqueda inicial desde otro módulo, p. ej. "Vender" en Vencimientos (/pos?q=Amoxicilina) */
   useEffect(() => {
@@ -123,7 +129,7 @@ export function PosScreen() {
       }
       addToCart(branchId, p.id, pres.id, qty);
       setLastAdded(p.id);
-      el?.animate?.([{ transform: "scale(0.94)" }, { transform: "scale(1)" }], { duration: 220, easing: "cubic-bezier(.32,.72,0,1)" });
+      animateIn(el, [{ transform: "scale(0.94)" }, { transform: "scale(1)" }], { duration: 200 });
     },
     [stockInfo, lines, addToCart, branchId],
   );
@@ -141,7 +147,14 @@ export function PosScreen() {
   };
 
   const onSearchKey = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key !== "Enter") return;
+    if (e.nativeEvent.isComposing) return;
+    if (e.key === "Escape") {
+      if (searchEscapeAction(q) === "clear") setQ("");
+      else e.currentTarget.blur();
+      return;
+    }
+    /* Ctrl+Enter es cobrar (atajo global), no agregar */
+    if (e.key !== "Enter" || e.ctrlKey || e.metaKey) return;
     const code = q.trim();
     const target = productList.find((p) => p.barcode === code) ?? (results.length === 1 ? results[0] : undefined);
     if (target) {
@@ -160,6 +173,30 @@ export function PosScreen() {
   }, [lastAdded, productMap, productList, stockInfo]);
 
   type Draft = Parameters<Parameters<typeof PaymentDialog>[0]["onConfirm"]>[0];
+
+  const openPayment = () => {
+    setPayError(null);
+    setPaying(true);
+  };
+
+  usePosShortcuts({ searchRef, dialogOpen: paying || !!receipt || cartOpen, canCharge, onPay: openPayment });
+
+  /* Al cerrar el cobro o el comprobante, el foco vuelve al buscador (en pantallas táctiles no, para no subir el teclado). */
+  const dialogOpen = paying || !!receipt;
+  const hadDialog = useRef(false);
+  useEffect(() => {
+    if (!dialogOpen && hadDialog.current && !window.matchMedia("(pointer: coarse)").matches) {
+      const id = setTimeout(() => searchRef.current?.focus(), 0);
+      hadDialog.current = dialogOpen;
+      return () => clearTimeout(id);
+    }
+    hadDialog.current = dialogOpen;
+  }, [dialogOpen]);
+
+  const closeCart = () => {
+    setCartOpen(false);
+    fabRef.current?.focus();
+  };
 
   const finishSale = () => {
     attempt.current = null;
@@ -220,7 +257,7 @@ export function PosScreen() {
     );
   }
 
-  const panel = (
+  const renderPanel = (titleId?: string) => (
     <CartPanel
       lines={lines}
       totals={totals}
@@ -228,16 +265,14 @@ export function PosScreen() {
       onCustomer={(c) => setCustomer(branchId, c)}
       onQty={changeQty}
       onClear={() => clear(branchId)}
-      onCharge={() => {
-        setPayError(null);
-        setPaying(true);
-      }}
+      onCharge={openPayment}
       canCharge={canCharge}
       writable={writable}
       cashOpen={cashOpen}
       equivalents={equivalents}
       onAddEquivalent={(p) => add(p, "unidad")}
-      onClose={() => setCartOpen(false)}
+      onClose={closeCart}
+      titleId={titleId}
     />
   );
 
@@ -268,7 +303,12 @@ export function PosScreen() {
           <div className="flex gap-2">
             <div className="relative min-w-0 flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden />
-              <Input autoFocus value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onSearchKey} placeholder="Buscar: paracetamol, Apronax, Genfar o código de barras…" className="pl-9" aria-label="Buscar producto" />
+              <Input ref={searchRef} autoFocus value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onSearchKey} placeholder="Buscar: paracetamol, Apronax, Genfar o código de barras…" className="pl-9 pr-12" aria-label="Buscar producto" aria-keyshortcuts="F2" />
+              {!q && (
+                <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded-md border border-line bg-sunken px-1.5 text-micro font-semibold text-muted sm:pointer-fine:inline-block" aria-hidden>
+                  F2
+                </kbd>
+              )}
               {q && (
                 <IconButton size="xs" onClick={() => setQ("")} className="absolute right-2 top-1/2 -translate-y-1/2" aria-label="Limpiar búsqueda">
                   <X className="h-3.5 w-3.5" aria-hidden />
@@ -333,23 +373,20 @@ export function PosScreen() {
       </div>
 
       <aside className="hidden w-[380px] shrink-0 border-l border-line bg-surface lg:block" aria-label="Venta actual">
-        {panel}
+        {renderPanel()}
       </aside>
 
-      {lines.length > 0 && !cartOpen && (
-        <button type="button" onClick={() => setCartOpen(true)} className="fixed inset-x-4 bottom-20 z-20 flex h-14 items-center justify-between rounded-2xl bg-brand px-5 text-white shadow-overlay lg:hidden">
+      {lines.length > 0 && (
+        <button ref={fabRef} type="button" onClick={() => setCartOpen(true)} className="fixed inset-x-4 bottom-20 z-20 flex h-14 items-center justify-between rounded-2xl bg-brand px-5 text-white shadow-overlay transition-transform duration-[var(--dur-fast)] ease-[var(--ease-out)] active:scale-[0.98] lg:hidden">
           <span className="text-sm font-semibold">
             Ver venta · {lines.length} {lines.length === 1 ? "producto" : "productos"}
           </span>
           <span className="text-lg font-semibold tabular-nums">{soles(totals.total)}</span>
         </button>
       )}
-      {cartOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="absolute inset-0 bg-scrim" onClick={() => setCartOpen(false)} aria-hidden />
-          <div className="absolute inset-x-0 bottom-0 top-12 overflow-hidden rounded-t-3xl bg-surface">{panel}</div>
-        </div>
-      )}
+      <CartSheet open={cartOpen} onClose={closeCart} titleId={cartTitleId}>
+        {renderPanel(cartTitleId)}
+      </CartSheet>
 
       {paying && (
         <PaymentDialog

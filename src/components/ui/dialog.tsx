@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useId, useRef, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { IconButton } from "./icon-button";
+import { useFocusTrap } from "./use-focus-trap";
 
 interface DialogProps {
   title: string;
@@ -14,38 +15,11 @@ interface DialogProps {
   size?: "md" | "lg" | "xl";
 }
 
-/** Diálogo modal accesible: foco inicial, Escape para cerrar y foco atrapado en el contenido. */
+/** Diálogo modal accesible: foco inicial (o el campo marcado con `data-autofocus`), Escape para cerrar y foco atrapado en el contenido. */
 export function Dialog({ title, description, onClose, children, footer, size = "md" }: DialogProps) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
-
-  useEffect(() => {
-    const prev = document.activeElement as HTMLElement | null;
-    const node = ref.current;
-    node?.querySelector<HTMLElement>("input, select, textarea, button:not([data-close])")?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      if (e.key !== "Tab" || !node) return;
-      const items = [...node.querySelectorAll<HTMLElement>("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])")].filter((el) => !el.hasAttribute("disabled"));
-      const first = items[0];
-      const last = items[items.length - 1];
-      if (!first || !last) return;
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-      prev?.focus();
-    };
-  }, [onClose]);
+  useFocusTrap(ref, onClose);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Banknote, Check, CreditCard, Smartphone, Stethoscope } from "lucide-react";
 import type { Customer, DocType, PaymentMethod, Prescription, SaleRequest } from "@/lib/api/types";
 import { documentIsValid, isValidCmp, quickCashAmounts, round2, type Totals } from "@/lib/domain/pharmacy";
@@ -12,6 +12,7 @@ import { SectionLabel } from "@/components/ui/section-label";
 import { hitArea } from "@/components/ui/icon-button";
 import { soles } from "@/lib/format";
 import { cn } from "@/lib/cn";
+import { animateIn } from "@/lib/motion";
 
 type Draft = Omit<SaleRequest, "branchId" | "items">;
 
@@ -50,6 +51,16 @@ export function PaymentDialog({ totals, itemsCount, customer, yapeNumber, submit
   const rxOk = !totals.needsRx || (rx.number.trim() !== "" && rx.doctor.trim() !== "" && isValidCmp(rx.cmp));
   const payOk = method !== "efectivo" || rec >= total;
   const ok = docOk && rxOk && payOk && !submitting;
+  const enough = rec > 0 && rec >= total;
+  const missing = round2(total - rec);
+
+  /* El vuelto aparece con un golpe suave la primera vez que alcanza. */
+  const changeRef = useRef<HTMLDivElement>(null);
+  const wasEnough = useRef(false);
+  useEffect(() => {
+    if (enough && !wasEnough.current) animateIn(changeRef.current, [{ opacity: 0.4, transform: "scale(0.97)" }, { opacity: 1, transform: "none" }], { duration: 200 });
+    wasEnough.current = enough;
+  }, [enough]);
 
   const switchDoc = (v: DocType) => {
     setDoc(v);
@@ -69,7 +80,7 @@ export function PaymentDialog({ totals, itemsCount, customer, yapeNumber, submit
 
   return (
     <Dialog
-      title={`Cobrar ${soles(total)}`}
+      title="Cobrar"
       description={`${itemsCount} ${itemsCount === 1 ? "producto" : "productos"} · ${customer ? customer.name : "Cliente varios"}`}
       onClose={onClose}
       size="lg"
@@ -77,8 +88,9 @@ export function PaymentDialog({ totals, itemsCount, customer, yapeNumber, submit
         <>
           {error && <p className="mr-auto text-sm text-danger-fg" role="alert">{error}</p>}
           <Button onClick={onClose}>Cancelar</Button>
-          <Button variant="primary" disabled={!ok} loading={submitting} onClick={confirm}>
-            <Check className="h-4 w-4" aria-hidden /> {offline ? "Cobrar sin conexión" : `Confirmar y emitir ${doc}`}
+          <Button variant="primary" size="lg" disabled={!ok} loading={submitting} onClick={confirm} className="tabular-nums">
+            {!submitting && <Check className="h-4 w-4" aria-hidden />}
+            {submitting ? "Cobrando…" : offline ? `Cobrar ${soles(total)} sin conexión` : `Cobrar ${soles(total)} y emitir ${doc}`}
           </Button>
         </>
       }
@@ -90,6 +102,13 @@ export function PaymentDialog({ totals, itemsCount, customer, yapeNumber, submit
           confirm();
         }}
       >
+        <div className="flex items-end justify-between gap-3 rounded-2xl bg-subtle px-4 py-3 md:col-span-2">
+          <div>
+            <SectionLabel>Total a cobrar</SectionLabel>
+            <p className="mt-0.5 text-4xl font-semibold leading-none tracking-tight tabular-nums">{soles(total)}</p>
+          </div>
+          <p className="pb-0.5 text-right text-caption text-muted">IGV incluido</p>
+        </div>
         <div className="grid content-start gap-4">
           {offline && (
             <p className="rounded-2xl bg-warning-bg p-3 text-xs text-warning-fg" role="status">
@@ -131,7 +150,7 @@ export function PaymentDialog({ totals, itemsCount, customer, yapeNumber, submit
 
         <div className="grid content-start gap-3">
           <SectionLabel>Método de pago</SectionLabel>
-          <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Método de pago">
+          <div className="grid grid-cols-3 gap-1 rounded-xl bg-sunken p-1" role="radiogroup" aria-label="Método de pago">
             {METHODS.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
@@ -139,7 +158,10 @@ export function PaymentDialog({ totals, itemsCount, customer, yapeNumber, submit
                 role="radio"
                 aria-checked={method === id}
                 onClick={() => setMethod(id)}
-                className={cn("flex flex-col items-center gap-1.5 rounded-2xl border p-3 text-xs font-semibold transition", method === id ? "border-transparent bg-brand text-white" : "border-line text-fg-2 hover:bg-subtle")}
+                className={cn(
+                  "flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-xs font-semibold transition-[background-color,color,transform] duration-[var(--dur-fast)] ease-[var(--ease-out)] active:scale-[0.97]",
+                  method === id ? "bg-brand text-white shadow-subtle" : "text-fg-2 hover:bg-surface",
+                )}
               >
                 <Icon className="h-5 w-5" aria-hidden /> {label}
               </button>
@@ -148,19 +170,26 @@ export function PaymentDialog({ totals, itemsCount, customer, yapeNumber, submit
           {method === "efectivo" && (
             <div className="rounded-2xl bg-subtle p-3">
               <Field label="Monto recibido">
-                <Input inputMode="decimal" value={received} onChange={(e) => setReceived(e.target.value.replace(/[^\d.]/g, ""))} className="text-lg font-semibold tabular-nums" placeholder={total.toFixed(2)} />
+                <Input data-autofocus inputMode="decimal" value={received} onChange={(e) => setReceived(e.target.value.replace(/[^\d.]/g, ""))} className="h-12 text-xl font-semibold tabular-nums" placeholder={total.toFixed(2)} />
               </Field>
               <div className="mt-2 flex flex-wrap gap-2">
                 {quickCashAmounts(total).map((v) => (
-                  <button key={v} type="button" onClick={() => setReceived(String(v))} className={cn(hitArea, "h-10 rounded-lg bg-surface px-3 text-sm font-semibold tabular-nums ring-1 ring-line transition-colors duration-[var(--dur-fast)] hover:bg-sunken")}>
+                  <button key={v} type="button" onClick={() => setReceived(String(v))} className={cn(hitArea, "h-11 rounded-lg bg-surface px-3 text-sm font-semibold tabular-nums ring-1 ring-line transition-[background-color,transform] duration-[var(--dur-fast)] ease-[var(--ease-out)] hover:bg-sunken active:scale-[0.97]")}>
                     {v - total < 1 && v === Math.ceil(total) ? `Exacto ${soles(total)}` : `S/ ${v}`}
                   </button>
                 ))}
               </div>
-              <div className="mt-3 flex items-center justify-between">
-                <span className="text-sm text-fg-2">Vuelto</span>
-                <span className={cn("text-2xl font-semibold tabular-nums", change < 0 ? "text-muted" : "text-success-fg")} aria-live="polite">
-                  {soles(Math.max(0, change))}
+              <div
+                ref={changeRef}
+                aria-live="polite"
+                className={cn(
+                  "mt-3 flex items-center justify-between gap-3 rounded-xl border px-4 py-3 transition-[background-color,border-color] duration-[var(--dur-base)] ease-[var(--ease-out)]",
+                  enough ? "border-success-border bg-success-bg" : rec > 0 ? "border-warning-border bg-warning-bg" : "border-line bg-surface",
+                )}
+              >
+                <span className={cn("text-sm font-semibold", enough ? "text-success-fg" : rec > 0 ? "text-warning-fg" : "text-fg-2")}>{enough ? "Vuelto" : rec > 0 ? "Falta" : "Vuelto"}</span>
+                <span className={cn("text-4xl font-semibold leading-none tracking-tight tabular-nums", enough ? "text-success-fg" : rec > 0 ? "text-warning-fg" : "text-muted")}>
+                  {enough ? soles(change) : rec > 0 ? soles(missing) : soles(0)}
                 </span>
               </div>
             </div>
@@ -190,10 +219,6 @@ export function PaymentDialog({ totals, itemsCount, customer, yapeNumber, submit
             <div className="flex justify-between">
               <dt>IGV (18 %)</dt>
               <dd className="tabular-nums">{soles(totals.igv)}</dd>
-            </div>
-            <div className="mt-1 flex justify-between text-sm font-semibold text-fg">
-              <dt>Total</dt>
-              <dd className="tabular-nums">{soles(total)}</dd>
             </div>
           </dl>
         </div>
