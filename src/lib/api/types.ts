@@ -243,7 +243,10 @@ export interface CustomerInput {
 /** Cliente con sus totales, para la cartera. */
 export interface CustomerSummary extends Customer {
   purchases: number;
+  /** Total comprado ya sin las devoluciones (notas de crédito). */
   totalSpent: number;
+  /** Total devuelto por notas de crédito; ya está restado de `totalSpent`. */
+  totalReturned: number;
   lastPurchaseAt: string | null;
 }
 
@@ -254,7 +257,10 @@ export interface CustomerPurchase {
   branchId: BranchId;
   at: string;
   total: number;
+  /** Lo que sigue comprado: ya sin lo devuelto. Si todo se devolvió, la compra no aparece. */
   items: { productId: number; units: number; total: number; presentationLabel: string; qty: number }[];
+  /** Importe devuelto por notas de crédito (ya descontado de `total`). */
+  returned?: number;
 }
 
 /** Última compra de cada tratamiento y último aviso enviado, para calcular las recompras. */
@@ -560,6 +566,11 @@ export interface SalesReportLine {
   /** Descuento promedio aplicado (0..1). */
   discount: number;
   prescription: Prescription | null;
+  /**
+   * `devolucion` = viene de una nota de crédito: `at` es cuándo se emitió la nota, `qty`, `units`, `total` y `cost` van en negativo
+   * (el costo solo si la mercadería volvió al stock). Si falta, es una venta.
+   */
+  kind?: "venta" | "devolucion";
 }
 
 /* ------------------------------ Panel del día ------------------------------ */
@@ -568,16 +579,24 @@ export interface SalesReportLine {
 export interface DailySales {
   date: string; // YYYY-MM-DD, hora de Lima
   branchId: BranchId;
+  /** Venta neta: lo vendido menos las devoluciones. */
   total: number;
+  /** Devoluciones (notas de crédito) del día; ya están restadas de `total`. */
+  returns: number;
   tickets: number;
 }
 
 export interface TodayStats {
   branchId: BranchId;
+  /** Venta neta de hoy: `gross − returns`. */
   total: number;
+  gross: number;
+  /** Devoluciones (notas de crédito) emitidas hoy en este local. */
+  returns: number;
   tickets: number;
+  /** Neto por método de pago (cada devolución resta del método de la venta original). */
   byMethod: PaymentTotals;
-  /** Venta por hora del día, índice 0 a 23. */
+  /** Venta neta por hora del día, índice 0 a 23 (la devolución resta en la hora en que se emitió). */
   byHour: number[];
   /** Los más vendidos de hoy por importe, máximo 8. */
   topProducts: { productId: number; units: number; total: number }[];
@@ -638,13 +657,34 @@ export interface CashSaleRow {
   hasPrescription: boolean;
 }
 
+/** Nota de crédito emitida durante el turno, para la lista de devoluciones. */
+export interface CashReturnRow {
+  id: string;
+  /** Número de la nota, p. ej. BC01-000001. */
+  number: string;
+  /** Comprobante que modifica. */
+  voucherNumber: string;
+  issuedAt: string;
+  total: number;
+  /** Método con que se pagó la venta original. */
+  method: PaymentMethod;
+  userName: string;
+}
+
+/** Devoluciones del turno por método de pago. */
+export type ReturnTotals = PaymentTotals & { count: number };
+
 /** Estado del turno abierto: lo que se vendió, los movimientos y cuánto efectivo debe haber. */
 export interface CashSummary {
   session: CashSession;
   sales: CashSaleRow[];
+  /** Vendido (bruto) por método de pago. */
   totals: PaymentTotals & { tickets: number };
+  /** Notas de crédito emitidas en este turno, por método de pago de la venta original. */
+  returns: ReturnTotals;
+  returnRows: CashReturnRow[];
   movements: CashMovement[];
-  /** Fondo + ventas en efectivo + ingresos − egresos − retiros */
+  /** Fondo + ventas en efectivo − devoluciones en efectivo + ingresos − egresos − retiros */
   expected: number;
 }
 
@@ -666,11 +706,15 @@ export interface CashClosing {
   closedAt: string;
   closedBy: string;
   openingAmount: number;
+  /** Vendido (bruto) por método de pago. */
   sales: PaymentTotals;
+  /** Devoluciones del turno por método de pago (notas emitidas mientras estuvo abierto). */
+  returns: ReturnTotals;
   tickets: number;
   ingresos: number;
   egresos: number;
   retiros: number;
+  /** Fondo + ventas en efectivo − devoluciones en efectivo + ingresos − egresos − retiros */
   expected: number;
   counted: number;
   /** contado − esperado: negativo = faltante, positivo = sobrante */

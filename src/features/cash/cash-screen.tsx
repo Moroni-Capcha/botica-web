@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, Banknote, ChevronRight, CreditCard, FileSpreadsheet, History, Lock, Plus, Receipt, Smartphone, Stethoscope, TriangleAlert, Wallet, type LucideIcon } from "lucide-react";
-import type { CashClosing, CashMovementType } from "@/lib/api/types";
+import type { CashClosing, CashMovementType, PaymentMethod } from "@/lib/api/types";
+import { netPayments, sumPayments } from "@/lib/domain/returns";
 import { errorMessage } from "@/lib/api";
 import { useAddCashMovement, useCashClosings, useCashSummary, useConfig, useOpenCash } from "@/lib/queries";
 import { closeDifference, denominationLabel, DENOMINATIONS, MOVEMENT_LABEL, movementError, PAYMENT_LABEL } from "@/lib/domain/cash";
@@ -48,6 +49,12 @@ export function CashScreen() {
 
   const data = summary.data;
   const isOpen = data?.session.open ?? false;
+  const net = data ? netPayments(data.totals, data.returns) : { efectivo: 0, yape: 0, tarjeta: 0 };
+  const methodHint = (m: PaymentMethod) => {
+    const n = data?.sales.filter((s) => s.method === m).length ?? 0;
+    const back = data?.returns[m] ?? 0;
+    return back > 0 ? `${n} ventas · devuelto ${soles(back)}` : `${n} ventas`;
+  };
   const moveErr = data ? movementError(moveType, Number(amount) || 0, note, data.expected) : null;
 
   const addMovement = () => {
@@ -113,19 +120,24 @@ export function CashScreen() {
         <>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
             <Kpi icon={Wallet} label="Fondo inicial" value={soles(data.session.openingAmount)} hint={`Abrió ${data.session.openedBy ?? ""} · ${data.session.openedAt ? timeShort(data.session.openedAt) : ""}`} />
-            <Kpi icon={Banknote} label="Efectivo" value={soles(data.totals.efectivo)} hint={`${data.sales.filter((s) => s.method === "efectivo").length} ventas`} />
-            <Kpi icon={Smartphone} label="Yape / Plin" value={soles(data.totals.yape)} hint={`${data.sales.filter((s) => s.method === "yape").length} ventas`} />
-            <Kpi icon={CreditCard} label="Tarjeta" value={soles(data.totals.tarjeta)} hint={`${data.sales.filter((s) => s.method === "tarjeta").length} ventas`} />
-            <Kpi icon={Lock} label="Debe haber en caja" value={soles(data.expected)} hint="Fondo + efectivo ± movimientos" strong />
+            <Kpi icon={Banknote} label="Efectivo" value={soles(net.efectivo)} hint={methodHint("efectivo")} />
+            <Kpi icon={Smartphone} label="Yape / Plin" value={soles(net.yape)} hint={methodHint("yape")} />
+            <Kpi icon={CreditCard} label="Tarjeta" value={soles(net.tarjeta)} hint={methodHint("tarjeta")} />
+            <Kpi icon={Lock} label="Debe haber en caja" value={soles(data.expected)} hint="Fondo + efectivo − devoluciones ± movimientos" strong />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
             <section className="min-w-0 overflow-hidden rounded-2xl border border-zinc-200 bg-white" aria-labelledby="turn-sales">
               <div className="border-b border-zinc-100 p-4 sm:px-5">
                 <h2 id="turn-sales" className="font-semibold tracking-tight">
-                  Ventas del turno · <span className="tabular-nums">{soles(data.totals.efectivo + data.totals.yape + data.totals.tarjeta)}</span>
+                  Ventas del turno · <span className="tabular-nums">{soles(sumPayments(net))}</span>
                 </h2>
                 <p className="text-xs text-zinc-500">{data.totals.tickets} comprobantes emitidos</p>
+                {data.returns.count > 0 && (
+                  <p className="mt-1 text-xs tabular-nums text-zinc-600">
+                    Vendido {soles(sumPayments(data.totals))} − Devoluciones / notas de crédito {soles(sumPayments(data.returns))} = Venta neta {soles(sumPayments(net))}
+                  </p>
+                )}
               </div>
               {data.sales.length === 0 ? (
                 <Empty icon={Receipt} title="Aún no hay ventas en este turno" />
@@ -150,6 +162,22 @@ export function CashScreen() {
             </section>
 
             <div className="grid content-start gap-4">
+              {data.returnRows.length > 0 && (
+                <section className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5" aria-labelledby="cash-returns">
+                  <h2 id="cash-returns" className="font-semibold tracking-tight">Devoluciones / notas de crédito · <span className="tabular-nums">{soles(sumPayments(data.returns))}</span></h2>
+                  <p className="mb-3 text-xs text-zinc-500">Solo lo devuelto en efectivo ({soles(data.returns.efectivo)}) sale de la caja. Yape y tarjeta se devuelven por su propio medio.</p>
+                  <ul className="grid gap-1.5 text-sm">
+                    {data.returnRows.map((r) => (
+                      <li key={r.id} className="flex items-start justify-between gap-2">
+                        <span className="min-w-0 text-zinc-600">
+                          {timeShort(r.issuedAt)} · {r.number} <span className="text-xs text-zinc-400">sobre {r.voucherNumber} · {PAYMENT_LABEL[r.method]}</span>
+                        </span>
+                        <span className="shrink-0 tabular-nums text-rose-600">−{soles(r.total)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
               <section className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5" aria-labelledby="cash-moves">
                 <h2 id="cash-moves" className="font-semibold tracking-tight">Movimientos de caja</h2>
                 <p className="mb-3 text-xs text-zinc-500">{MOVE_HINT[moveType]}.</p>
@@ -227,7 +255,7 @@ export function CashScreen() {
         ) : !closings.data?.length ? (
           <Empty icon={History} title={`Sin cierres en ${days} días`} />
         ) : (
-          <Table minWidth={multi ? 980 : 900} head={["Fecha", ...(multi ? ["Local"] : []), "Cerró", { label: "Tickets", align: "right" }, { label: "Efectivo", align: "right" }, { label: "Yape / Plin", align: "right" }, { label: "Tarjeta", align: "right" }, { label: "Debe haber", align: "right" }, { label: "Contado", align: "right" }, { label: "Diferencia", align: "right" }, { label: <span className="sr-only">Ver</span> }]}>
+          <Table minWidth={multi ? 1060 : 980} head={["Fecha", ...(multi ? ["Local"] : []), "Cerró", { label: "Tickets", align: "right" }, { label: "Efectivo", align: "right" }, { label: "Yape / Plin", align: "right" }, { label: "Tarjeta", align: "right" }, { label: "Devuelto", align: "right" }, { label: "Debe haber", align: "right" }, { label: "Contado", align: "right" }, { label: "Diferencia", align: "right" }, { label: <span className="sr-only">Ver</span> }]}>
             {closings.data.map((c) => {
               const { tone } = closeDifference(c.counted, c.expected);
               return (
@@ -241,6 +269,7 @@ export function CashScreen() {
                   <td className={cn(td, "whitespace-nowrap text-right tabular-nums")}>{soles(c.sales.efectivo)}</td>
                   <td className={cn(td, "whitespace-nowrap text-right tabular-nums")}>{soles(c.sales.yape)}</td>
                   <td className={cn(td, "whitespace-nowrap text-right tabular-nums")}>{soles(c.sales.tarjeta)}</td>
+                  <td className={cn(td, "whitespace-nowrap text-right tabular-nums")}>{c.returns.count ? `−${soles(sumPayments(c.returns))}` : "—"}</td>
                   <td className={cn(td, "whitespace-nowrap text-right tabular-nums")}>{soles(c.expected)}</td>
                   <td className={cn(td, "whitespace-nowrap text-right tabular-nums")}>{soles(c.counted)}</td>
                   <td className={cn(td, "whitespace-nowrap text-right font-semibold tabular-nums", TONE_TEXT[tone])}>
@@ -292,6 +321,7 @@ function ClosingDetail({ closing: c, branchName, onClose }: { closing: CashClosi
           <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">Efectivo</p>
           {row("Fondo inicial", c.openingAmount)}
           {row("Ventas en efectivo", c.sales.efectivo, "+")}
+          {c.returns.efectivo > 0 && row("Devoluciones en efectivo", c.returns.efectivo, "−")}
           {c.ingresos > 0 && row("Ingresos", c.ingresos, "+")}
           {c.egresos > 0 && row("Egresos", c.egresos, "−")}
           {c.retiros > 0 && row("Retiros", c.retiros, "−")}
@@ -312,7 +342,14 @@ function ClosingDetail({ closing: c, branchName, onClose }: { closing: CashClosi
             {row("Efectivo", c.sales.efectivo)}
             {row("Yape / Plin", c.sales.yape)}
             {row("Tarjeta", c.sales.tarjeta)}
-            {row("Total", round2(c.sales.efectivo + c.sales.yape + c.sales.tarjeta), undefined, true)}
+            {row("Total vendido", sumPayments(c.sales), undefined, true)}
+            {c.returns.count > 0 && (
+              <>
+                {row(`Devoluciones / notas de crédito (${c.returns.count})`, sumPayments(c.returns), "−")}
+                <p className="pl-3 text-xs text-zinc-500">En efectivo {soles(c.returns.efectivo)} · Yape / Plin {soles(c.returns.yape)} · Tarjeta {soles(c.returns.tarjeta)}</p>
+                {row("Venta neta", sumPayments(netPayments(c.sales, c.returns)), undefined, true)}
+              </>
+            )}
           </dl>
           {counted.length > 0 && (
             <div>

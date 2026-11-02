@@ -206,7 +206,7 @@ export function CustomersScreen() {
           ) : filtered.length === 0 ? (
             <Empty icon={Users} title="Sin clientes para esa búsqueda" />
           ) : (
-            <Table minWidth={820} head={["Cliente", "Documento", "Celular", { label: "Compras", align: "right" }, { label: "Total", align: "right" }, "Última compra", { label: "Puntos", align: "right" }]}>
+            <Table minWidth={820} head={["Cliente", "Documento", "Celular", { label: "Compras", align: "right" }, { label: "Total (neto)", align: "right" }, "Última compra", { label: "Puntos", align: "right" }]}>
               {filtered.map((c) => (
                 <tr key={c.id} tabIndex={0} onClick={() => setEditing(c)} onKeyDown={(e) => e.key === "Enter" && setEditing(c)} className="cursor-pointer outline-none transition-colors hover:bg-zinc-50 focus-visible:bg-zinc-50" aria-label={`Abrir ficha de ${c.name}`}>
                   <td className={td}>
@@ -219,7 +219,7 @@ export function CustomersScreen() {
                   <td className={cn(td, "whitespace-nowrap tabular-nums text-zinc-600")}>{c.ruc ? `RUC ${c.ruc}` : c.dni ? `DNI ${c.dni}` : "—"}</td>
                   <td className={cn(td, "whitespace-nowrap tabular-nums text-zinc-600")}>{c.phone || "—"}</td>
                   <td className={cn(td, "text-right tabular-nums")}>{c.purchases}</td>
-                  <td className={cn(td, "whitespace-nowrap text-right tabular-nums")}>{soles(c.totalSpent)}</td>
+                  <td className={cn(td, "whitespace-nowrap text-right tabular-nums")}>{soles(c.totalSpent)}{c.totalReturned > 0 && <span className="block text-[11px] font-normal text-zinc-500">devolvió {soles(c.totalReturned)}</span>}</td>
                   <td className={cn(td, "whitespace-nowrap tabular-nums text-zinc-600")}>{c.lastPurchaseAt ? dateShort(c.lastPurchaseAt) : "—"}</td>
                   <td className={cn(td, "text-right font-semibold tabular-nums")}>{c.points}</td>
                 </tr>

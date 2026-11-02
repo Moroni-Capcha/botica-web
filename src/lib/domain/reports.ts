@@ -53,7 +53,12 @@ export const periodDays = (p: Pick<Period, "from" | "to">) => Math.round((parseD
 /* ------------------------------ Totales ------------------------------ */
 
 export interface Totals {
+  /** Venta neta: lo vendido menos las devoluciones (notas de crédito). */
   total: number;
+  /** Lo vendido, antes de devoluciones. */
+  gross: number;
+  /** Lo devuelto en el periodo (positivo), por notas de crédito emitidas en él. */
+  returns: number;
   taxBase: number;
   igv: number;
   cost: number;
@@ -66,14 +71,19 @@ export interface Totals {
   avgTicket: number;
 }
 
+const isReturn = (l: Pick<SalesReportLine, "kind">) => l.kind === "devolucion";
+
+/** Totales de las líneas. Las devoluciones vienen en negativo, así que `total`, costo, utilidad y margen ya son netos. */
 export function totalsOf(lines: SalesReportLine[]): Totals {
   const total = round2(lines.reduce((s, l) => s + l.total, 0));
-  const cost = round2(lines.reduce((s, l) => s + l.cost, 0));
+  const returns = round2(-lines.filter(isReturn).reduce((s, l) => s + l.total, 0)) || 0;
+  const gross = round2(total + returns);
+  const cost = round2(lines.reduce((s, l) => s + l.cost, 0)) || 0; // `|| 0` evita -0
   const taxBase = round2(total / (1 + IGV));
-  const profit = round2(taxBase - cost);
-  const tickets = new Set(lines.map((l) => l.saleId)).size;
+  const profit = round2(taxBase - cost) || 0;
+  const tickets = new Set(lines.filter((l) => !isReturn(l)).map((l) => l.saleId)).size;
   return {
-    total, taxBase, igv: round2(total - taxBase), cost, profit, margin: taxBase > 0 ? round2((profit / taxBase) * 100) : 0,
+    total, gross, returns, taxBase, igv: round2(total - taxBase), cost, profit, margin: taxBase > 0 ? round2((profit / taxBase) * 100) : 0,
     units: lines.reduce((s, l) => s + l.units, 0), tickets, avgTicket: tickets ? round2(total / tickets) : 0,
   };
 }
@@ -113,7 +123,7 @@ export function byDay(lines: SalesReportLine[], period: Pick<Period, "from" | "t
     if (!r) continue;
     r.total += l.total;
     r.byBranch[l.branchId] = (r.byBranch[l.branchId] ?? 0) + l.total;
-    r.tickets.add(l.saleId);
+    if (!isReturn(l)) r.tickets.add(l.saleId);
   }
   return [...rows.values()].map((r) => ({ date: r.date, total: round2(r.total), byBranch: Object.fromEntries(Object.entries(r.byBranch).map(([k, v]) => [k, round2(v)])), tickets: r.tickets.size }));
 }
@@ -132,7 +142,7 @@ export interface DeadStockRow {
 
 /** Productos con stock vigente en un local que no se vendieron ahí en todo el periodo. Ordenado por plata inmovilizada. */
 export function deadStock(products: Product[], lots: Lot[], lines: SalesReportLine[], branchIds: BranchId[], now: number): DeadStockRow[] {
-  const sold = new Set(lines.map((l) => `${l.branchId}:${l.productId}`));
+  const sold = new Set(lines.filter((l) => !isReturn(l)).map((l) => `${l.branchId}:${l.productId}`));
   const out: DeadStockRow[] = [];
   for (const branchId of branchIds) {
     const own = lots.filter((l) => l.branchId === branchId);
@@ -166,7 +176,7 @@ export function prescriptionBook(lines: SalesReportLine[], products: Map<number,
   const m = new Map<string, PrescriptionEntry>();
   for (const l of lines) {
     const p = products.get(l.productId);
-    if (!l.prescription || !p || p.rx === "libre") continue;
+    if (isReturn(l) || !l.prescription || !p || p.rx === "libre") continue;
     const e = m.get(l.saleId) ?? { saleId: l.saleId, number: l.number, at: l.at, branchId: l.branchId, sellerName: l.sellerName, prescription: l.prescription, items: [], controlled: false };
     e.items.push({ productId: l.productId, units: l.units, presentationLabel: l.presentationLabel, qty: l.qty });
     if (p.rx === "controlado") e.controlled = true;

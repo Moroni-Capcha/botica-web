@@ -29,11 +29,12 @@ import { isValidBoticaCode, isValidEmail, normalizeBoticaCode, normalizeEmail, p
 import { findPlan, listPlanOffers, TRIAL_DAYS } from "@/lib/domain/plans";
 import { isSetupStep, normalizeDone, SETUP_STEPS } from "@/lib/domain/onboarding";
 import { accountErrors, accountGuard, branchErrors, branchSlug, deactivateBlockers, planUsage, hasErrors, normalizePharmacy, pharmacyErrors, rulesErrors } from "@/lib/domain/settings";
+import { netPayments, netPurchase, returnLines, returnsByMethod, type LotCost } from "@/lib/domain/returns";
 import { acceptedResponse, allocateReturn, canResend, creditableLines, creditNoteNumber, creditedTotalOf, noteSeries, planCreditNote, voidBlocker, voidReasonError } from "@/lib/domain/vouchers";
 import { SEED_DAILY_UNITS, SEED_LOT_PLAN, SEED_PRODUCTS, SEED_SUC_MISSING } from "./seed-data";
 
 const KEY = "bh.mock.v1";
-const VERSION = 15; // subir cuando cambie la forma de los datos: se regeneran
+const VERSION = 16; // subir cuando cambie la forma de los datos: se regeneran
 const DAY = 86_400_000;
 
 /**
@@ -325,11 +326,29 @@ function seedCustomers(db: MockDb, t0: number) {
 /** Ventas que siguen vigentes: las anuladas (comunicación de baja) no cuentan en reportes, caja ni compras del cliente. */
 const liveSales = (d: Pick<MockDb, "sales" | "vouchers">): Sale[] => d.sales.filter((s) => d.vouchers[s.id]?.status !== "anulado");
 
-/** Compras del cliente: historial de ejemplo más las ventas con el cliente asignado. */
+/** Costo del lote para revertirlo al devolver mercadería; si el lote ya no existe, el costo del producto. */
+function lotCostOf(d: Pick<MockDb, "lots" | "products">): LotCost {
+  const lots = new Map(d.lots.map((l) => [l.id, l.cost]));
+  const products = new Map(d.products.map((p) => [p.id, p.cost]));
+  return (lotId, productId) => lots.get(lotId) ?? products.get(productId) ?? 0;
+}
+
+/** Líneas en negativo de las notas de crédito válidas que cumplen `keep` (por local y fecha de emisión de la nota). */
+function returnLinesIn(d: MockDb, keep: (l: SalesReportLine) => boolean): SalesReportLine[] {
+  const cost = lotCostOf(d);
+  return d.sales.flatMap((s) => {
+    const notes = d.creditNotes.filter((n) => n.voucherId === s.id);
+    return notes.length ? returnLines(s, notes, cost).filter(keep) : [];
+  });
+}
+
+/** Compras del cliente: historial de ejemplo más las ventas con el cliente asignado, ya sin lo devuelto. */
 function purchasesOf(d: MockDb, customerId: number): CustomerPurchase[] {
   const fromSales: CustomerPurchase[] = liveSales(d)
     .filter((s) => s.customerId === customerId)
-    .map((s) => ({ saleId: s.id, number: s.number, branchId: s.branchId, at: s.createdAt, total: s.total, items: s.items.map((it) => ({ productId: it.productId, units: it.units, total: it.total, presentationLabel: it.presentationLabel, qty: it.qty })) }));
+    .map((s) => ({ s, net: netPurchase(s, d.creditNotes.filter((n) => n.voucherId === s.id)) }))
+    .filter(({ s, net }) => net.total > 0 || net.returned === 0 || s.total === 0)
+    .map(({ s, net }) => ({ saleId: s.id, number: s.number, branchId: s.branchId, at: s.createdAt, total: net.total, items: net.items, ...(net.returned > 0 ? { returned: net.returned } : {}) }));
   const idPrefix = [`h${customerId}-`, `x${customerId}-`];
   const history = d.customerHistory.filter((h) => idPrefix.some((p) => h.saleId.startsWith(p)) || (h as CustomerPurchase & { customerId?: number }).customerId === customerId);
   return [...fromSales, ...history].sort((a, b) => b.at.localeCompare(a.at));
@@ -339,7 +358,7 @@ function purchasesOf(d: MockDb, customerId: number): CustomerPurchase[] {
 function customerSummaries(d: MockDb): CustomerSummary[] {
   return d.customers.map((c) => {
     const ps = purchasesOf(d, c.id);
-    return { ...c, purchases: ps.length, totalSpent: round2(ps.reduce((a, p) => a + p.total, 0)), lastPurchaseAt: ps[0]?.at ?? null };
+    return { ...c, purchases: ps.length, totalSpent: round2(ps.reduce((a, p) => a + p.total, 0)), totalReturned: round2(ps.reduce((a, p) => a + (p.returned ?? 0), 0)), lastPurchaseAt: ps[0]?.at ?? null };
   });
 }
 
@@ -458,7 +477,7 @@ function seedClosings(db: MockDb, t0: number, rnd: () => number): CashClosing[] 
       const { difference } = closeDifference(counted, expected);
       out.push({
         id: id++, branchId: branch.id, openedAt: new Date(day + 8 * 3600_000).toISOString(), openedBy: SELLER[branch.id] ?? "", closedAt: new Date(day + 21 * 3600_000 + 10 * 60_000).toISOString(), closedBy: SELLER[branch.id] ?? "",
-        openingAmount: 150, sales: { efectivo, yape, tarjeta }, tickets: Math.max(1, Math.round(revenue / 9)), ...m, expected, counted, difference, denominations: {},
+        openingAmount: 150, sales: { efectivo, yape, tarjeta }, returns: { efectivo: 0, yape: 0, tarjeta: 0, count: 0 }, tickets: Math.max(1, Math.round(revenue / 9)), ...m, expected, counted, difference, denominations: {},
         note: Math.abs(difference) >= 1 ? (difference < 0 ? "Vuelto mal dado en hora punta" : "Cliente dejó el vuelto") : "", movements,
       });
     }
@@ -765,8 +784,19 @@ function summaryOf(d: MockDb, branchId: string) {
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .map((s) => ({ id: s.id, number: s.number, createdAt: s.createdAt, total: s.total, method: s.payment.method, sellerName: s.sellerName, hasPrescription: !!s.prescription }));
   const totals = paymentTotals(sales);
+  /* Devoluciones: notas emitidas en este turno. Solo las de ventas pagadas en efectivo sacan plata de la caja. */
+  const saleOf = new Map(d.sales.map((s) => [s.id, s]));
+  const notes = d.creditNotes.filter((n) => n.branchId === branchId && new Date(n.issuedAt).getTime() >= since);
+  const returns = returnsByMethod(notes, (id) => saleOf.get(id)?.payment.method);
+  const returnRows = notes
+    .filter((n) => n.status !== "rechazado" && n.status !== "anulado" && saleOf.has(n.voucherId))
+    .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt))
+    .map((n) => ({ id: n.id, number: n.number, voucherNumber: n.voucherNumber, issuedAt: n.issuedAt, total: n.total, method: saleOf.get(n.voucherId)!.payment.method, userName: n.userName }));
   const movements = session.open ? (d.cashMovements[branchId] ?? []) : [];
-  return { session, sales, totals: { ...totals, tickets: sales.length }, movements: [...movements].reverse(), expected: session.open ? expectedCash(session.openingAmount, totals.efectivo, movements) : 0 };
+  return {
+    session, sales, totals: { ...totals, tickets: sales.length }, returns, returnRows, movements: [...movements].reverse(),
+    expected: session.open ? expectedCash(session.openingAmount, netPayments(totals, returns).efectivo, movements) : 0,
+  };
 }
 
 function requireAdmin(u: StaffRecord, what = "la asistencia") {
@@ -1229,6 +1259,8 @@ export function createMockClient(): ApiClient {
           });
         }
       }
+      /* Notas de crédito: restan el día en que se emitieron, no el de la venta */
+      lines.push(...returnLinesIn(d, (l) => scope.includes(l.branchId) && inRange(l.at)));
       return lines.sort((x, y) => x.at.localeCompare(y.at));
     },
     async getDashboard(days) {
@@ -1245,13 +1277,24 @@ export function createMockClient(): ApiClient {
         const date = isoDay(t0 - i * DAY + 12 * 3600_000);
         for (const branchId of branchIds) {
           const cs = d.closings.filter((c) => c.branchId === branchId && isoDay(new Date(c.closedAt).getTime()) === date);
-          series.push({ date, branchId, total: round2(cs.reduce((a, c) => a + c.sales.efectivo + c.sales.yape + c.sales.tarjeta, 0)), tickets: cs.reduce((a, c) => a + c.tickets, 0) });
+          const returns = round2(cs.reduce((a, c) => a + (c.returns ? c.returns.efectivo + c.returns.yape + c.returns.tarjeta : 0), 0));
+          series.push({ date, branchId, total: round2(cs.reduce((a, c) => a + c.sales.efectivo + c.sales.yape + c.sales.tarjeta, 0) - returns), returns, tickets: cs.reduce((a, c) => a + c.tickets, 0) });
         }
       }
       const todayStats = branchIds.map((branchId) => {
         const sales = liveSales(d).filter((x) => x.branchId === branchId && new Date(x.createdAt).getTime() >= t0);
         const byHour = Array.from({ length: 24 }, () => 0);
         const top = new Map<number, { productId: number; units: number; total: number }>();
+        /* Devoluciones emitidas hoy (de cualquier venta): restan en la hora, el método y el producto */
+        const back = returnLinesIn(d, (l) => l.branchId === branchId && new Date(l.at).getTime() >= t0);
+        for (const l of back) {
+          const h = new Date(l.at).getHours();
+          byHour[h] = round2((byHour[h] ?? 0) + l.total);
+          const cur = top.get(l.productId) ?? { productId: l.productId, units: 0, total: 0 };
+          cur.units += l.units;
+          cur.total = round2(cur.total + l.total);
+          top.set(l.productId, cur);
+        }
         for (const x of sales) {
           const h = new Date(x.createdAt).getHours();
           byHour[h] = round2((byHour[h] ?? 0) + x.total);
@@ -1262,9 +1305,12 @@ export function createMockClient(): ApiClient {
             top.set(it.productId, cur);
           }
         }
+        const gross = round2(sales.reduce((a, x) => a + x.total, 0));
+        const returns = round2(-back.reduce((a, l) => a + l.total, 0));
         return {
-          branchId, total: round2(sales.reduce((a, x) => a + x.total, 0)), tickets: sales.length, byMethod: paymentTotals(sales.map((x) => ({ method: x.payment.method, total: x.total }))), byHour,
-          topProducts: [...top.values()].sort((a, b) => b.total - a.total).slice(0, 8),
+          branchId, total: round2(gross - returns), gross, returns, tickets: sales.length,
+          byMethod: paymentTotals([...sales.map((x) => ({ method: x.payment.method, total: x.total })), ...back.map((l) => ({ method: l.method, total: l.total }))]), byHour,
+          topProducts: [...top.values()].filter((t) => t.total > 0).sort((a, b) => b.total - a.total).slice(0, 8),
         };
       });
       return { series, today: todayStats };
@@ -1625,6 +1671,8 @@ export function createMockClient(): ApiClient {
         if (new Date(sale.createdAt).getTime() < from) continue;
         for (const it of sale.items) add(sale.branchId, it.productId, it.units);
       }
+      /* Lo devuelto por nota de crédito baja la demanda (las unidades, no los descuentos) */
+      for (const l of returnLinesIn(d, (x) => new Date(x.at).getTime() >= from)) if (l.units) add(l.branchId, l.productId, l.units);
       return [...m.values()].filter((v) => v.units > 0);
     },
     async setLotDiscount(branchId, lotIds, discount) {
@@ -1782,7 +1830,7 @@ export function createMockClient(): ApiClient {
       const movements = d.cashMovements[branchId] ?? [];
       const closing: CashClosing = {
         id: Math.max(0, ...d.closings.map((c) => c.id)) + 1, branchId, openedAt: session!.openedAt!, openedBy: session!.openedBy ?? "", closedAt: new Date().toISOString(), closedBy: u.name,
-        openingAmount: session!.openingAmount, sales: { efectivo: sum.totals.efectivo, yape: sum.totals.yape, tarjeta: sum.totals.tarjeta }, tickets: sum.totals.tickets,
+        openingAmount: session!.openingAmount, sales: { efectivo: sum.totals.efectivo, yape: sum.totals.yape, tarjeta: sum.totals.tarjeta }, returns: sum.returns, tickets: sum.totals.tickets,
         ...movementTotals(movements), expected: sum.expected, counted: round2(counted), difference, denominations: input.denominations, note: input.note.trim(), movements,
       };
       d.closings.push(closing);

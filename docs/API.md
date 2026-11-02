@@ -151,10 +151,10 @@ En el mock, el dueño de ejemplo es `dueno@botica-huanuco.pe` con contraseña `C
 
 ```json
 {
-  "series": [{ "date": "2026-10-21", "branchId": "principal", "total": 312.4, "tickets": 41 }],
+  "series": [{ "date": "2026-10-21", "branchId": "principal", "total": 302.4, "returns": 10, "tickets": 41 }],
   "today": [{
-    "branchId": "principal", "total": 72.8, "tickets": 6,
-    "byMethod": { "efectivo": 40.3, "yape": 29, "tarjeta": 3.5 },
+    "branchId": "principal", "total": 72.8, "gross": 82.8, "returns": 10, "tickets": 6,
+    "byMethod": { "efectivo": 30.3, "yape": 39, "tarjeta": 3.5 },
     "byHour": [0, 0, 0, 0, 0, 0, 0, 0, 22.5, 50.3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     "topProducts": [{ "productId": 1, "units": 30, "total": 6 }]
   }]
@@ -163,6 +163,7 @@ En el mock, el dueño de ejemplo es `dueno@botica-huanuco.pe` con contraseña `C
 
 - `series`: una fila por día **anterior a hoy** y local, del más antiguo al más reciente, **incluidos los días sin venta** (con 0) para que el gráfico no salte días. `date` en hora de Lima. `days` entre 1 y 60.
 - `today`: venta desde las 00:00 de hoy (Lima). `byHour` tiene 24 posiciones (0 = 00:00–00:59). `topProducts` son los 8 de mayor importe, usando `items[].total` de las ventas.
+- **Devoluciones (notas de crédito).** `total` es la venta **neta**: `gross − returns`. `gross` es lo vendido hoy y `returns` el importe (positivo) de las notas de crédito válidas emitidas hoy en ese local, aunque la venta original sea de otro día. En `series`, `total` ya viene neto y `returns` dice cuánto se devolvió ese día (la suma de `returns` de los cierres de caja del día). `byMethod`, `byHour` y `topProducts` también son netos: cada nota resta en el método de pago de la venta original, en la hora en que se emitió y en los productos devueltos (un descuento global se reparte entre los productos de la venta según su importe). Una nota rechazada o anulada por SUNAT no cuenta. `tickets` cuenta solo ventas, no notas.
 - El administrador recibe todos los locales; el encargado, solo el suyo.
 - Lo demás del panel (pendientes de vencimiento, stock, traslados, caja y asistencia) se arma en el front con los endpoints de cada módulo (`buildAlerts` en `src/lib/domain/dashboard.ts`).
 
@@ -304,13 +305,13 @@ Código del traslado: `T-` y el id con 4 dígitos (`T-0012`). El administrador p
 
 `Customer` ahora trae `treatments: [{ productId, everyDays }]` (medicamentos de uso continuo con su ciclo), `contactConsent` (aceptó recibir avisos), `notes` y `createdAt`. Reemplaza a `chronicProductIds`. Validación (la misma de `validateCustomer`): nombre de 3 letras o más; DNI de 8 dígitos y RUC válido, ambos sin repetir; para marcar `contactConsent` hace falta un celular peruano (9 dígitos que empiezan en 9); medicamentos sin repetir y ciclo de 1 a 365 días.
 
-`GET /customers/all` → `CustomerSummary[]`: todos los clientes con `purchases`, `totalSpent` y `lastPurchaseAt`. Declárala antes de `/customers/:id`.
+`GET /customers/all` → `CustomerSummary[]`: todos los clientes con `purchases`, `totalSpent`, `totalReturned` y `lastPurchaseAt`. `totalSpent` es **neto**: ya descuenta lo devuelto con notas de crédito (`totalReturned`, que es positivo). Una compra devuelta por completo no cuenta en `purchases`. Declárala antes de `/customers/:id`.
 
 `GET /customers/all?q=rosa&page=1&pageSize=25` → `Page<CustomerSummary>` (ver "Paginación en el servidor"). Con `page`, la misma cartera pero recortada y con la búsqueda hecha en el servidor: `q` coincide con el nombre (sin importar mayúsculas) o, si trae números, con los dígitos del DNI, RUC o celular (`matchesCustomer` en `src/lib/domain/customers.ts`). Orden: compra más reciente primero y, al final, quienes nunca compraron, por nombre (`byRecentPurchase`). Sin `page` responde el arreglo completo de siempre, que las recompras siguen usando.
 
 `PUT /customers/:id` con `CustomerInput` → `Customer`. Los puntos no se editan aquí: los suma la venta (1 por cada S/ 10).
 
-`GET /customers/:id/purchases` → `CustomerPurchase[]`: las ventas con ese cliente, de la más reciente a la más antigua, máximo 50.
+`GET /customers/:id/purchases` → `CustomerPurchase[]`: las ventas con ese cliente, de la más reciente a la más antigua, máximo 50. Con notas de crédito válidas, `total` e `items` ya vienen sin lo devuelto y `returned` trae el importe devuelto (se omite si no hubo notas). Una venta devuelta por completo no aparece. Estas mismas compras alimentan `GET /customers/refills`: lo devuelto no cuenta como última compra del producto. Lo que se devolvió por un descuento global baja `total`, pero no cambia `items`.
 
 `GET /customers/refills` → `RefillInfo[]`: una fila por cliente y tratamiento, con la fecha de la última venta que incluyó ese producto (`lastPurchaseAt`, `null` si nunca), las unidades de esa compra y el último aviso registrado. El estado (atrasado, hoy, pronto, al día) lo calcula el front con `refillRows`.
 
@@ -331,14 +332,19 @@ Un turno de caja por local: se abre con un fondo, acumula ventas y movimientos, 
   "session": { "branchId": "principal", "open": true, "openedAt": "2026-10-27T08:00:00-05:00", "openedBy": "Q.F. Daniel Rojas", "openingAmount": 150 },
   "sales": [{ "id": "s_91", "number": "B001-003141", "createdAt": "2026-10-27T10:42:00-05:00", "total": 18.5, "method": "efectivo", "sellerName": "Q.F. Daniel Rojas", "hasPrescription": false }],
   "totals": { "efectivo": 93.4, "yape": 29.4, "tarjeta": 3.5, "tickets": 20 },
+  "returns": { "efectivo": 6.5, "yape": 0, "tarjeta": 0, "count": 1 },
+  "returnRows": [{ "id": "nc_1", "number": "BC01-000001", "voucherNumber": "B001-003141", "issuedAt": "2026-10-27T12:10:00-05:00", "total": 6.5, "method": "efectivo", "userName": "Q.F. Daniel Rojas" }],
   "movements": [{ "id": 1, "at": "2026-10-27T11:00:00-05:00", "type": "egreso", "amount": 12, "note": "Movilidad", "userName": "Q.F. Daniel Rojas" }],
-  "expected": 231.4
+  "expected": 224.9
 }
 ```
 
 - `sales`: ventas del local desde `openedAt`, de la más reciente a la más antigua.
-- `expected` = fondo + ventas en efectivo + ingresos − egresos − retiros. El efectivo de la venta es su `total`, porque el vuelto ya se entregó.
-- Con la caja cerrada: `session.open = false`, listas vacías y `expected = 0`.
+- `expected` = fondo + ventas en efectivo − devoluciones en efectivo + ingresos − egresos − retiros. El efectivo de la venta es su `total`, porque el vuelto ya se entregó.
+- `totals` es lo **vendido** (bruto) por método. `returns` son las notas de crédito válidas emitidas **durante este turno** (`issuedAt` desde `openedAt`, en este local), sumadas por el método de pago de la **venta original**, y `count` cuántas son. `returnRows` las lista, la más reciente primero. Venta neta del turno = `totals − returns`.
+- Solo `returns.efectivo` baja `expected`: el reembolso en efectivo sale de la caja del turno en que se emite la nota (no importa la fecha de la venta). Lo devuelto por Yape o tarjeta no toca el efectivo, pero se muestra como devolución en el resumen y en el cierre.
+- Una nota rechazada o anulada por SUNAT no cuenta. Si la caja está cerrada cuando se emite la nota, no resta de ningún turno (conviene abrir caja antes de devolver efectivo).
+- Con la caja cerrada: `session.open = false`, listas vacías, `returns` en 0 y `expected = 0`.
 
 `POST /cash/:branchId/movements` con `{ "type": "egreso", "amount": 7.5, "note": "Agua para el local" }` → `CashMovement` (201)
 
@@ -354,7 +360,7 @@ Un turno de caja por local: se abre con un fondo, acumula ventas y movimientos, 
 
 - Si llegan `denominations`, el servidor recalcula `counted` con ellas.
 - `difference = counted − expected` (negativo: faltante; positivo: sobrante). Con una diferencia de S/ 1 o más en valor absoluto, `note` es obligatoria (mínimo 5 caracteres); si falta, `400 DIFERENCIA_SIN_MOTIVO`.
-- Guarda el cierre con totales por método, egresos, retiros, ingresos, arqueo y movimientos, y deja la caja cerrada. Desde ahí `POST /sales` responde `CAJA_CERRADA` hasta que se vuelva a abrir.
+- Guarda el cierre con totales por método (`sales`, lo vendido), `returns` (devoluciones del turno por método, con `count`; mismo cálculo que en el resumen), egresos, retiros, ingresos, arqueo y movimientos, y deja la caja cerrada. `expected` ya descuenta las devoluciones en efectivo. Desde ahí `POST /sales` responde `CAJA_CERRADA` hasta que se vuelva a abrir.
 
 `GET /cash/closings?days=30&branchId=principal` → `CashClosing[]`, del más reciente al más antiguo. Sin `branchId`, todos los locales (solo `admin`).
 
@@ -510,9 +516,11 @@ La pantalla es del administrador. El endpoint acepta también a una cuenta de lo
 
 - `total` es lo cobrado por la línea, con IGV y después del descuento. `cost` es el costo sin IGV de los lotes que salieron (FEFO), no el costo de lista.
 - `discount` es el descuento promedio aplicado (0..1). `prescription` va en todas las líneas de una venta con receta; el front arma el libro de recetas solo con los productos que la requieren.
-- Las anuladas no se incluyen.
+- Las anuladas (comunicación de baja) no se incluyen.
+- `kind` (opcional): `"venta"` (si falta, es una venta) o `"devolucion"`. El servidor agrega **una fila `devolucion` por cada línea de cada nota de crédito válida** (no rechazada ni anulada) cuyo `at` (fecha de **emisión de la nota**, no de la venta) cae en el rango. Ahí `number` es el de la nota, `saleId`, `method`, `sellerName`, `documentType` y `customerId` son los de la venta original, `prescription` es `null`, y `qty`, `units`, `total` y `cost` van en **negativo**.
+- Nota por ítem (07) y total (01, 06): una fila por producto devuelto con su `total`. Con devolución de stock (`returnedToStock`), `cost` es el costo de las unidades devueltas **a precio del lote de origen** (las unidades vuelven a los lotes en el orden en que salieron); sin devolución de stock, `cost` es 0 (resta venta, no costo). Descuento global o disminución (04, 09): sin productos; el importe se reparte entre las líneas de la venta según su `total` (en céntimos, sin perder ni inventar centavos), con `qty`, `units` y `cost` en 0.
 
-El front calcula todo lo demás con `src/lib/domain/reports.ts` (pruebas en `reports.test.ts`): venta sin IGV = total / 1,18; utilidad = venta sin IGV − costo; margen = utilidad / venta sin IGV; agrupación por producto, laboratorio, tipo, local, vendedor y pago; venta por día; productos con stock sin venta en el periodo (usa `GET /lots`); libro de recetas; comparación con el periodo anterior de la misma duración. Si el volumen crece, el backend puede ofrecer después los mismos cortes ya agrupados sin cambiar la pantalla.
+El front calcula todo lo demás con `src/lib/domain/reports.ts` (pruebas en `reports.test.ts`): venta sin IGV = total / 1,18; utilidad = venta sin IGV − costo; margen = utilidad / venta sin IGV; agrupación por producto, laboratorio, tipo, local, vendedor y pago; venta por día; productos con stock sin venta en el periodo (usa `GET /lots`); libro de recetas; comparación con el periodo anterior de la misma duración. Como las devoluciones vienen en negativo, `totalsOf` y todas las agrupaciones ya dan cifras **netas**; además `totalsOf` entrega `gross` (lo vendido), `returns` (lo devuelto, positivo) y `total = gross − returns`. `tickets` cuenta solo ventas; las devoluciones no entran al libro de recetas ni cuentan como venta de un producto para "sin movimiento". Reglas en `src/lib/domain/returns.ts` (pruebas en `returns.test.ts`). Si el volumen crece, el backend puede ofrecer después los mismos cortes ya agrupados sin cambiar la pantalla.
 
 ### Ajustes
 
@@ -616,7 +624,7 @@ Pantalla `Comprobantes` (módulo `comprobantes`, incluido en todos los planes). 
 - El importe de una línea es `line.total × qty / line.qty`; al acreditar lo que falta de la línea se toma el saldo exacto. Siempre con IGV incluido; `taxBase` e `igv` se calculan sobre el total de la nota.
 - Numeración: `BC01-000001` para boletas y `FC01-000001` para facturas (`B`/`F` + `C` + las dos últimas cifras de la serie del local), correlativo propio por serie. Solo se envía a SUNAT una nota sobre un comprobante ya aceptado.
 - Las unidades que vuelven al stock regresan a los lotes de la venta en el orden en que salieron y entran al kardex como `devolucion` con la referencia `Nota de crédito BC01-000001`.
-- Fuera de alcance por ahora: las notas todavía no restan en reportes ni en el cierre de caja; el reembolso se registra a mano como egreso de caja.
+- **Dinero.** Una nota de crédito válida (no rechazada ni anulada) resta de la venta neta, con IGV, en el día y el turno en que se **emitió**, no en los de la venta. Las notas parciales restan solo lo acreditado. Con devolución de stock, el costo se revierte al costo del lote de origen para que el margen siga bien; sin devolución, resta venta pero no costo. Aplica a: cierre de caja y efectivo esperado (solo lo pagado en efectivo; Yape y tarjeta se muestran como devoluciones por método), panel, reportes, compras del cliente y velocidad de venta (`GET /sales/velocity`: lo devuelto baja las unidades). Detalle de los campos en Caja, Panel del día, Reportes y Clientes. Un comprobante anulado no admite notas y uno con nota no se anula, así que nunca se resta dos veces.
 
 **Ticket de 80 mm.** La impresión se hace en el front (`@media print`, 80 mm de ancho) para la venta y la nota de crédito; el backend no genera PDF. El código QR y el hash de la representación impresa los entrega el proveedor de facturación y se agregarán al ticket cuando el contrato los incluya.
 

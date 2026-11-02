@@ -91,6 +91,12 @@ export function CloseDialog({ summary, branchName, onClose, onClosed }: { summar
             <dt className="text-zinc-600">Contado</dt>
             <dd className="text-lg font-semibold tabular-nums">{soles(counted)}</dd>
           </div>
+          {summary.returns.efectivo > 0 && (
+            <div className="flex justify-between">
+              <dt className="text-zinc-600">Ya descontado: devoluciones en efectivo</dt>
+              <dd className="tabular-nums">−{soles(summary.returns.efectivo)}</dd>
+            </div>
+          )}
           <div className="flex justify-between">
             <dt className="text-zinc-600">Debe haber</dt>
             <dd className="tabular-nums">{soles(summary.expected)}</dd>

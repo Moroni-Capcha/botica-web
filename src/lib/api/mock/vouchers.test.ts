@@ -128,6 +128,44 @@ describe("mock: comprobantes SUNAT", () => {
     expect((await rejects(api.createCreditNote(sale.id, { reasonCode: "09", note: "Cobro de más", amount: sale.total }))).code).toBe("DATOS_INVALIDOS");
   });
 
+  it("las notas de crédito restan en la caja, el panel y el reporte el día en que se emiten", async () => {
+    const sale = await sell(4);
+    const cash0 = await run(api.getCashSummary("principal"));
+    const today = (await run(api.getDashboard(7))).today.find((t) => t.branchId === "principal")!;
+    const sum = (ls: { total: number }[]) => ls.reduce((s, l) => s + l.total, 0);
+    const rep0 = await run(api.getSalesReport(range()));
+
+    const n = await run(api.createCreditNote(sale.id, { reasonCode: "07", note: "Devuelve dos", items: [{ lineIndex: 0, qty: 2 }] }));
+
+    const cash1 = await run(api.getCashSummary("principal"));
+    expect(cash1.totals).toEqual(cash0.totals); // lo vendido no cambia
+    expect(cash1.returns.count).toBe(cash0.returns.count + 1);
+    expect(cash1.returns.efectivo).toBeCloseTo(cash0.returns.efectivo + n.total, 2); // la venta fue en efectivo
+    expect(cash1.returns.yape).toBe(cash0.returns.yape);
+    expect(cash1.returnRows.some((r) => r.number === n.number && r.method === "efectivo" && r.total === n.total)).toBe(true);
+    if (cash1.session.open) expect(cash1.expected).toBeCloseTo(cash0.expected - n.total, 2);
+
+    const today1 = (await run(api.getDashboard(7))).today.find((t) => t.branchId === "principal")!;
+    expect(today1.gross).toBe(today.gross);
+    expect(today1.returns).toBeCloseTo(today.returns + n.total, 2);
+    expect(today1.total).toBeCloseTo(today.total - n.total, 2);
+    expect(today1.byMethod.efectivo).toBeCloseTo(today.byMethod.efectivo - n.total, 2);
+    expect(today1.tickets).toBe(today.tickets);
+
+    const rep1 = await run(api.getSalesReport(range()));
+    const back = rep1.filter((l) => l.kind === "devolucion" && l.number === n.number);
+    expect(back).toHaveLength(1);
+    expect(back[0]).toMatchObject({ qty: -2, productId: 1, saleId: sale.id });
+    expect(back[0]!.cost).toBeLessThan(0); // volvió al stock: el costo se revierte
+    expect(sum(rep1)).toBeCloseTo(sum(rep0) - n.total, 2);
+
+    // sin devolución de stock: resta venta pero no costo
+    const sale2 = await sell(2);
+    const n2 = await run(api.createCreditNote(sale2.id, { reasonCode: "07", note: "Producto dañado", items: [{ lineIndex: 0, qty: 1 }], returnStock: false }));
+    const back2 = (await run(api.getSalesReport(range()))).filter((l) => l.kind === "devolucion" && l.number === n2.number);
+    expect(back2.map((l) => l.cost)).toEqual([0]);
+  });
+
   it("una venta de hoy aparece en el rango de hoy y no en uno pasado; rechaza rangos inválidos", async () => {
     const sale = await sell(1);
     expect((await run(api.listVouchers(range()))).some((v) => v.id === sale.id)).toBe(true);

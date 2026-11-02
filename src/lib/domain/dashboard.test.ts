@@ -3,7 +3,7 @@ import type { CashSummary, DailySales, Transfer } from "@/lib/api/types";
 import { averageDay, buildAlerts, dailyTotals, greeting, sameDayLastWeek } from "./dashboard";
 
 const NOW = new Date(2026, 9, 27, 15, 0).getTime(); // martes 27/10/2026, 3 p. m.
-const s = (date: string, branchId: string, total: number): DailySales => ({ date, branchId, total, tickets: 10 });
+const s = (date: string, branchId: string, total: number): DailySales => ({ date, branchId, total, returns: 0, tickets: 10 });
 
 describe("venta", () => {
   const series = [s("2026-10-20", "principal", 300), s("2026-10-20", "sucursal", 120), s("2026-10-21", "principal", 0), s("2026-10-21", "sucursal", 0), s("2026-10-26", "principal", 250)];
@@ -30,7 +30,7 @@ describe("venta", () => {
 
 describe("pendientes", () => {
   const cash = (branchId: string, open: boolean, openedAt: string | null): CashSummary => ({
-    session: { branchId, open, openedAt, openedBy: null, openingAmount: 150 }, sales: [], totals: { efectivo: 0, yape: 0, tarjeta: 0, tickets: 0 }, movements: [], expected: 150,
+    session: { branchId, open, openedAt, openedBy: null, openingAmount: 150 }, sales: [], totals: { efectivo: 0, yape: 0, tarjeta: 0, tickets: 0 }, returns: { efectivo: 0, yape: 0, tarjeta: 0, count: 0 }, returnRows: [], movements: [], expected: 150,
   });
   const transfer = (status: Transfer["status"], from: string, to: string): Transfer => ({
     id: 4, code: "T-0004", fromBranchId: from, toBranchId: to, status, note: "", requested: [{ productId: 1, units: 5 }], items: [], createdAt: "", createdBy: "",
