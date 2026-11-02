@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   title: { default: "Digi!HME · Sistema para boticas", template: "%s · Digi!HME" },
   description: "Digi!HME: ventas, lotes, vencimientos, caja e inventario para boticas y farmacias",
   applicationName: "Digi!HME",
-  robots: { index: false, follow: false },
+  appleWebApp: { capable: true, title: "Digi!HME", statusBarStyle: "default" },  robots: { index: false, follow: false },
 };
 
 export const viewport: Viewport = { themeColor: "#0b4f45", width: "device-width", initialScale: 1 };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { effectiveStatus, isReadOnly, limaDay } from "@/lib/domain/account";
 import type { SetupStep, ClockRequest, ContactRequest, CustomerInput, ManualMarkRequest, WorkerInput } from "@/lib/api";
@@ -88,19 +88,24 @@ export const useCash = (branchId: BranchId) => useQuery({ queryKey: qk.cash(bran
 export const useCustomerSearch = (q: string, enabled: boolean) =>
   useQuery({ queryKey: qk.customers(q), queryFn: () => api.searchCustomers(q), enabled, staleTime: 30_000 });
 
+/** Refresca lo que cambia una venta: lotes, stock, kardex, caja, panel y compras del cliente. */
+export function invalidateAfterSale(qc: QueryClient, branchId: BranchId, customerId?: number | null) {
+  void qc.invalidateQueries({ queryKey: qk.lots(branchId) });
+  void qc.invalidateQueries({ queryKey: qk.branchStock });
+  void qc.invalidateQueries({ queryKey: ["velocity"] });
+  void qc.invalidateQueries({ queryKey: ["kardex"] });
+  void qc.invalidateQueries({ queryKey: qk.cashSummary(branchId) });
+  void qc.invalidateQueries({ queryKey: ["dashboard"] });
+  if (customerId) for (const key of [qk.customersAll, qk.refills, qk.customerPurchases(customerId)]) void qc.invalidateQueries({ queryKey: key });
+}
+
 export function useCreateSale() {
   const qc = useQueryClient();
   return useMutation({
+    // 'always': sin internet la mutación no debe quedar en pausa; el punto de venta decide guardar la venta en la cola.
+    networkMode: "always",
     mutationFn: (req: SaleRequest) => api.createSale(req),
-    onSuccess: (sale) => {
-      void qc.invalidateQueries({ queryKey: qk.lots(sale.branchId) });
-      void qc.invalidateQueries({ queryKey: qk.branchStock });
-      void qc.invalidateQueries({ queryKey: ["velocity"] });
-      void qc.invalidateQueries({ queryKey: ["kardex"] });
-      void qc.invalidateQueries({ queryKey: qk.cashSummary(sale.branchId) });
-      void qc.invalidateQueries({ queryKey: ["dashboard"] });
-      if (sale.customerId) for (const key of [qk.customersAll, qk.refills, qk.customerPurchases(sale.customerId)]) void qc.invalidateQueries({ queryKey: key });
-    },
+    onSuccess: (sale) => invalidateAfterSale(qc, sale.branchId, sale.customerId),
   });
 }
 

@@ -1,11 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
-import { Search, TriangleAlert, Wallet, X } from "lucide-react";
-import type { Lot, Product, Sale } from "@/lib/api/types";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { Search, TriangleAlert, Wallet, WifiOff, X } from "lucide-react";
+import type { Lot, Product, Sale, SaleRequest } from "@/lib/api/types";
 import { errorMessage } from "@/lib/api";
 import { useBranchStock, useCash, useConfig, useCreateSale, useLots, useOpenCash, useProducts, useWritable } from "@/lib/queries";
-import { useOperatingBranch } from "@/lib/auth/session-store";
+import { useOperatingBranch, useSessionStore } from "@/lib/auth/session-store";
+import { applyReserved, buildProvisionalSale, isConnectionError, isProvisionalSale, newClientSaleId, reservedUnits } from "@/lib/domain/offline-sales";
+import { useQueueStore } from "@/lib/offline/queue-store";
+import { useOnline } from "@/lib/offline/use-online";
 import {
   buildCartLines, cartTotals, daysUntil, findPresentation, sellableLots, stockLabel, unitsInCart, DEFAULT_THRESHOLDS,
 } from "@/lib/domain/pharmacy";
@@ -31,6 +34,11 @@ export function PosScreen() {
   const cash = useCash(branchId);
   const openCash = useOpenCash(branchId);
   const createSale = useCreateSale();
+  const online = useOnline();
+  const queue = useQueueStore((s) => s.state);
+  const sellerName = useSessionStore((s) => s.session?.user.name ?? "");
+  /** Misma venta, misma clave: si un intento queda sin respuesta, el reintento no la duplica. */
+  const attempt = useRef<{ sig: string; id: string } | null>(null);
 
   const cart = useBranchCart(branchId);
   const { add: addToCart, setQty, clear, setCustomer } = useCartStore();
@@ -56,7 +64,9 @@ export function PosScreen() {
   }, []);
 
   const productList: Product[] = products.data ?? [];
-  const lotList: Lot[] = lots.data ?? [];
+  const rawLots: Lot[] = lots.data ?? [];
+  /** Lotes con lo vendido sin conexión (aún sin enviar) ya descontado: no se vende dos veces lo mismo. */
+  const lotList: Lot[] = useMemo(() => applyReserved(rawLots, reservedUnits(queue, branchId), now), [rawLots, queue, branchId, now]);
   const productMap = useMemo(() => new Map(productList.map((p) => [p.id, p])), [productList]);
   const categories = useMemo(() => ["Todos", ...new Set(productList.map((p) => p.category))], [productList]);
   const labs = useMemo(() => [...new Set(productList.map((p) => p.lab))].sort((a, b) => a.localeCompare(b)), [productList]);
@@ -148,22 +158,57 @@ export function PosScreen() {
     return { base, options };
   }, [lastAdded, productMap, productList, stockInfo]);
 
-  const charge = async (draft: Parameters<Parameters<typeof PaymentDialog>[0]["onConfirm"]>[0]) => {
-    setPayError(null);
+  type Draft = Parameters<Parameters<typeof PaymentDialog>[0]["onConfirm"]>[0];
+
+  const finishSale = () => {
+    attempt.current = null;
+    clear(branchId);
+    setPaying(false);
+    setCartOpen(false);
+    setLastAdded(null);
+  };
+
+  /** Sin conexión: la venta queda en la cola del equipo (con su clave) y se entrega un ticket provisional. */
+  const saveOffline = async (request: SaleRequest & { clientSaleId: string }, draft: Draft) => {
     try {
-      const sale = await createSale.mutateAsync({ ...draft, branchId, items: cart.items.map((i) => ({ productId: i.productId, presentation: i.presentation, qty: i.qty })) });
-      clear(branchId);
-      setPaying(false);
-      setCartOpen(false);
-      setLastAdded(null);
+      const item = await useQueueStore.getState().enqueue({
+        request,
+        total: totals.total,
+        reserve: lines.map((l) => ({ productId: l.productId, units: l.units })),
+        now: Date.now(),
+      });
+      const sale = buildProvisionalSale({
+        clientSaleId: item.clientSaleId, ticket: item.ticket, branchId, soldAt: item.request.soldAt ?? new Date().toISOString(), sellerName, lines, totals,
+        payment: draft.payment, document: draft.document, customerId: draft.customerId ?? null, prescription: draft.prescription ?? null,
+      });
+      finishSale();
       setReceipt(sale);
-      notify(`${sale.document.type === "factura" ? "Factura" : "Boleta"} ${sale.number} emitida`);
+      notify(`Venta guardada sin conexión · ticket ${item.ticket}. Se enviará sola al volver el internet.`);
     } catch (e) {
       setPayError(errorMessage(e));
     }
   };
 
-  if (products.isError || lots.isError) {
+  const charge = async (draft: Draft) => {
+    setPayError(null);
+    const items = cart.items.map((i) => ({ productId: i.productId, presentation: i.presentation, qty: i.qty }));
+    const sig = JSON.stringify([branchId, items, draft]);
+    if (attempt.current?.sig !== sig) attempt.current = { sig, id: newClientSaleId() };
+    const request = { ...draft, branchId, items, clientSaleId: attempt.current.id };
+    if (!online) return saveOffline(request, draft);
+    try {
+      const sale = await createSale.mutateAsync(request);
+      finishSale();
+      setReceipt(sale);
+      notify(`${sale.document.type === "factura" ? "Factura" : "Boleta"} ${sale.number} emitida`);
+    } catch (e) {
+      /* Se cortó el internet al cobrar: la venta no se pierde, queda en la cola con la misma clave (si el servidor sí la recibió, al enviar no se duplica). */
+      if (isConnectionError(e)) return saveOffline(request, draft);
+      setPayError(errorMessage(e));
+    }
+  };
+
+  if ((products.isError && !products.data) || (lots.isError && !lots.data)) {
     return (
       <Empty icon={TriangleAlert} title="No se pudo cargar el catálogo">
         {errorMessage(products.error ?? lots.error)}{" "}
@@ -198,6 +243,13 @@ export function PosScreen() {
   return (
     <div className="flex h-full min-h-0">
       <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+        {!online && (
+          <div className="flex flex-wrap items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900 sm:px-6" role="status">
+            <WifiOff className="h-4 w-4 shrink-0" aria-hidden />
+            <span className="font-semibold">Sin conexión.</span>
+            <span>Puedes seguir cobrando con el stock guardado en este equipo; las ventas se envían solas al volver el internet.</span>
+          </div>
+        )}
         {cash.data && !cashOpen && (
           <div className="flex flex-wrap items-center gap-3 border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:px-6">
             <Wallet className="h-4 w-4" />
@@ -305,13 +357,14 @@ export function PosScreen() {
           customer={cart.customer}
           yapeNumber={config.data?.pharmacy.phone ?? ""}
           submitting={createSale.isPending}
+          offline={!online}
           error={payError}
           onClose={() => setPaying(false)}
           onConfirm={charge}
         />
       )}
       {receipt && config.data && (
-        <ReceiptDialog sale={receipt} pharmacy={config.data.pharmacy} branch={branches.find((b) => b.id === receipt.branchId)} products={productMap} onClose={() => setReceipt(null)} />
+        <ReceiptDialog sale={receipt} provisional={isProvisionalSale(receipt)} pharmacy={config.data.pharmacy} branch={branches.find((b) => b.id === receipt.branchId)} products={productMap} onClose={() => setReceipt(null)} />
       )}
     </div>
   );

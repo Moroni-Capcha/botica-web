@@ -8,6 +8,7 @@ import { useOperatingBranch, useSessionStore } from "@/lib/auth/session-store";
 import { BrandMark } from "@/components/brand-mark";
 import { cn } from "@/lib/cn";
 import { KioskDialog } from "@/features/attendance/kiosk-dialog";
+import { ConnectionStatus } from "@/features/offline/connection-status";
 
 function Clock() {
   const [now, setNow] = useState<Date | null>(null);
@@ -73,6 +74,7 @@ export function Topbar({ title, user, onLogout }: { title: string; user: User; o
         <Fingerprint className="h-4 w-4 text-brand" />
         <span className="hidden 2xl:inline">Asistencia</span>
       </button>
+      <ConnectionStatus />
       <Clock />
       <button type="button" onClick={onLogout} className="rounded-lg p-2 text-zinc-500 transition hover:bg-zinc-100 md:hidden" aria-label="Cerrar turno">
         <LogOut className="h-4 w-4" />

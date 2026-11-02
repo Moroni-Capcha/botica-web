@@ -281,6 +281,32 @@ export interface SaleRequest {
   prescription?: Prescription | null;
   /** PIN de un Q.F. cuando quien cobra no puede dispensar controlados. */
   approverPin?: string | null;
+  /**
+   * Clave de idempotencia generada por el front (UUID), una por venta. Si el backend ya registró una venta con esta clave,
+   * devuelve esa misma venta en vez de crear otra. Sirve para reintentar sin duplicar (corte de internet, ventas sin conexión).
+   */
+  clientSaleId?: string;
+  /** Momento real del cobro (ISO 8601). Solo viene en ventas hechas sin conexión; sin él, vale la hora del servidor. */
+  soldAt?: string;
+  /** Número provisional del ticket entregado sin conexión (OFF-0001). El número oficial lo asigna el backend. */
+  offlineTicket?: string;
+}
+
+/** Venta que se envía en lote a POST /sales/sync: la clave de idempotencia es obligatoria. */
+export type SaleSyncItem = SaleRequest & { clientSaleId: string };
+
+export interface SaleSyncRequest {
+  sales: SaleSyncItem[];
+}
+
+/** Resultado de una venta del lote. 'created' = se registró ahora; 'replayed' = ya existía con esa clave y se devuelve la original. */
+export type SaleSyncResult =
+  | { clientSaleId: string; status: "created" | "replayed"; sale: Sale }
+  | { clientSaleId: string; status: "failed"; error: ApiErrorBody };
+
+export interface SaleSyncResponse {
+  /** Un resultado por venta enviada, en el mismo orden. */
+  results: SaleSyncResult[];
 }
 
 export interface SaleLine {
@@ -310,6 +336,10 @@ export interface Sale {
   customerId: number | null;
   prescription: Prescription | null;
   approvedBy: string | null;
+  /** Clave de idempotencia con la que se registró, si el front la envió. */
+  clientSaleId?: string | null;
+  /** Número provisional del ticket entregado sin conexión, si la venta se hizo offline. */
+  offlineTicket?: string | null;
 }
 
 /** Reglas de compra. Se configuran en Ajustes. */

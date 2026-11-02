@@ -67,11 +67,12 @@ interface TicketBase {
 }
 
 /** Ticket de una venta (boleta o factura). `electronic` solo se pasa cuando ya se conoce el estado ante SUNAT. */
-export function SaleTicket({ sale, electronic, pharmacy, branch, products }: TicketBase & { sale: Sale; electronic?: { status: VoucherStatus; voided: VoidInfo | null } }) {
+export function SaleTicket({ sale, electronic, pharmacy, branch, products, provisional = false }: TicketBase & { sale: Sale; electronic?: { status: VoucherStatus; voided: VoidInfo | null }; provisional?: boolean }) {
   const factura = sale.document.type === "factura";
   return (
     <div className="ticket">
-      <Header pharmacy={pharmacy} branch={branch} title={factura ? "FACTURA ELECTRÓNICA" : "BOLETA DE VENTA ELECTRÓNICA"} number={sale.number} />
+      <Header pharmacy={pharmacy} branch={branch} title={provisional ? "TICKET PROVISIONAL" : factura ? "FACTURA ELECTRÓNICA" : "BOLETA DE VENTA ELECTRÓNICA"} number={sale.number} />
+      {provisional && <p className="mt-1 text-center font-bold">SIN VALOR TRIBUTARIO</p>}
       <p className="mt-2">Fecha: {dateShort(sale.createdAt)} {timeShort(sale.createdAt)}</p>
       <p>Cliente: {sale.document.customerName || "Cliente varios"}</p>
       {sale.document.customerDocId && <p>{factura ? "RUC" : "DNI"}: {sale.document.customerDocId}</p>}
@@ -99,7 +100,14 @@ export function SaleTicket({ sale, electronic, pharmacy, branch, products }: Tic
       {sale.prescription && <p className="mt-1">Receta {sale.prescription.number} · {sale.prescription.doctor} · CMP {sale.prescription.cmp}</p>}
       {sale.approvedBy && <p>Dispensado por {sale.approvedBy}</p>}
       <p className="mt-1">Atendido por: {sale.sellerName}</p>
-      <Footer status={electronic?.status} voided={electronic?.voided} />
+      {provisional ? (
+        <>
+          <p className="mt-2 text-center text-[10px]">Ticket provisional emitido sin conexión. Su {factura ? "factura" : "boleta"} electrónica oficial se emite al enviar la venta; consúltela en sunat.gob.pe.</p>
+          <p className="mt-1 text-center">¡Gracias por su compra!</p>
+        </>
+      ) : (
+        <Footer status={electronic?.status} voided={electronic?.voided} />
+      )}
     </div>
   );
 }

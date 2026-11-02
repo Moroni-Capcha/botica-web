@@ -10,12 +10,12 @@ import { PrintRoot, SaleTicket, printTicket } from "@/features/vouchers/ticket";
 const PAY: Record<Sale["payment"]["method"], string> = { efectivo: "Efectivo", yape: "Yape / Plin", tarjeta: "Tarjeta" };
 
 /** Vista del comprobante emitido. El ticket de 80 mm se imprime desde aquí; el QR y el hash los agrega el proveedor de facturación electrónica. */
-export function ReceiptDialog({ sale, pharmacy, branch, products, onClose }: { sale: Sale; pharmacy: Pharmacy; branch: Branch | undefined; products: Map<number, Product>; onClose: () => void }) {
+export function ReceiptDialog({ sale, pharmacy, branch, products, provisional = false, onClose }: { sale: Sale; pharmacy: Pharmacy; branch: Branch | undefined; products: Map<number, Product>; provisional?: boolean; onClose: () => void }) {
   const title = sale.document.type === "factura" ? "Factura" : "Boleta";
   return (
     <Dialog
-      title="Venta registrada"
-      description={`${title} ${sale.number} · stock descontado por lote`}
+      title={provisional ? "Venta guardada sin conexión" : "Venta registrada"}
+      description={provisional ? `Ticket provisional ${sale.number} · se enviará al volver el internet` : `${title} ${sale.number} · stock descontado por lote`}
       onClose={onClose}
       footer={
         <>
@@ -33,7 +33,8 @@ export function ReceiptDialog({ sale, pharmacy, branch, products, onClose }: { s
           <p className="text-sm font-bold">{pharmacy.name.toUpperCase()}</p>
           <p>RUC {pharmacy.ruc}</p>
           {branch && <p>{branch.name} · {branch.address}</p>}
-          <p className="mt-2 font-bold">{title.toUpperCase()} {sale.document.type === "boleta" ? "DE VENTA " : ""}ELECTRÓNICA</p>
+          <p className="mt-2 font-bold">{provisional ? "TICKET PROVISIONAL" : `${title.toUpperCase()} ${sale.document.type === "boleta" ? "DE VENTA " : ""}ELECTRÓNICA`}</p>
+          {provisional && <p className="text-[11px]">Sin valor tributario: la {title.toLowerCase()} electrónica oficial se emite al enviar la venta.</p>}
           <p className="font-bold">{sale.number}</p>
         </div>
         <p className="mt-2">Fecha: {dateShort(sale.createdAt)} {timeShort(sale.createdAt)}</p>
@@ -68,7 +69,7 @@ export function ReceiptDialog({ sale, pharmacy, branch, products, onClose }: { s
         <p className="mt-1">Atendido por: {sale.sellerName}</p>
       </div>
       <PrintRoot>
-        <SaleTicket sale={sale} pharmacy={pharmacy} branch={branch} products={products} />
+        <SaleTicket sale={sale} pharmacy={pharmacy} branch={branch} products={products} provisional={provisional} />
       </PrintRoot>
     </Dialog>
   );

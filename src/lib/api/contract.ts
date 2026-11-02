@@ -9,7 +9,7 @@ import type {
   Dashboard, SalesReportLine, AttendanceMark, ContactRequest, CustomerInput, CustomerPurchase, CustomerSummary, RefillInfo, AttendanceSettings, ClockRequest, KioskWorker, ManualMarkRequest, Worker, WorkerInput,
   AccountInput, BranchCreateInput, BranchCreated, Plan, BranchInput, BranchSeries, RulesInput, StaffAccount,
   StaffSummary, Supplier, SupplierInput, Transfer, TransferAskRequest, TransferSendRequest, User, BranchId, WriteOffRequest,
-  CreditNote, CreditNoteRequest, Voucher, VoidRequest,
+  CreditNote, CreditNoteRequest, Voucher, VoidRequest, SaleSyncRequest, SaleSyncResponse,
 } from "./types";
 
 export interface PublicConfig {
@@ -161,7 +161,10 @@ export interface ApiClient {
   closeCash(branchId: BranchId, input: CashCloseRequest): Promise<CashClosing>;
   /** Cierres de los últimos `days` días. Sin `branchId`, todos los locales (solo administrador). */
   listCashClosings(options: { branchId?: BranchId; days: number }): Promise<CashClosing[]>;
+  /** Con `clientSaleId`, repetir la llamada devuelve la venta original (idempotente). Con otros datos y la misma clave: CLAVE_REPETIDA (409). */
   createSale(input: SaleRequest): Promise<Sale>;
+  /** Registra en orden un lote de ventas hechas sin conexión (máx. 50). Cada una responde por separado; un fallo no frena a las demás. */
+  syncSales(input: SaleSyncRequest): Promise<SaleSyncResponse>;
 
   /* Comprobantes electrónicos (SUNAT) */
   /** Boletas y facturas emitidas entre dos fechas (YYYY-MM-DD, ambas incluidas), con su estado ante SUNAT. El encargado recibe solo su local. */

@@ -8,8 +8,9 @@ import type {
   SalesReportLine, AttendanceMark, AttendanceSettings, KioskWorker, Worker, CustomerPurchase, CustomerInput,
   Branch, CashClosing, CashMovement, CashSession, Customer, ExpiryThresholds, KardexEntry, Lot, MoveType, Product, ProductInput, ProductVelocity, Purchase, PurchasingSettings, Sale, SaleRequest, Session,
   StaffSummary, Supplier, SupplierInput, Transfer, TransferItem, User, Role, StaffAccount, AccountInput, BranchInput, RulesInput, Pharmacy, Plan, Account, AccountStatus, BoticaPublic, PlanOffer, SignUpInput, Setup, SetupStep,
-  CreditNote, ElectronicState, Voucher, VoidInfo,
+  CreditNote, ElectronicState, Voucher, VoidInfo, SaleSyncResult,
 } from "../types";
+import { SYNC_BATCH_MAX } from "@/lib/domain/offline-sales";
 import { tokenStore } from "../token";
 import { tenantStore } from "../tenant";
 import { allocateFefo, daysUntil, findPresentation, isValidCmp, documentIsValid, parseDay, round2, IGV, weightedDiscount } from "@/lib/domain/pharmacy";
@@ -1740,6 +1741,21 @@ export function createMockClient(): ApiClient {
       const u = currentUser();
       assertBranch(u, req.branchId);
       const d = get();
+      /* Idempotencia: la misma clave devuelve la venta original; con otros datos, es un error. */
+      if (req.clientSaleId !== undefined) {
+        if (!/^[A-Za-z0-9_-]{8,64}$/.test(req.clientSaleId)) fail("DATOS_INVALIDOS", "La clave de la venta (clientSaleId) no es válida.", 400);
+        const prior = d.sales.find((s) => s.clientSaleId === req.clientSaleId);
+        if (prior) {
+          const same = prior.branchId === req.branchId && prior.items.length === req.items.length && prior.items.every((l, i) => l.productId === req.items[i]?.productId && l.presentation === req.items[i]?.presentation && l.qty === req.items[i]?.qty);
+          if (!same) fail("CLAVE_REPETIDA", "Esa clave de venta ya se usó con otros datos.", 409);
+          return prior;
+        }
+      }
+      let soldAtMs: number | null = null;
+      if (req.soldAt !== undefined) {
+        soldAtMs = Date.parse(req.soldAt);
+        if (!Number.isFinite(soldAtMs) || soldAtMs > Date.now() + 5 * 60_000) fail("DATOS_INVALIDOS", "La hora de la venta (soldAt) no es válida.", 400);
+      }
       if (!d.cash[req.branchId]?.open) fail("CAJA_CERRADA", "La caja de este local está cerrada. Ábrela para poder cobrar.");
       if (!req.items.length) fail("VENTA_VACIA", "Agrega al menos un producto.");
       const now = Date.now();
@@ -1777,8 +1793,11 @@ export function createMockClient(): ApiClient {
       const number = req.document.type === "factura" ? `F${branch.series}-${String(++sq.f).padStart(6, "0")}` : `B${branch.series}-${String(++sq.b).padStart(6, "0")}`;
       const taxBase = round2(total / (1 + IGV));
       const received = req.payment.method === "efectivo" ? req.payment.received ?? total : total;
+      let saleId = `s_${now.toString(36)}`;
+      while (d.sales.some((s) => s.id === saleId)) saleId += "x";
       const sale: Sale = {
-        id: `s_${now.toString(36)}`, branchId: req.branchId, number, createdAt: new Date(now).toISOString(), sellerName: u.name,
+        id: saleId, branchId: req.branchId, number, createdAt: new Date(soldAtMs ?? now).toISOString(), sellerName: u.name,
+        clientSaleId: req.clientSaleId ?? null, offlineTicket: req.offlineTicket ?? null,
         items: items.map((x) => x.line), total, taxBase, igv: round2(total - taxBase),
         payment: { method: req.payment.method, received, change: round2(received - total), reference: req.payment.reference },
         document: req.document, customerId: req.customerId ?? null, prescription: needsRx ? req.prescription ?? null : null, approvedBy,
@@ -1790,6 +1809,29 @@ export function createMockClient(): ApiClient {
       }
       commit();
       return sale;
+    },
+
+    async syncSales(input) {
+      const sales = input?.sales;
+      if (!Array.isArray(sales) || sales.length === 0 || sales.length > SYNC_BATCH_MAX) fail("DATOS_INVALIDOS", `Envía entre 1 y ${SYNC_BATCH_MAX} ventas por lote.`, 400);
+      const results: SaleSyncResult[] = [];
+      /* En orden, una por una; cada resultado es independiente: una venta rechazada no frena a las demás. */
+      for (const item of sales) {
+        const clientSaleId = item?.clientSaleId;
+        if (typeof clientSaleId !== "string" || !clientSaleId) {
+          results.push({ clientSaleId: String(clientSaleId ?? ""), status: "failed", error: { code: "DATOS_INVALIDOS", message: "Falta la clave de la venta (clientSaleId)." } });
+          continue;
+        }
+        const existed = get().sales.some((s) => s.clientSaleId === clientSaleId);
+        try {
+          const sale = await client.createSale(item);
+          results.push({ clientSaleId, status: existed ? "replayed" : "created", sale });
+        } catch (e) {
+          const err = e instanceof ApiError ? { code: e.code, message: e.message, details: e.details } : { code: "ERROR_INTERNO", message: "El servidor no pudo registrar la venta." };
+          results.push({ clientSaleId, status: "failed", error: err });
+        }
+      }
+      return { results };
     },
 
     async listVouchers(options) {

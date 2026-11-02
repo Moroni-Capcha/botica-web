@@ -19,6 +19,8 @@ interface Props {
   customer: Customer | null;
   yapeNumber: string;
   submitting: boolean;
+  /** Sin conexión: la venta se guarda en el equipo y se entrega un ticket provisional. */
+  offline?: boolean;
   error: string | null;
   onClose: () => void;
   onConfirm: (draft: Draft) => void;
@@ -30,7 +32,7 @@ const METHODS: { id: PaymentMethod; label: string; icon: typeof Banknote }[] = [
   { id: "tarjeta", label: "Tarjeta", icon: CreditCard },
 ];
 
-export function PaymentDialog({ totals, itemsCount, customer, yapeNumber, submitting, error, onClose, onConfirm }: Props) {
+export function PaymentDialog({ totals, itemsCount, customer, yapeNumber, submitting, offline = false, error, onClose, onConfirm }: Props) {
   const total = totals.total;
   const [doc, setDoc] = useState<DocType>(customer?.ruc ? "factura" : "boleta");
   const [docId, setDocId] = useState(customer?.ruc || customer?.dni || "");
@@ -74,7 +76,7 @@ export function PaymentDialog({ totals, itemsCount, customer, yapeNumber, submit
           {error && <p className="mr-auto text-sm text-rose-600" role="alert">{error}</p>}
           <Button onClick={onClose}>Cancelar</Button>
           <Button variant="primary" disabled={!ok} loading={submitting} onClick={confirm}>
-            <Check className="h-4 w-4" /> Confirmar y emitir {doc}
+            <Check className="h-4 w-4" /> {offline ? "Cobrar sin conexión" : `Confirmar y emitir ${doc}`}
           </Button>
         </>
       }
@@ -87,6 +89,11 @@ export function PaymentDialog({ totals, itemsCount, customer, yapeNumber, submit
         }}
       >
         <div className="grid content-start gap-4">
+          {offline && (
+            <p className="rounded-2xl bg-amber-50 p-3 text-xs text-amber-900" role="status">
+              Sin conexión: la venta se guarda en este equipo y se envía sola al volver el internet. Entrega el ticket provisional; la {doc} oficial se emite al enviarla.
+            </p>
+          )}
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Comprobante</p>
             <Segmented full label="Tipo de comprobante" value={doc} onChange={switchDoc} options={[{ id: "boleta", label: "Boleta" }, { id: "factura", label: "Factura" }]} />

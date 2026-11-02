@@ -35,6 +35,8 @@ Cualquier respuesta 4xx o 5xx trae este cuerpo. El front muestra `message` tal c
 | 400 | `DOCUMENTO_INVALIDO` | DNI o RUC no válido para el comprobante |
 | 400 | `PAGO_INSUFICIENTE` | Efectivo recibido menor al total |
 | 409 | `STOCK_INSUFICIENTE` | No alcanzan los lotes vigentes del local |
+| 409 | `CLAVE_REPETIDA` | La `clientSaleId` ya se usó con una venta de otros datos |
+| 5xx | `ERROR_INTERNO` | Falla pasajera del servidor; en `POST /sales/sync` va dentro de `results[].error` y el front reintenta |
 | 404 | `PRODUCTO_NO_EXISTE` | Producto eliminado o inexistente |
 | 404 | `LOTE_NO_EXISTE` | Lote inexistente o de otro local |
 | 400 | `DATOS_INVALIDOS` | Falta un dato o está fuera de rango (el `message` dice cuál) |
@@ -401,6 +403,63 @@ Lo que el backend hace al registrar la venta, en una transacción:
 7. Devuelve la venta con los lotes usados en cada línea (`items[].lots`).
 
 Las reglas de los pasos 2, 3 y 5 están en `src/lib/domain/pharmacy.ts` con pruebas en `pharmacy.test.ts`. Conviene que el backend use los mismos casos de prueba.
+
+#### Clave de idempotencia (`clientSaleId`) y ventas sin conexión
+
+El punto de venta puede quedarse sin internet. Para no perder ni duplicar ventas, el front genera una **clave por venta** y la envía en el cuerpo de `POST /sales`:
+
+| Campo | Tipo | Cuándo viene | Qué hace el backend |
+| --- | --- | --- | --- |
+| `clientSaleId` | string (UUID; 8 a 64 caracteres `A-Za-z0-9_-`) | Siempre en ventas nuevas del front | Guarda la clave con la venta (`unique` por botica). Si llega otra vez, **devuelve la venta original** (mismo `id` y `number`) sin tocar stock, caja ni correlativo. |
+| `soldAt` | ISO 8601 | Solo en ventas cobradas sin conexión | Es la hora real del cobro: va en `createdAt` de la venta. Se rechaza con `400 DATOS_INVALIDOS` si no es una fecha o está más de 5 minutos en el futuro. Sin este campo vale la hora del servidor. |
+| `offlineTicket` | string (`OFF-0001`) | Solo en ventas cobradas sin conexión | Es el número provisional del ticket que se entregó al cliente. Se guarda en la venta (`Sale.offlineTicket`) para poder relacionarlo con el comprobante oficial. No reemplaza al correlativo: el número oficial (`B001-000123`) lo asigna el backend al registrar. |
+
+Reglas de idempotencia:
+
+1. Repetir `POST /sales` con la misma `clientSaleId` y los mismos datos (local e ítems: producto, presentación y cantidad) devuelve la venta original. Respuesta `200` (la primera vez es `201`).
+2. La misma clave con otros datos es `409 CLAVE_REPETIDA`: no se registra nada.
+3. La búsqueda por clave va **antes** de validar caja y stock: una venta ya registrada se puede reenviar aunque la caja ya se haya cerrado o el stock haya cambiado.
+4. `Sale.clientSaleId` y `Sale.offlineTicket` vuelven en la respuesta (`null` si la venta no los traía).
+5. El front reutiliza la misma clave si un intento quedó sin respuesta (corte de internet o tiempo agotado), así el reintento no duplica la venta aunque el servidor sí la haya recibido.
+
+#### `POST /sales/sync` · envío en lote de ventas sin conexión
+
+Cuando vuelve la conexión, el front envía en orden de cobro (FIFO) las ventas guardadas, hasta 50 por llamada.
+
+```json
+{
+  "sales": [
+    { "clientSaleId": "7f0c2e6e-6a3e-4f43-9d9a-2f7f9f8b1a10", "soldAt": "2026-11-02T10:15:00-05:00", "offlineTicket": "OFF-0001",
+      "branchId": "principal", "items": [{ "productId": 1, "presentation": "unidad", "qty": 2 }],
+      "payment": { "method": "efectivo", "received": 10 }, "document": { "type": "boleta" } }
+  ]
+}
+```
+
+Respuesta `200` con **un resultado por venta, en el mismo orden** (`SaleSyncResponse`):
+
+```json
+{
+  "results": [
+    { "clientSaleId": "7f0c2e6e-…", "status": "created", "sale": { "id": "s_…", "number": "B001-000124", "offlineTicket": "OFF-0001" } },
+    { "clientSaleId": "a1b2c3d4-…", "status": "replayed", "sale": { "id": "s_…", "number": "B001-000120" } },
+    { "clientSaleId": "9e8d7c6b-…", "status": "failed", "error": { "code": "STOCK_INSUFICIENTE", "message": "No hay stock suficiente de Amoxicilina 500 mg en este local." } }
+  ]
+}
+```
+
+- `created`: se registró ahora. `replayed`: la clave ya existía y se devuelve la venta original (no se descontó nada). `failed`: rechazada por una regla; trae el mismo `error` que daría `POST /sales` (`STOCK_INSUFICIENTE`, `CAJA_CERRADA`, `RECETA_REQUERIDA`, `DOCUMENTO_INVALIDO`, `PAGO_INSUFICIENTE`, `PRODUCTO_NO_EXISTE`, `SIN_PERMISO`, `CLAVE_REPETIDA`, `DATOS_INVALIDOS`).
+- Se procesan **de una en una y en el orden recibido**, cada una en su propia transacción (los correlativos salen en ese orden). Una venta rechazada **no frena ni revierte** a las demás.
+- Las validaciones son las de `POST /sales` (pasos 1 a 7 de arriba). Si una venta falla por un error pasajero del servidor, devolver `status: "failed"` con `code: "ERROR_INTERNO"`: el front la reintenta sola. Cualquier otro código lo toma como rechazo definitivo y la deja a la vista para que el administrador la reintente o la descarte.
+- Errores que afectan a **todo** el lote (respuesta HTTP sin `results`): `401 NO_AUTORIZADO` y `403 CUENTA_SUSPENDIDA` (el front espera sin perder las ventas), `400 DATOS_INVALIDOS` (lote vacío, de más de 50 ventas o con formato inválido) y 5xx (el front reintenta con espera creciente: 5 s, 10 s, 20 s… hasta 5 min). El lote sigue siendo seguro de repetir entero gracias a `clientSaleId`.
+- Una venta del lote que no aparezca en `results` se considera no confirmada y se vuelve a enviar.
+
+**Qué hace el front** (`src/lib/domain/offline-sales.ts`, con pruebas):
+
+- Sin conexión (o si falla la red al cobrar) guarda la venta en una cola persistente del equipo (IndexedDB; si no hay, localStorage), con la clave, `soldAt` y un ticket provisional `OFF-0001`, `OFF-0002`… (serie por equipo y botica, nunca se reutiliza). El ticket impreso dice "Ticket provisional · sin valor tributario".
+- Envía solo al volver la conexión (evento `online` y reintento cada 20 s) o con **Sincronizar ahora**, en orden FIFO. Una venta solo sale de la cola cuando el backend la confirmó.
+- Descuenta localmente del stock lo vendido sin conexión (FEFO) para no vender dos veces el mismo lote mientras tanto.
+- Con la cuenta en solo lectura (`CUENTA_SUSPENDIDA`) no envía y conserva las ventas hasta que se reactive.
 
 ### Reportes
 

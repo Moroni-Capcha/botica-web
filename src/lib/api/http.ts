@@ -3,16 +3,20 @@ import type { ApiClient, BranchStock, NewCustomer, PublicConfig } from "./contra
 import { ApiError } from "./errors";
 import type { PlanOffer, SignUpInput, Setup, SetupStep, Account, AccountInput, BoticaPublic, Branch, BranchCreateInput, BranchCreated, BranchInput, BranchSeries, Pharmacy, RulesInput, StaffAccount, SalesReportLine, ContactRequest, CustomerInput, CustomerPurchase, CustomerSummary, RefillInfo, Dashboard, AttendanceMark, ClockRequest, KioskWorker, ManualMarkRequest, Worker, WorkerInput } from "./types";
 import type { ApiErrorBody, BranchId, CashCloseRequest, CashClosing, CashMovement, CashMovementRequest, CashSession, CashSummary, Customer, Kardex, Lot, Product, ProductInput, ProductVelocity, Purchase, PurchaseRequest, Supplier, SupplierInput, Transfer, TransferAskRequest, TransferSendRequest, Sale, SaleRequest, Session, StaffSummary, User, WriteOffRequest } from "./types";
-import type { CreditNote, CreditNoteRequest, Voucher, VoidRequest } from "./types";
+import type { CreditNote, CreditNoteRequest, Voucher, VoidRequest, SaleSyncRequest, SaleSyncResponse } from "./types";
 import { tenantStore } from "./tenant";
 import { tokenStore } from "./token";
+import { connection } from "./connection";
 
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export function createHttpClient(baseUrl: string): ApiClient {
   const base = baseUrl.replace(/\/$/, "");
 
-  async function request<T>(method: Method, path: string, body?: unknown): Promise<T> {
+  /** Tiempo máximo de espera de las ventas: con internet débil, mejor guardar la venta sin conexión que dejar al cajero esperando. */
+  const SALE_TIMEOUT_MS = 20_000;
+
+  async function request<T>(method: Method, path: string, body?: unknown, timeoutMs?: number): Promise<T> {
     const headers: Record<string, string> = { Accept: "application/json" };
     if (body !== undefined) headers["Content-Type"] = "application/json";
     const botica = tenantStore.get();
@@ -22,11 +26,13 @@ export function createHttpClient(baseUrl: string): ApiClient {
 
     let res: Response;
     try {
-      res = await fetch(`${base}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+      res = await fetch(`${base}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined });
     } catch {
+      connection.reportUnreachable();
       throw new ApiError({ code: "SIN_CONEXION", message: "No hay conexión con el servidor. Revisa el internet del local." }, 0);
     }
 
+    connection.reportReachable();
     if (res.status === 401) {
       tokenStore.clear();
       tokenStore.notifyExpired();
@@ -116,7 +122,8 @@ export function createHttpClient(baseUrl: string): ApiClient {
     addCashMovement: (branchId: BranchId, input: CashMovementRequest) => request<CashMovement>("POST", `/cash/${encodeURIComponent(branchId)}/movements`, input),
     closeCash: (branchId: BranchId, input: CashCloseRequest) => request<CashClosing>("POST", `/cash/${encodeURIComponent(branchId)}/close`, input),
     listCashClosings: ({ branchId, days }: { branchId?: BranchId; days: number }) => request<CashClosing[]>("GET", `/cash/closings${q({ days: String(days), ...(branchId ? { branchId } : {}) })}`),
-    createSale: (input: SaleRequest) => request<Sale>("POST", "/sales", input),
+    createSale: (input: SaleRequest) => request<Sale>("POST", "/sales", input, SALE_TIMEOUT_MS),
+    syncSales: (input: SaleSyncRequest) => request<SaleSyncResponse>("POST", "/sales/sync", input, SALE_TIMEOUT_MS * 3),
 
     listVouchers: ({ from, to, branchId }: { from: string; to: string; branchId?: BranchId }) => request<Voucher[]>("GET", `/vouchers${q({ from, to, ...(branchId ? { branchId } : {}) })}`),
     listCreditNotes: ({ from, to, branchId }: { from: string; to: string; branchId?: BranchId }) => request<CreditNote[]>("GET", `/credit-notes${q({ from, to, ...(branchId ? { branchId } : {}) })}`),

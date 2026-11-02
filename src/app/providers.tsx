@@ -5,6 +5,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Toaster, notify } from "@/components/ui/toast";
 import { useConfig } from "@/lib/queries";
 import { isApiError } from "@/lib/api";
+import { restoreQueryCache, startQueryCachePersistence } from "@/lib/offline/query-cache";
+import { RegisterServiceWorker } from "@/features/offline/register-sw";
 
 /** Aplica los colores de la botica (vienen de la API) a las variables CSS. */
 function BrandStyle() {
@@ -36,9 +38,15 @@ export function Providers({ children }: { children: ReactNode }) {
         },
       }),
   );
+  useEffect(() => {
+    // Conserva productos, lotes y caja en el equipo para poder abrir el punto de venta sin internet.
+    void restoreQueryCache(client);
+    return startQueryCachePersistence(client);
+  }, [client]);
   return (
     <QueryClientProvider client={client}>
       <BrandStyle />
+      <RegisterServiceWorker />
       {children}
       <Toaster />
     </QueryClientProvider>
