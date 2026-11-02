@@ -8,6 +8,8 @@ import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
+import { SectionLabel } from "@/components/ui/section-label";
+import { hitArea } from "@/components/ui/icon-button";
 import { soles } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
@@ -73,10 +75,10 @@ export function PaymentDialog({ totals, itemsCount, customer, yapeNumber, submit
       size="lg"
       footer={
         <>
-          {error && <p className="mr-auto text-sm text-rose-600" role="alert">{error}</p>}
+          {error && <p className="mr-auto text-sm text-danger-fg" role="alert">{error}</p>}
           <Button onClick={onClose}>Cancelar</Button>
           <Button variant="primary" disabled={!ok} loading={submitting} onClick={confirm}>
-            <Check className="h-4 w-4" /> {offline ? "Cobrar sin conexión" : `Confirmar y emitir ${doc}`}
+            <Check className="h-4 w-4" aria-hidden /> {offline ? "Cobrar sin conexión" : `Confirmar y emitir ${doc}`}
           </Button>
         </>
       }
@@ -90,12 +92,12 @@ export function PaymentDialog({ totals, itemsCount, customer, yapeNumber, submit
       >
         <div className="grid content-start gap-4">
           {offline && (
-            <p className="rounded-2xl bg-amber-50 p-3 text-xs text-amber-900" role="status">
+            <p className="rounded-2xl bg-warning-bg p-3 text-xs text-warning-fg" role="status">
               Sin conexión: la venta se guarda en este equipo y se envía sola al volver el internet. Entrega el ticket provisional; la {doc} oficial se emite al enviarla.
             </p>
           )}
           <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Comprobante</p>
+            <SectionLabel className="mb-2">Comprobante</SectionLabel>
             <Segmented full label="Tipo de comprobante" value={doc} onChange={switchDoc} options={[{ id: "boleta", label: "Boleta" }, { id: "factura", label: "Factura" }]} />
             <div className="mt-3 grid grid-cols-[1fr_1.4fr] gap-2">
               <Field label={doc === "factura" ? "RUC (11 dígitos)" : `DNI ${total > 700 ? "(obligatorio > S/ 700)" : "(opcional)"}`}>
@@ -108,9 +110,9 @@ export function PaymentDialog({ totals, itemsCount, customer, yapeNumber, submit
           </div>
 
           {totals.needsRx && (
-            <fieldset className="rounded-2xl border border-sky-200 bg-sky-50/60 p-3">
-              <legend className="flex items-center gap-1.5 px-1 text-xs font-semibold text-sky-800">
-                <Stethoscope className="h-4 w-4" /> Receta médica {totals.needsControlled ? "especial (controlados)" : ""}
+            <fieldset className="rounded-2xl border border-info-border bg-info-bg/60 p-3">
+              <legend className="flex items-center gap-1.5 px-1 text-xs font-semibold text-info-fg">
+                <Stethoscope className="h-4 w-4" aria-hidden /> Receta médica {totals.needsControlled ? "especial (controlados)" : ""}
               </legend>
               <div className="grid grid-cols-2 gap-2">
                 <Field label="N.º de receta">
@@ -128,7 +130,7 @@ export function PaymentDialog({ totals, itemsCount, customer, yapeNumber, submit
         </div>
 
         <div className="grid content-start gap-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Método de pago</p>
+          <SectionLabel>Método de pago</SectionLabel>
           <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Método de pago">
             {METHODS.map(({ id, label, icon: Icon }) => (
               <button
@@ -137,35 +139,35 @@ export function PaymentDialog({ totals, itemsCount, customer, yapeNumber, submit
                 role="radio"
                 aria-checked={method === id}
                 onClick={() => setMethod(id)}
-                className={cn("flex flex-col items-center gap-1.5 rounded-2xl border p-3 text-xs font-semibold transition", method === id ? "border-transparent bg-brand text-white" : "border-zinc-200 text-zinc-600 hover:bg-zinc-50")}
+                className={cn("flex flex-col items-center gap-1.5 rounded-2xl border p-3 text-xs font-semibold transition", method === id ? "border-transparent bg-brand text-white" : "border-line text-fg-2 hover:bg-subtle")}
               >
-                <Icon className="h-5 w-5" /> {label}
+                <Icon className="h-5 w-5" aria-hidden /> {label}
               </button>
             ))}
           </div>
           {method === "efectivo" && (
-            <div className="rounded-2xl bg-zinc-50 p-3">
+            <div className="rounded-2xl bg-subtle p-3">
               <Field label="Monto recibido">
                 <Input inputMode="decimal" value={received} onChange={(e) => setReceived(e.target.value.replace(/[^\d.]/g, ""))} className="text-lg font-semibold tabular-nums" placeholder={total.toFixed(2)} />
               </Field>
-              <div className="mt-2 flex flex-wrap gap-1.5">
+              <div className="mt-2 flex flex-wrap gap-2">
                 {quickCashAmounts(total).map((v) => (
-                  <button key={v} type="button" onClick={() => setReceived(String(v))} className="rounded-lg bg-white px-3 py-1.5 text-sm font-semibold tabular-nums ring-1 ring-zinc-200 hover:bg-zinc-100">
+                  <button key={v} type="button" onClick={() => setReceived(String(v))} className={cn(hitArea, "h-10 rounded-lg bg-surface px-3 text-sm font-semibold tabular-nums ring-1 ring-line transition-colors duration-[var(--dur-fast)] hover:bg-sunken")}>
                     {v - total < 1 && v === Math.ceil(total) ? `Exacto ${soles(total)}` : `S/ ${v}`}
                   </button>
                 ))}
               </div>
               <div className="mt-3 flex items-center justify-between">
-                <span className="text-sm text-zinc-600">Vuelto</span>
-                <span className={cn("text-2xl font-semibold tabular-nums", change < 0 ? "text-zinc-300" : "text-emerald-700")} aria-live="polite">
+                <span className="text-sm text-fg-2">Vuelto</span>
+                <span className={cn("text-2xl font-semibold tabular-nums", change < 0 ? "text-muted" : "text-success-fg")} aria-live="polite">
                   {soles(Math.max(0, change))}
                 </span>
               </div>
             </div>
           )}
           {method === "yape" && (
-            <div className="rounded-2xl bg-zinc-50 p-3 text-sm">
-              <p className="text-zinc-600">El cliente yapea o plinea al número de la botica:</p>
+            <div className="rounded-2xl bg-subtle p-3 text-sm">
+              <p className="text-fg-2">El cliente yapea o plinea al número de la botica:</p>
               <p className="mt-1 text-xl font-semibold tabular-nums">{yapeNumber}</p>
               <Field label="Código de operación (opcional)" className="mt-3">
                 <Input value={reference} onChange={(e) => setReference(e.target.value)} />
@@ -173,14 +175,14 @@ export function PaymentDialog({ totals, itemsCount, customer, yapeNumber, submit
             </div>
           )}
           {method === "tarjeta" && (
-            <div className="rounded-2xl bg-zinc-50 p-3 text-sm text-zinc-600">
+            <div className="rounded-2xl bg-subtle p-3 text-sm text-fg-2">
               Pasa la tarjeta por el POS del banco y confirma cuando el voucher salga aprobado.
               <Field label="N.º de voucher (opcional)" className="mt-3">
                 <Input value={reference} onChange={(e) => setReference(e.target.value)} />
               </Field>
             </div>
           )}
-          <dl className="rounded-2xl border border-zinc-200 p-3 text-xs text-zinc-500">
+          <dl className="rounded-2xl border border-line p-3 text-xs text-muted">
             <div className="flex justify-between">
               <dt>Op. gravada</dt>
               <dd className="tabular-nums">{soles(totals.taxBase)}</dd>
@@ -189,7 +191,7 @@ export function PaymentDialog({ totals, itemsCount, customer, yapeNumber, submit
               <dt>IGV (18 %)</dt>
               <dd className="tabular-nums">{soles(totals.igv)}</dd>
             </div>
-            <div className="mt-1 flex justify-between text-sm font-semibold text-zinc-900">
+            <div className="mt-1 flex justify-between text-sm font-semibold text-fg">
               <dt>Total</dt>
               <dd className="tabular-nums">{soles(total)}</dd>
             </div>

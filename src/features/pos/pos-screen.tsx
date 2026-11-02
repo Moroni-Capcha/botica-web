@@ -15,6 +15,7 @@ import {
 import { minFor } from "@/lib/domain/inventory";
 import { Button } from "@/components/ui/button";
 import { Empty } from "@/components/ui/empty";
+import { hitArea, IconButton } from "@/components/ui/icon-button";
 import { Input, Select, inputClass } from "@/components/ui/field";
 import { notify } from "@/components/ui/toast";
 import { soles } from "@/lib/format";
@@ -244,15 +245,15 @@ export function PosScreen() {
     <div className="flex h-full min-h-0">
       <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
         {!online && (
-          <div className="flex flex-wrap items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900 sm:px-6" role="status">
+          <div className="flex flex-wrap items-center gap-2 border-b border-warning-border bg-warning-bg px-4 py-2.5 text-sm text-warning-fg sm:px-6" role="status">
             <WifiOff className="h-4 w-4 shrink-0" aria-hidden />
             <span className="font-semibold">Sin conexión.</span>
             <span>Puedes seguir cobrando con el stock guardado en este equipo; las ventas se envían solas al volver el internet.</span>
           </div>
         )}
         {cash.data && !cashOpen && (
-          <div className="flex flex-wrap items-center gap-3 border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:px-6">
-            <Wallet className="h-4 w-4" />
+          <div className="flex flex-wrap items-center gap-3 border-b border-warning-border bg-warning-bg px-4 py-3 text-sm text-warning-fg sm:px-6">
+            <Wallet className="h-4 w-4" aria-hidden />
             <span className="font-semibold">La caja de este local está cerrada.</span>
             <label className="flex items-center gap-2">
               Fondo inicial S/
@@ -263,15 +264,15 @@ export function PosScreen() {
             </Button>
           </div>
         )}
-        <div className="sticky top-0 z-10 border-b border-zinc-200 bg-canvas/95 px-4 pb-3 pt-4 backdrop-blur sm:px-6">
+        <div className="sticky top-0 z-10 border-b border-line bg-canvas/95 px-4 pb-3 pt-4 backdrop-blur sm:px-6">
           <div className="flex gap-2">
             <div className="relative min-w-0 flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden />
               <Input autoFocus value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onSearchKey} placeholder="Buscar: paracetamol, Apronax, Genfar o código de barras…" className="pl-9" aria-label="Buscar producto" />
               {q && (
-                <button type="button" onClick={() => setQ("")} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-zinc-400 hover:bg-zinc-100" aria-label="Limpiar búsqueda">
-                  <X className="h-3.5 w-3.5" />
-                </button>
+                <IconButton size="xs" onClick={() => setQ("")} className="absolute right-2 top-1/2 -translate-y-1/2" aria-label="Limpiar búsqueda">
+                  <X className="h-3.5 w-3.5" aria-hidden />
+                </IconButton>
               )}
             </div>
             <Select value={lab} onChange={(e) => setLab(e.target.value)} className="w-36 shrink-0 sm:w-48" aria-label="Laboratorio o marca">
@@ -281,7 +282,7 @@ export function PosScreen() {
               ))}
             </Select>
           </div>
-          <div className="mt-3 flex gap-1.5 overflow-x-auto" role="radiogroup" aria-label="Tipo de producto">
+          <div className="-mx-1 -mb-2 mt-1 flex gap-1.5 overflow-x-auto px-1 py-2" role="radiogroup" aria-label="Tipo de producto">
             {categories.map((c) => (
               <button
                 key={c}
@@ -289,7 +290,7 @@ export function PosScreen() {
                 role="radio"
                 aria-checked={category === c}
                 onClick={() => setCategory(c)}
-                className={cn("shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition", category === c ? "bg-brand text-white" : "bg-white text-zinc-600 ring-1 ring-zinc-200 hover:bg-zinc-50")}
+                className={cn(hitArea, "shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors duration-[var(--dur-fast)]", category === c ? "bg-brand text-white" : "bg-surface text-fg-2 ring-1 ring-line hover:bg-subtle")}
               >
                 {c}
               </button>
@@ -298,7 +299,7 @@ export function PosScreen() {
         </div>
 
         <div className="grid gap-2.5 p-4 sm:p-6 xl:grid-cols-2">
-          {(products.isLoading || lots.isLoading) && Array.from({ length: 6 }, (_, i) => <div key={i} className="h-40 animate-pulse rounded-2xl bg-white" />)}
+          {(products.isLoading || lots.isLoading) && Array.from({ length: 6 }, (_, i) => <div key={i} className="h-40 animate-pulse rounded-2xl bg-surface" />)}
           {results.map((p) => {
             const info = stockInfo.get(p.id);
             const next = info?.next;
@@ -331,12 +332,12 @@ export function PosScreen() {
         </div>
       </div>
 
-      <aside className="hidden w-[380px] shrink-0 border-l border-zinc-200 bg-white lg:block" aria-label="Venta actual">
+      <aside className="hidden w-[380px] shrink-0 border-l border-line bg-surface lg:block" aria-label="Venta actual">
         {panel}
       </aside>
 
       {lines.length > 0 && !cartOpen && (
-        <button type="button" onClick={() => setCartOpen(true)} className="fixed inset-x-4 bottom-20 z-20 flex h-14 items-center justify-between rounded-2xl bg-brand px-5 text-white shadow-2xl lg:hidden">
+        <button type="button" onClick={() => setCartOpen(true)} className="fixed inset-x-4 bottom-20 z-20 flex h-14 items-center justify-between rounded-2xl bg-brand px-5 text-white shadow-overlay lg:hidden">
           <span className="text-sm font-semibold">
             Ver venta · {lines.length} {lines.length === 1 ? "producto" : "productos"}
           </span>
@@ -345,8 +346,8 @@ export function PosScreen() {
       )}
       {cartOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="absolute inset-0 bg-zinc-900/40" onClick={() => setCartOpen(false)} aria-hidden />
-          <div className="absolute inset-x-0 bottom-0 top-12 overflow-hidden rounded-t-3xl bg-white">{panel}</div>
+          <div className="absolute inset-0 bg-scrim" onClick={() => setCartOpen(false)} aria-hidden />
+          <div className="absolute inset-x-0 bottom-0 top-12 overflow-hidden rounded-t-3xl bg-surface">{panel}</div>
         </div>
       )}
 

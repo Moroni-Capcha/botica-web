@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { IconButton } from "./icon-button";
 
 interface DialogProps {
   title: string;
@@ -48,30 +49,30 @@ export function Dialog({ title, description, onClose, children, footer, size = "
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
-      <div className="absolute inset-0 animate-[fade_.2s_ease-out] bg-zinc-900/40" onClick={onClose} aria-hidden />
+      <div className="absolute inset-0 animate-fade bg-scrim" onClick={onClose} aria-hidden />
       <div
         ref={ref}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         className={cn(
-          "relative flex max-h-[92dvh] w-full animate-[pop_.3s_cubic-bezier(.32,.72,0,1)] flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl",
+          "relative flex max-h-[92dvh] w-full animate-pop flex-col overflow-hidden rounded-t-3xl border border-line bg-surface shadow-overlay sm:rounded-3xl",
           size === "md" && "sm:max-w-lg",
           size === "lg" && "sm:max-w-3xl",
           size === "xl" && "sm:max-w-5xl",
         )}
       >
-        <div className="flex items-start gap-3 border-b border-zinc-100 px-5 py-4">
+        <div className="flex items-start gap-3 border-b border-line-soft px-5 py-4">
           <div className="min-w-0 flex-1">
             <h2 id={titleId} className="text-base font-semibold tracking-tight">{title}</h2>
-            {description && <p className="mt-0.5 text-xs text-zinc-500">{description}</p>}
+            {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
           </div>
-          <button data-close type="button" onClick={onClose} className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100" aria-label="Cerrar">
-            <X className="h-5 w-5" />
-          </button>
+          <IconButton data-close size="sm" onClick={onClose} aria-label="Cerrar">
+            <X className="h-5 w-5" aria-hidden />
+          </IconButton>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
-        {footer && <div className="flex flex-wrap items-center justify-end gap-2 border-t border-zinc-100 px-5 py-3">{footer}</div>}
+        {footer && <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line-soft px-5 py-3">{footer}</div>}
       </div>
     </div>
   );

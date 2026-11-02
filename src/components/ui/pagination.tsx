@@ -23,9 +23,9 @@ export function Pagination({ page, pageSize, total, onPage, noun = "registros", 
   const pages = pageCount(total, pageSize);
   const { first, last } = pageBounds(page, pageSize, total);
   return (
-    <nav aria-label="Páginas" className={cn("flex flex-wrap items-center justify-between gap-2 border-t border-zinc-100 px-4 py-3 text-xs text-zinc-500 sm:px-5", className)}>
+    <nav aria-label="Páginas" className={cn("flex flex-wrap items-center justify-between gap-2 border-t border-line-soft px-4 py-3 text-xs text-muted sm:px-5", className)}>
       <p role="status" aria-live="polite">
-        Mostrando <b className="tabular-nums text-zinc-800">{first.toLocaleString("es-PE")} a {last.toLocaleString("es-PE")}</b> de <b className="tabular-nums text-zinc-800">{total.toLocaleString("es-PE")}</b> {noun}
+        Mostrando <b className="tabular-nums text-fg">{first.toLocaleString("es-PE")} a {last.toLocaleString("es-PE")}</b> de <b className="tabular-nums text-fg">{total.toLocaleString("es-PE")}</b> {noun}
       </p>
       {pages > 1 && (
         <div className="flex items-center gap-1">

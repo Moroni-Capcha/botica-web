@@ -181,7 +181,7 @@ export function ColumnChart({ data, series, height = 220, format, formatTick = f
                       onMouseEnter={() => setHover(i)}
                       onFocus={() => setHover(i)}
                       onBlur={() => setHover(null)}
-                      className="cursor-default outline-none"
+                      className="cursor-default"
                     />
                   </g>
                 );
