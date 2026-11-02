@@ -21,10 +21,11 @@ Build the front-end side of the SaaS roadmap in `CLAUDE.md` (items 1-6), contrac
   - Console: `/consola` (route group `(platform)`), `POST /platform/login`, `POST /platform/logout`, `GET /platform/tenants` (paged, counts by status), `PATCH /platform/tenants/:code` (change plan, extend trial, suspend, reactivate, reason required, recorded in the botica audit). Separate token store `bh.platform.session`; `platformApi` is a separate client.
   - Monitoring: `src/lib/monitoring.ts` no-op without `NEXT_PUBLIC_SENTRY_DSN` and an SDK; PII scrubbed by `domain/privacy.ts`; `app/error.tsx`, `app/global-error.tsx`, TanStack Query cache hooks; README guide for DevOps.
   - Pagination: `Page<T>` convention in `docs/API.md`; required on audit and tenants, optional on `GET /kardex` and `GET /customers/all`; `Pagination` UI component. Not paginated on purpose: vouchers/credit notes (screen needs full-period status counts and filters) and reports.
+- [x] T8 (713bd9c; typecheck ok, 294 tests, build ok; NOT verified in a real browser: cash, panel, reports, customers screens and their Excel downloads were not opened by hand) Credit notes subtract everywhere money is summarized. Pure rules in `domain/returns.ts` (+ `returns.test.ts`): notes count on the day/shift they were issued, by the original payment method (only cash touches the register), cost reverses at the origin lot cost only when stock returns. Contract: `CashSummary.returns/returnRows`, `CashClosing.returns`, `DailySales.returns`, `TodayStats.gross/returns` (`total` now net), `SalesReportLine.kind` (negative `devolucion` lines), `CustomerSummary.totalReturned`, `CustomerPurchase.returned`. Mock `VERSION` 16. Visible "Devoluciones / notas de crédito" line in cash, close detail, panel, reports and Excel exports. Known limit: a note issued while the register is closed subtracts from no shift.
 
 ## Route per task
 T1 delegated writer (contract/types/mock/http/domain/docs, 2+ files). T2-T4 delegated writer.
-T5, T6, T7: delegated writer each (2+ non-trivial files, preparation reading goes with the write). Goal set by user 2026-11-02: finish all front work so the backend team can work undisturbed (contract in `docs/API.md` complete for every module).
+T5, T6, T7, T8: delegated writer each (2+ non-trivial files, preparation reading goes with the write). Goal set by user 2026-11-02: finish all front work so the backend team can work undisturbed (contract in `docs/API.md` complete for every module).
 
 ## Progress / evidence
 (branch created from master @3086017; typecheck + 93 tests green at start)
@@ -37,4 +38,4 @@ Browser check 2026-11-02 (dev server, Chrome, mock `bh-huanuco` data, no console
 - Known gap: resending a voucher is not recorded in the audit log.
 
 ## Next step
-Front work is complete (T1-T7). Remaining: PR decision, remaining manual checks above, and the backend implementing `docs/API.md`.
+Front work is complete (T1-T8). Remaining: PR decision, remaining manual checks above, and the backend implementing `docs/API.md`.
