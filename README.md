@@ -38,7 +38,7 @@ NEXT_PUBLIC_API_MODE=http
 NEXT_PUBLIC_API_URL=http://localhost:4000/api
 ```
 
-El contrato está en [docs/API.md](docs/API.md).
+El contrato está en [docs/API.md](docs/API.md). Si vas a construir el backend, empieza por la [guía para el backend](docs/BACKEND.md).
 
 ## Monitoreo de errores (Sentry)
 
