@@ -52,7 +52,9 @@ Cualquier respuesta 4xx o 5xx trae este cuerpo. El front muestra `message` tal c
 | 409 | `CAJA_ABIERTA` | Se intenta abrir una caja que ya está abierta |
 | 400 | `CAJA_SIN_EFECTIVO` | El egreso o retiro supera el efectivo que debe haber |
 | 400 | `DIFERENCIA_SIN_MOTIVO` | Cierre con diferencia de S/ 1 o más sin explicar |
-| 409 | `ESTADO_INVALIDO` | La acción no corresponde al estado del traslado (p. ej. recibir un pedido sin despachar) |
+| 409 | `ESTADO_INVALIDO` | La acción no corresponde al estado del traslado (p. ej. recibir un pedido sin despachar) o del comprobante (p. ej. reenviar uno ya aceptado) |
+| 404 | `COMPROBANTE_NO_EXISTE` | Comprobante o nota de crédito inexistente |
+| 409 | `PLAZO_VENCIDO` | Anulación de un comprobante emitido hace más de 7 días |
 
 ## Roles y locales
 
@@ -469,6 +471,64 @@ Todo es solo para el administrador (`403 SIN_PERMISO`). Los datos de la botica, 
 - `409 CUENTA_PROTEGIDA` si el cambio dejaría sin administrador activo, o si el administrador intenta desactivarse o quitarse el rol a sí mismo.
 - Al cambiar el PIN, el rol o el local de otra cuenta, o al desactivarla, se invalidan sus sesiones abiertas.
 - Las cuentas desactivadas no salen en `GET /auth/staff` y no pueden ingresar. No se borran.
+
+### Comprobantes electrónicos (SUNAT)
+
+Pantalla `Comprobantes` (módulo `comprobantes`, incluido en todos los planes). El administrador ve todos los locales; una cuenta de local, solo el suyo (otro `branchId` → `403 SIN_PERMISO`; sin `branchId` → su local). Las escrituras respetan la cuenta suspendida (`403 CUENTA_SUSPENDIDA`). Las reglas están en `src/lib/domain/vouchers.ts` con pruebas en `vouchers.test.ts`; conviene que el backend use los mismos casos.
+
+**Estados** (`status`): `pendiente` (enviado, SUNAT aún no responde o no hubo conexión), `aceptado`, `rechazado` (SUNAT lo devolvió con error) y `anulado` (dado de baja). `sunat` trae la última respuesta `{ code, message, at }` (`code` `"0"` = aceptado) o `null` si no hubo respuesta. `attempts` cuenta los envíos a SUNAT, el original incluido. Toda venta (`POST /sales`) nace `pendiente` y pasa a `aceptado` o `rechazado` cuando el proveedor de facturación responde; el front solo lee y reenvía, no recalcula nada.
+
+`GET /vouchers?from=2026-10-01&to=2026-10-27&branchId=principal` → `Voucher[]`. Una fila por boleta o factura, fechas locales (America/Lima) y ambas incluidas, máximo 370 días (`400 DATOS_INVALIDOS`). Sin `branchId`, todos los locales. Del más reciente al más antiguo.
+
+```json
+{
+  "id": "s-1042", "number": "B001-000123", "type": "boleta", "branchId": "principal",
+  "issuedAt": "2026-10-26T10:15:00-05:00", "customerName": "Rosa Huamán", "customerDocId": "40125588",
+  "total": 9.6, "taxBase": 8.14, "igv": 1.46,
+  "status": "aceptado",
+  "sunat": { "code": "0", "message": "La Boleta numero B001-000123, ha sido aceptada", "at": "2026-10-26T10:15:04-05:00" },
+  "attempts": 1, "voided": null, "creditedTotal": 0,
+  "sale": { "...": "la Sale completa, con items y lotes" }
+}
+```
+
+- `id` es el mismo de la venta. `creditedTotal` suma las notas de crédito que no fueron rechazadas y `creditNotes` trae todas las notas emitidas sobre el comprobante (de cualquier fecha), la más antigua primero: con eso el front calcula lo que aún se puede devolver.
+- `voided` es `null` o `{ at, by, reason, ticket }` (el `ticket` de la comunicación de baja).
+
+`GET /credit-notes?from=&to=&branchId=` → `CreditNote[]`, mismas reglas de fechas y local.
+
+`POST /vouchers/:id/resend` → `Voucher` actualizado. Solo si está `pendiente` o `rechazado` (`409 ESTADO_INVALIDO` en otro caso). Suma un envío (`attempts`) y deja la nueva respuesta de SUNAT. `POST /credit-notes/:id/resend` hace lo mismo con una nota.
+
+`POST /vouchers/:id/void` con `{ "reason": "Se facturó al cliente equivocado", "returnStock": true }` → `Voucher` con `status: "anulado"` y `voided`. Es la comunicación de baja:
+
+- Solo `aceptado`. `pendiente` y `rechazado` no se anulan (`409 ESTADO_INVALIDO`); tampoco uno que ya tiene notas de crédito.
+- Plazo de **7 días calendario** desde el día de emisión, hora de Lima, tanto para boletas como para facturas; pasado ese plazo, `409 PLAZO_VENCIDO` y corresponde una nota de crédito.
+- `reason` de 5 a 160 caracteres. Un local desactivado no admite anular ni emitir notas (`409 LOCAL_INACTIVO`).
+- `returnStock: true` devuelve la mercadería a los mismos lotes de la venta y la deja en el kardex como `devolucion` (entra). Con `false` el stock no cambia (la mercadería no volvió a la botica).
+- Una venta anulada deja de contar en reportes, caja, panel y compras del cliente; el kardex conserva la salida y la devolución.
+
+`POST /vouchers/:id/credit-notes` con `CreditNoteRequest` → `CreditNote` (201). Solo sobre un comprobante `aceptado` (`409 ESTADO_INVALIDO`).
+
+```json
+{ "reasonCode": "07", "note": "El cliente devolvió un blíster", "items": [{ "lineIndex": 0, "qty": 1 }], "returnStock": true }
+```
+
+| Código (catálogo 09) | Motivo | Qué se indica | Stock |
+| --- | --- | --- | --- |
+| `01` | Anulación de la operación | nada: se acredita todo | puede volver |
+| `06` | Devolución total | nada: se acredita todo | puede volver |
+| `07` | Devolución por ítem | `items` (`lineIndex` de `sale.items` y `qty` de la presentación vendida) | puede volver |
+| `04` | Descuento global | `amount` | no |
+| `09` | Disminución en el valor | `amount` | no |
+
+- `note` (detalle del motivo) de 3 a 160 caracteres. `returnStock` es `true` por defecto y solo cuenta en `01`, `06` y `07`; los motivos de importe nunca mueven stock.
+- Los motivos `01` y `06` solo se pueden emitir si no hay otra nota válida sobre la venta. Nunca se acredita más que el total del comprobante ni más cantidad de la vendida (`400 DATOS_INVALIDOS`, con el máximo en el `message`).
+- El importe de una línea es `line.total × qty / line.qty`; al acreditar lo que falta de la línea se toma el saldo exacto. Siempre con IGV incluido; `taxBase` e `igv` se calculan sobre el total de la nota.
+- Numeración: `BC01-000001` para boletas y `FC01-000001` para facturas (`B`/`F` + `C` + las dos últimas cifras de la serie del local), correlativo propio por serie. Solo se envía a SUNAT una nota sobre un comprobante ya aceptado.
+- Las unidades que vuelven al stock regresan a los lotes de la venta en el orden en que salieron y entran al kardex como `devolucion` con la referencia `Nota de crédito BC01-000001`.
+- Fuera de alcance por ahora: las notas todavía no restan en reportes ni en el cierre de caja; el reembolso se registra a mano como egreso de caja.
+
+**Ticket de 80 mm.** La impresión se hace en el front (`@media print`, 80 mm de ancho) para la venta y la nota de crédito; el backend no genera PDF. El código QR y el hash de la representación impresa los entrega el proveedor de facturación y se agregarán al ticket cuando el contrato los incluya.
 
 ## Próximas entregas
 

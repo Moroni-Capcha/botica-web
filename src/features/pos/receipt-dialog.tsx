@@ -1,14 +1,15 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { Plus, Printer } from "lucide-react";
 import type { Branch, Pharmacy, Product, Sale } from "@/lib/api/types";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { dateShort, timeShort } from "@/lib/format";
+import { PrintRoot, SaleTicket, printTicket } from "@/features/vouchers/ticket";
 
 const PAY: Record<Sale["payment"]["method"], string> = { efectivo: "Efectivo", yape: "Yape / Plin", tarjeta: "Tarjeta" };
 
-/** Vista del comprobante emitido. La representación impresa oficial la genera el proveedor de facturación electrónica. */
+/** Vista del comprobante emitido. El ticket de 80 mm se imprime desde aquí; el QR y el hash los agrega el proveedor de facturación electrónica. */
 export function ReceiptDialog({ sale, pharmacy, branch, products, onClose }: { sale: Sale; pharmacy: Pharmacy; branch: Branch | undefined; products: Map<number, Product>; onClose: () => void }) {
   const title = sale.document.type === "factura" ? "Factura" : "Boleta";
   return (
@@ -17,9 +18,14 @@ export function ReceiptDialog({ sale, pharmacy, branch, products, onClose }: { s
       description={`${title} ${sale.number} · stock descontado por lote`}
       onClose={onClose}
       footer={
-        <Button variant="primary" onClick={onClose}>
-          <Plus className="h-4 w-4" /> Nueva venta
-        </Button>
+        <>
+          <Button onClick={printTicket}>
+            <Printer className="h-4 w-4" /> Imprimir ticket 80 mm
+          </Button>
+          <Button variant="primary" onClick={onClose}>
+            <Plus className="h-4 w-4" /> Nueva venta
+          </Button>
+        </>
       }
     >
       <div className="mx-auto max-w-sm rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 p-5 font-mono text-[12px] leading-relaxed text-zinc-800">
@@ -61,6 +67,9 @@ export function ReceiptDialog({ sale, pharmacy, branch, products, onClose }: { s
         {sale.approvedBy && <p>Dispensado por {sale.approvedBy}</p>}
         <p className="mt-1">Atendido por: {sale.sellerName}</p>
       </div>
+      <PrintRoot>
+        <SaleTicket sale={sale} pharmacy={pharmacy} branch={branch} products={products} />
+      </PrintRoot>
     </Dialog>
   );
 }

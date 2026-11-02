@@ -9,6 +9,7 @@ import type {
   Dashboard, SalesReportLine, AttendanceMark, ContactRequest, CustomerInput, CustomerPurchase, CustomerSummary, RefillInfo, AttendanceSettings, ClockRequest, KioskWorker, ManualMarkRequest, Worker, WorkerInput,
   AccountInput, BranchCreateInput, BranchCreated, Plan, BranchInput, BranchSeries, RulesInput, StaffAccount,
   StaffSummary, Supplier, SupplierInput, Transfer, TransferAskRequest, TransferSendRequest, User, BranchId, WriteOffRequest,
+  CreditNote, CreditNoteRequest, Voucher, VoidRequest,
 } from "./types";
 
 export interface PublicConfig {
@@ -161,4 +162,18 @@ export interface ApiClient {
   /** Cierres de los últimos `days` días. Sin `branchId`, todos los locales (solo administrador). */
   listCashClosings(options: { branchId?: BranchId; days: number }): Promise<CashClosing[]>;
   createSale(input: SaleRequest): Promise<Sale>;
+
+  /* Comprobantes electrónicos (SUNAT) */
+  /** Boletas y facturas emitidas entre dos fechas (YYYY-MM-DD, ambas incluidas), con su estado ante SUNAT. El encargado recibe solo su local. */
+  listVouchers(options: { from: string; to: string; branchId?: BranchId }): Promise<Voucher[]>;
+  /** Notas de crédito emitidas entre dos fechas. El encargado recibe solo las de su local. */
+  listCreditNotes(options: { from: string; to: string; branchId?: BranchId }): Promise<CreditNote[]>;
+  /** Vuelve a enviar a SUNAT un comprobante pendiente o rechazado. ESTADO_INVALIDO (409) si ya está aceptado o anulado. */
+  resendVoucher(id: string): Promise<Voucher>;
+  /** Igual que resendVoucher, para una nota de crédito. */
+  resendCreditNote(id: string): Promise<CreditNote>;
+  /** Comunicación de baja: anula un comprobante aceptado dentro de los 7 días de su emisión. */
+  voidVoucher(id: string, input: VoidRequest): Promise<Voucher>;
+  /** Emite una nota de crédito sobre un comprobante aceptado. Devuelve la nota. */
+  createCreditNote(voucherId: string, input: CreditNoteRequest): Promise<CreditNote>;
 }

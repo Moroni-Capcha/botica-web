@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { effectiveStatus, isReadOnly, limaDay } from "@/lib/domain/account";
 import type { SetupStep, ClockRequest, ContactRequest, CustomerInput, ManualMarkRequest, WorkerInput } from "@/lib/api";
+import type { CreditNote, CreditNoteRequest, Voucher, VoidRequest } from "@/lib/api";
 import type { BranchId, CashCloseRequest, CashMovementRequest, Lot, Product, ProductInput, PurchaseRequest, SaleRequest, Supplier, SupplierInput, Transfer, TransferAskRequest, TransferSendRequest, WriteOffRequest } from "@/lib/api";
 import type { NewCustomer, AccountInput, BranchCreateInput, BranchInput, Pharmacy, RulesInput, PublicConfig } from "@/lib/api";
 
@@ -35,6 +36,8 @@ export const qk = {
   transfers: (days: number) => ["transfers", days] as const,
   purchases: (branchId: BranchId | null, days: number) => ["purchases", branchId, days] as const,
   kardex: (productId: number, branchId: BranchId | null, days: number) => ["kardex", productId, branchId, days] as const,
+  vouchers: (from: string, to: string, branchId: BranchId | null) => ["vouchers", from, to, branchId] as const,
+  creditNotes: (from: string, to: string, branchId: BranchId | null) => ["credit-notes", from, to, branchId] as const,
 };
 
 export const useConfig = () => useQuery({ queryKey: qk.config, queryFn: api.getPublicConfig, staleTime: 10 * 60_000 });
@@ -277,6 +280,43 @@ export function useLogContact() {
     mutationFn: ({ customerId, input }: { customerId: number; input: ContactRequest }) => api.logContact(customerId, input),
     onSuccess: () => void qc.invalidateQueries({ queryKey: qk.refills }),
   });
+}
+
+/* ------------------------------ Comprobantes (SUNAT) ------------------------------ */
+
+export const useVouchers = (from: string, to: string, branchId: BranchId | null, enabled = true) =>
+  useQuery({ queryKey: qk.vouchers(from, to, branchId), queryFn: () => api.listVouchers({ from, to, branchId: branchId ?? undefined }), staleTime: 20_000, refetchInterval: 60_000, enabled, placeholderData: (prev) => prev });
+export const useCreditNotes = (from: string, to: string, branchId: BranchId | null, enabled = true) =>
+  useQuery({ queryKey: qk.creditNotes(from, to, branchId), queryFn: () => api.listCreditNotes({ from, to, branchId: branchId ?? undefined }), staleTime: 20_000, refetchInterval: 60_000, enabled, placeholderData: (prev) => prev });
+
+/** Reenviar solo cambia el estado ante SUNAT. */
+export function useResendVoucher() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (a: { kind: "voucher" | "note"; id: string }): Promise<Voucher | CreditNote> => (a.kind === "voucher" ? api.resendVoucher(a.id) : api.resendCreditNote(a.id)),
+    onSuccess: () => {
+      for (const key of [["vouchers"], ["credit-notes"]]) void qc.invalidateQueries({ queryKey: key });
+    },
+  });
+}
+
+/** Anular o emitir una nota puede devolver mercadería al stock y quita ventas de la caja, el panel y los reportes: se refresca todo eso. */
+function useRefreshAfterVoucherChange() {
+  const qc = useQueryClient();
+  return (branchId: BranchId) => {
+    for (const key of [["vouchers"], ["credit-notes"], qk.lots(branchId), qk.branchStock, ["kardex"], ["velocity"], qk.cashSummary(branchId), ["dashboard"], ["sales-report"], qk.customersAll, qk.refills, ["customer-purchases"]])
+      void qc.invalidateQueries({ queryKey: key });
+  };
+}
+
+export function useVoidVoucher() {
+  const refresh = useRefreshAfterVoucherChange();
+  return useMutation({ mutationFn: ({ id, input }: { id: string; input: VoidRequest }) => api.voidVoucher(id, input), onSuccess: (v) => refresh(v.branchId) });
+}
+
+export function useCreateCreditNote() {
+  const refresh = useRefreshAfterVoucherChange();
+  return useMutation({ mutationFn: ({ voucherId, input }: { voucherId: string; input: CreditNoteRequest }) => api.createCreditNote(voucherId, input), onSuccess: (n) => refresh(n.branchId) });
 }
 
 /* ------------------------------ Ajustes ------------------------------ */

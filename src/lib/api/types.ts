@@ -694,3 +694,113 @@ export interface RulesInput {
   purchasing: PurchasingSettings;
   attendance: AttendanceSettings;
 }
+
+/* ------------------------------ Comprobantes (SUNAT) ------------------------------ */
+
+/**
+ * pendiente: se envió y SUNAT aún no responde (o no hubo conexión).
+ * aceptado: SUNAT lo validó. rechazado: SUNAT lo devolvió con un error. anulado: se dio de baja.
+ */
+export type VoucherStatus = "pendiente" | "aceptado" | "rechazado" | "anulado";
+
+/** Última respuesta de SUNAT (vía el proveedor de facturación electrónica). `code` "0" = aceptado. */
+export interface SunatResponse {
+  code: string;
+  message: string;
+  at: string; // ISO
+}
+
+/** Estado electrónico de un comprobante. `sunat` es null mientras no hay respuesta. */
+export interface ElectronicState {
+  status: VoucherStatus;
+  sunat: SunatResponse | null;
+  /** Veces que se envió a SUNAT (el envío original cuenta como 1). */
+  attempts: number;
+}
+
+export interface VoidInfo {
+  at: string; // ISO
+  by: string;
+  reason: string;
+  /** Ticket de la comunicación de baja que devolvió SUNAT. */
+  ticket: string;
+}
+
+/** Boleta o factura emitida por una venta, con su estado ante SUNAT. */
+export interface Voucher extends ElectronicState {
+  /** Es el mismo id de la venta. */
+  id: string;
+  number: string;
+  type: DocType;
+  branchId: BranchId;
+  issuedAt: string; // ISO
+  customerName: string;
+  customerDocId: string;
+  total: number;
+  taxBase: number;
+  igv: number;
+  voided: VoidInfo | null;
+  /** Suma de las notas de crédito válidas (no rechazadas). */
+  creditedTotal: number;
+  /** Notas de crédito emitidas sobre este comprobante, de cualquier fecha (la más antigua primero). */
+  creditNotes: CreditNote[];
+  /** La venta completa: sirve para armar el ticket y elegir qué productos se devuelven. */
+  sale: Sale;
+}
+
+export interface VoidRequest {
+  reason: string;
+  /** Si la mercadería vuelve al stock (entra al kardex como devolución de cliente). */
+  returnStock: boolean;
+}
+
+/** Catálogo 09 de SUNAT (motivos de nota de crédito) que usa el sistema. */
+export type CreditReasonCode = "01" | "04" | "06" | "07" | "09";
+
+export interface CreditNoteItem {
+  /** Posición de la línea en `Voucher.sale.items`. */
+  lineIndex: number;
+  productId: number;
+  presentationLabel: string;
+  qty: number;
+  units: number;
+  total: number;
+}
+
+export interface CreditNote extends ElectronicState {
+  id: string;
+  /** "BC01-000001" para boletas, "FC01-000001" para facturas. */
+  number: string;
+  /** Tipo del comprobante que modifica. */
+  type: DocType;
+  branchId: BranchId;
+  issuedAt: string; // ISO
+  userName: string;
+  voucherId: string;
+  voucherNumber: string;
+  customerName: string;
+  customerDocId: string;
+  reasonCode: CreditReasonCode;
+  reasonLabel: string;
+  /** Detalle que escribió quien la emitió. */
+  note: string;
+  items: CreditNoteItem[];
+  total: number;
+  taxBase: number;
+  igv: number;
+  /** Las unidades volvieron al stock. */
+  returnedToStock: boolean;
+}
+
+/**
+ * Según el motivo, se indica `items` (devolución por ítem), `amount` (descuento o disminución)
+ * o nada (anulación y devolución total: se acredita todo el comprobante).
+ */
+export interface CreditNoteRequest {
+  reasonCode: CreditReasonCode;
+  note: string;
+  items?: { lineIndex: number; qty: number }[];
+  amount?: number;
+  /** Solo motivos con mercadería (01, 06, 07). Por defecto true. */
+  returnStock?: boolean;
+}

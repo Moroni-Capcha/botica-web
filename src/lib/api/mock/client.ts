@@ -8,6 +8,7 @@ import type {
   SalesReportLine, AttendanceMark, AttendanceSettings, KioskWorker, Worker, CustomerPurchase, CustomerInput,
   Branch, CashClosing, CashMovement, CashSession, Customer, ExpiryThresholds, KardexEntry, Lot, MoveType, Product, ProductInput, ProductVelocity, Purchase, PurchasingSettings, Sale, SaleRequest, Session,
   StaffSummary, Supplier, SupplierInput, Transfer, TransferItem, User, Role, StaffAccount, AccountInput, BranchInput, RulesInput, Pharmacy, Plan, Account, AccountStatus, BoticaPublic, PlanOffer, SignUpInput, Setup, SetupStep,
+  CreditNote, ElectronicState, Voucher, VoidInfo,
 } from "../types";
 import { tokenStore } from "../token";
 import { tenantStore } from "../tenant";
@@ -23,10 +24,11 @@ import { isValidBoticaCode, isValidEmail, normalizeBoticaCode, normalizeEmail, p
 import { findPlan, listPlanOffers, TRIAL_DAYS } from "@/lib/domain/plans";
 import { isSetupStep, normalizeDone, SETUP_STEPS } from "@/lib/domain/onboarding";
 import { accountErrors, accountGuard, branchErrors, branchSlug, deactivateBlockers, planUsage, hasErrors, normalizePharmacy, pharmacyErrors, rulesErrors } from "@/lib/domain/settings";
+import { acceptedResponse, allocateReturn, canResend, creditableLines, creditNoteNumber, creditedTotalOf, noteSeries, planCreditNote, voidBlocker, voidReasonError } from "@/lib/domain/vouchers";
 import { SEED_DAILY_UNITS, SEED_LOT_PLAN, SEED_PRODUCTS, SEED_SUC_MISSING } from "./seed-data";
 
 const KEY = "bh.mock.v1";
-const VERSION = 13; // subir cuando cambie la forma de los datos: se regeneran
+const VERSION = 14; // subir cuando cambie la forma de los datos: se regeneran
 const DAY = 86_400_000;
 
 /**
@@ -57,6 +59,11 @@ interface StockMove {
   userName: string;
 }
 
+/** Estado electrónico de una venta ante SUNAT. Si una venta no figura aquí, se considera aceptada al emitirse. */
+interface VoucherRecord extends ElectronicState {
+  voided: VoidInfo | null;
+}
+
 interface MockDb {
   version: typeof VERSION;
   expiry: ExpiryThresholds;
@@ -84,6 +91,11 @@ interface MockDb {
   /** Avisos de recompra enviados: cliente:producto → fecha */
   contacts: Record<string, string>;
   sales: Sale[];
+  /** Estado ante SUNAT por id de venta (solo las que ya cambiaron del estado "aceptado"). */
+  vouchers: Record<string, VoucherRecord>;
+  creditNotes: CreditNote[];
+  /** Último correlativo de nota de crédito por serie: "BC01" → 3 */
+  noteSeq: Record<string, number>;
   moves: StockMove[];
   suppliers: Supplier[];
   purchases: Purchase[];
@@ -95,8 +107,8 @@ interface MockDb {
 }
 
 const PERMISSIONS: Record<Role, string[]> = {
-  admin: ["panel", "pos", "vencimientos", "inventario", "traslados", "compras", "clientes", "caja", "asistencia", "reportes", "ajustes"],
-  encargado: ["panel", "pos", "vencimientos", "inventario", "traslados", "compras", "clientes", "caja"],
+  admin: ["panel", "pos", "vencimientos", "inventario", "traslados", "compras", "clientes", "caja", "comprobantes", "asistencia", "reportes", "ajustes"],
+  encargado: ["panel", "pos", "vencimientos", "inventario", "traslados", "compras", "clientes", "caja", "comprobantes"],
 };
 
 /* Generador estable para que los datos de ejemplo sean iguales en cada carga */
@@ -197,6 +209,9 @@ function seed(now: number): MockDb {
     workers: SEED_WORKERS.map((w) => ({ ...w, schedule: { ...w.schedule, days: [...w.schedule.days] } })),
     marks: [],
     sales: [],
+    vouchers: {},
+    creditNotes: [],
+    noteSeq: {},
     moves,
     suppliers: SEED_SUPPLIERS.map((x) => ({ ...x })),
     purchases,
@@ -209,7 +224,21 @@ function seed(now: number): MockDb {
   db.closings = seedClosings(db, t0, rnd);
   db.marks = seedMarks(db.workers, t0, now);
   seedCustomers(db, t0);
+  seedVouchers(db);
   return db;
+}
+
+/** Para que la pantalla de comprobantes tenga casos reales: uno pendiente y uno rechazado entre las ventas de hoy. */
+function seedVouchers(db: MockDb) {
+  const mine = db.sales.filter((s) => s.branchId === "principal");
+  const pending = mine[mine.length - 1];
+  const rejected = mine[mine.length - 2];
+  if (pending) db.vouchers[pending.id] = { status: "pendiente", sunat: null, attempts: 1, voided: null };
+  if (rejected)
+    db.vouchers[rejected.id] = {
+      status: "rechazado", attempts: 1, voided: null,
+      sunat: { code: "1033", message: `El comprobante ${rejected.number} fue registrado previamente con otros datos`, at: rejected.createdAt },
+    };
 }
 
 /**
@@ -281,9 +310,12 @@ function seedCustomers(db: MockDb, t0: number) {
   db.contacts["8:19"] = new Date(t0 - DAY + 17 * 3600_000).toISOString();
 }
 
+/** Ventas que siguen vigentes: las anuladas (comunicación de baja) no cuentan en reportes, caja ni compras del cliente. */
+const liveSales = (d: Pick<MockDb, "sales" | "vouchers">): Sale[] => d.sales.filter((s) => d.vouchers[s.id]?.status !== "anulado");
+
 /** Compras del cliente: historial de ejemplo más las ventas con el cliente asignado. */
 function purchasesOf(d: MockDb, customerId: number): CustomerPurchase[] {
-  const fromSales: CustomerPurchase[] = d.sales
+  const fromSales: CustomerPurchase[] = liveSales(d)
     .filter((s) => s.customerId === customerId)
     .map((s) => ({ saleId: s.id, number: s.number, branchId: s.branchId, at: s.createdAt, total: s.total, items: s.items.map((it) => ({ productId: it.productId, units: it.units, total: it.total, presentationLabel: it.presentationLabel, qty: it.qty })) }));
   const idPrefix = [`h${customerId}-`, `x${customerId}-`];
@@ -610,6 +642,9 @@ function seedEmpty(input: SignUpInput, now: number): MockDb {
     workers: [],
     marks: [],
     sales: [],
+    vouchers: {},
+    creditNotes: [],
+    noteSeq: {},
     moves: [],
     suppliers: [],
     purchases: [],
@@ -675,13 +710,35 @@ function recordExit(d: MockDb, t: Transfer, userName: string, now: number) {
     d.moves.push({ id: ++moveId, at: new Date(now).toISOString(), branchId: t.fromBranchId, productId: it.productId, lotId: it.lotId, lotCode: it.lotCode, type: "traslado_salida", delta: -it.units, note: `Traslado ${t.code} a ${BRANCH_NAME[t.toBranchId] ?? t.toBranchId}`, userName });
 }
 
+/** Estado ante SUNAT de una venta. Las que nunca cambiaron figuran como aceptadas en el momento de emitirse. */
+function recordOf(d: MockDb, sale: Sale): VoucherRecord {
+  return d.vouchers[sale.id] ?? { status: "aceptado", sunat: acceptedResponse(sale.document.type, sale.number, Date.parse(sale.createdAt)), attempts: 1, voided: null };
+}
+
+function toVoucher(d: MockDb, sale: Sale): Voucher {
+  const customerName = sale.document.customerName || d.customers.find((c) => c.id === sale.customerId)?.name || "";
+  const notes = d.creditNotes.filter((n) => n.voucherId === sale.id);
+  return {
+    id: sale.id, number: sale.number, type: sale.document.type, branchId: sale.branchId, issuedAt: sale.createdAt, customerName, customerDocId: sale.document.customerDocId ?? "",
+    total: sale.total, taxBase: sale.taxBase, igv: sale.igv, ...recordOf(d, sale), creditedTotal: creditedTotalOf(notes), creditNotes: notes, sale,
+  };
+}
+
+/** Entra al kardex y al lote unidades que vuelven a la botica (devolución de un cliente). */
+function returnToLot(d: MockDb, lotId: number, units: number, note: string, userName: string, now: number) {
+  const lot = d.lots.find((l) => l.id === lotId);
+  if (!lot) return;
+  lot.qty += units;
+  d.moves.push({ id: Math.max(0, ...d.moves.map((m) => m.id)) + 1, at: new Date(now).toISOString(), branchId: lot.branchId, productId: lot.productId, lotId: lot.id, lotCode: lot.code, type: "devolucion", delta: units, note, userName });
+}
+
 const closedSession = (branchId: string): CashSession => ({ branchId, open: false, openedAt: null, openedBy: null, openingAmount: 0 });
 
 /** Ventas y movimientos del turno abierto y el efectivo que debe haber. */
 function summaryOf(d: MockDb, branchId: string) {
   const session = d.cash[branchId] ?? closedSession(branchId);
   const since = session.openedAt ? new Date(session.openedAt).getTime() : Number.POSITIVE_INFINITY;
-  const sales = d.sales
+  const sales = liveSales(d)
     .filter((s) => s.branchId === branchId && new Date(s.createdAt).getTime() >= since)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .map((s) => ({ id: s.id, number: s.number, createdAt: s.createdAt, total: s.total, method: s.payment.method, sellerName: s.sellerName, hasPrescription: !!s.prescription }));
@@ -782,6 +839,24 @@ export function createMockClient(): ApiClient {
   const toUser = (s: StaffRecord): User => ({ id: s.id, name: s.name, role: s.role, branchId: s.branchId, permissions: PERMISSIONS[s.role] });
   const assertBranch = (u: StaffRecord, branchId: string) => {
     if (u.role !== "admin" && u.branchId !== branchId) fail("SIN_PERMISO", "Tu cuenta solo puede operar en tu local.", 403);
+  };
+
+  /** Rango y local de una consulta de comprobantes; devuelve quién entra (local y fecha). */
+  const voucherWindow = (u: StaffRecord, d: MockDb, { from, to, branchId }: { from: string; to: string; branchId?: string }) => {
+    if (branchId) assertBranch(u, branchId);
+    const scope = branchId ? [branchId] : u.role === "admin" ? d.branches.map((b) => b.id) : [u.branchId!];
+    const a = parseDay(from);
+    const b = parseDay(to) + DAY;
+    if (!(a < b) || b - a > 370 * DAY) fail("DATOS_INVALIDOS", "Rango de fechas no válido (máximo un año).");
+    return (branch: string, iso: string) => {
+      const t = Date.parse(iso);
+      return scope.includes(branch) && t >= a && t < b;
+    };
+  };
+  const saleOf = (u: StaffRecord, d: MockDb, id: string): Sale => {
+    const sale = d.sales.find((s) => s.id === id) ?? fail("COMPROBANTE_NO_EXISTE", "El comprobante no existe.", 404);
+    assertBranch(u, sale.branchId);
+    return sale;
   };
 
   const client: ApiClient = {
@@ -1083,7 +1158,7 @@ export function createMockClient(): ApiClient {
         });
       }
       /* Ventas registradas */
-      for (const sale of d.sales) {
+      for (const sale of liveSales(d)) {
         if (!scope.includes(sale.branchId) || !inRange(sale.createdAt)) continue;
         for (const it of sale.items) {
           lines.push({
@@ -1113,7 +1188,7 @@ export function createMockClient(): ApiClient {
         }
       }
       const todayStats = branchIds.map((branchId) => {
-        const sales = d.sales.filter((x) => x.branchId === branchId && new Date(x.createdAt).getTime() >= t0);
+        const sales = liveSales(d).filter((x) => x.branchId === branchId && new Date(x.createdAt).getTime() >= t0);
         const byHour = Array.from({ length: 24 }, () => 0);
         const top = new Map<number, { productId: number; units: number; total: number }>();
         for (const x of sales) {
@@ -1480,7 +1555,7 @@ export function createMockClient(): ApiClient {
         m.set(k, v);
       };
       for (const mv of d.moves) if (mv.type === "venta" && new Date(mv.at).getTime() >= from) add(mv.branchId, mv.productId, -mv.delta);
-      for (const sale of d.sales) {
+      for (const sale of liveSales(d)) {
         if (new Date(sale.createdAt).getTime() < from) continue;
         for (const it of sale.items) add(sale.branchId, it.productId, it.units);
       }
@@ -1715,6 +1790,105 @@ export function createMockClient(): ApiClient {
       }
       commit();
       return sale;
+    },
+
+    async listVouchers(options) {
+      await wait(220);
+      const u = currentUser();
+      const d = get();
+      const inScope = voucherWindow(u, d, options);
+      return d.sales
+        .filter((s) => inScope(s.branchId, s.createdAt))
+        .map((s) => toVoucher(d, s))
+        .sort((x, y) => y.issuedAt.localeCompare(x.issuedAt));
+    },
+    async listCreditNotes(options) {
+      await wait(180);
+      const u = currentUser();
+      const d = get();
+      const inScope = voucherWindow(u, d, options);
+      return d.creditNotes.filter((n) => inScope(n.branchId, n.issuedAt)).sort((x, y) => y.issuedAt.localeCompare(x.issuedAt));
+    },
+    async resendVoucher(id) {
+      await wait(700);
+      const u = currentUser();
+      const d = get();
+      const sale = saleOf(u, d, id);
+      const rec = recordOf(d, sale);
+      if (rec.status === "anulado") fail("ESTADO_INVALIDO", "Este comprobante está anulado: no se envía a SUNAT.", 409);
+      if (!canResend(rec.status)) fail("ESTADO_INVALIDO", "SUNAT ya aceptó este comprobante. No hace falta reenviarlo.", 409);
+      /* En la simulación, SUNAT acepta el reenvío */
+      d.vouchers[sale.id] = { ...rec, status: "aceptado", sunat: acceptedResponse(sale.document.type, sale.number, Date.now()), attempts: rec.attempts + 1 };
+      commit();
+      return toVoucher(d, sale);
+    },
+    async resendCreditNote(id) {
+      await wait(700);
+      const u = currentUser();
+      const d = get();
+      const i = d.creditNotes.findIndex((n) => n.id === id);
+      const note = d.creditNotes[i] ?? fail("COMPROBANTE_NO_EXISTE", "La nota de crédito no existe.", 404);
+      assertBranch(u, note.branchId);
+      if (!canResend(note.status)) fail("ESTADO_INVALIDO", "SUNAT ya aceptó esta nota de crédito. No hace falta reenviarla.", 409);
+      const next: CreditNote = { ...note, status: "aceptado", sunat: acceptedResponse("nota_credito", note.number, Date.now()), attempts: note.attempts + 1 };
+      d.creditNotes[i] = next;
+      commit();
+      return next;
+    },
+    async voidVoucher(id, input) {
+      await wait(600);
+      const u = currentUser();
+      const d = get();
+      const sale = saleOf(u, d, id);
+      assertOpen(d, sale.branchId);
+      const reasonError = voidReasonError(input.reason);
+      if (reasonError) fail("DATOS_INVALIDOS", reasonError);
+      const v = toVoucher(d, sale);
+      const now = Date.now();
+      const blocker = voidBlocker(v, now);
+      if (blocker) fail(v.status === "aceptado" && v.creditedTotal === 0 ? "PLAZO_VENCIDO" : "ESTADO_INVALIDO", blocker, 409);
+      if (input.returnStock) {
+        for (const line of sale.items) for (const l of line.lots) returnToLot(d, l.lotId, l.units, `Anulación de ${sale.number}`, u.name, now);
+      }
+      const voided: VoidInfo = { at: new Date(now).toISOString(), by: u.name, reason: input.reason.trim(), ticket: String(now).padStart(15, "0") };
+      d.vouchers[sale.id] = { ...recordOf(d, sale), status: "anulado", voided };
+      commit();
+      return toVoucher(d, sale);
+    },
+    async createCreditNote(voucherId, input) {
+      await wait(600);
+      const u = currentUser();
+      const d = get();
+      const sale = saleOf(u, d, voucherId);
+      const branch = assertOpen(d, sale.branchId);
+      const rec = recordOf(d, sale);
+      if (rec.status === "anulado") fail("ESTADO_INVALIDO", "El comprobante está anulado: no admite nota de crédito.", 409);
+      if (rec.status !== "aceptado") fail("ESTADO_INVALIDO", "SUNAT aún no acepta este comprobante. Reenvíalo antes de emitir la nota de crédito.", 409);
+      const prior = toVoucher(d, sale).creditNotes;
+      const plan = planCreditNote(sale, prior, input);
+      if (!plan.ok) return fail("DATOS_INVALIDOS", plan.error);
+      const now = Date.now();
+      const returnStock = plan.reason.stock && plan.items.length > 0 && (input.returnStock ?? true);
+      const prefix = noteSeries(sale.document.type, branch.series);
+      const seq = (d.noteSeq[prefix] ?? 0) + 1;
+      const number = creditNoteNumber(sale.document.type, branch.series, seq);
+      if (returnStock) {
+        const lines = creditableLines(sale, prior);
+        for (const it of plan.items) {
+          const c = lines[it.lineIndex]!;
+          for (const a of allocateReturn(c.line.lots.map((l) => ({ lotId: l.lotId, units: l.units })), c.returnedUnits, it.units)) returnToLot(d, a.lotId, a.units, `Nota de crédito ${number}`, u.name, now);
+        }
+      }
+      d.noteSeq[prefix] = seq;
+      const note: CreditNote = {
+        id: `nc_${now.toString(36)}`, number, type: sale.document.type, branchId: sale.branchId, issuedAt: new Date(now).toISOString(), userName: u.name,
+        voucherId: sale.id, voucherNumber: sale.number, customerName: toVoucher(d, sale).customerName, customerDocId: sale.document.customerDocId ?? "",
+        reasonCode: plan.reason.code, reasonLabel: plan.reason.label, note: input.note.trim(), items: plan.items, total: plan.total, taxBase: plan.taxBase, igv: plan.igv,
+        returnedToStock: returnStock, status: "aceptado", sunat: acceptedResponse("nota_credito", number, now), attempts: 1,
+      };
+      d.creditNotes.push(note);
+      commit();
+      return note;
     },
   };
   return guardWrites(client, () => get().account);

@@ -17,7 +17,7 @@ interface PlanDef {
   modules: readonly string[];
 }
 
-const INICIO = ["panel", "pos", "vencimientos", "inventario", "compras", "clientes", "caja", "ajustes"];
+const INICIO = ["panel", "pos", "vencimientos", "inventario", "compras", "clientes", "caja", "comprobantes", "ajustes"];
 
 export const PLAN_CATALOG: readonly PlanDef[] = [
   { id: "inicio", name: "Plan Inicio", basePrice: 50, maxBranches: 1, modules: INICIO },

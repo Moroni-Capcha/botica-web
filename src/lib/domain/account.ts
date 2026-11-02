@@ -7,7 +7,7 @@ import type { Account, AccountStatus } from "@/lib/api/types";
 const DAY = 86_400_000;
 
 /** Ids de módulo = ids de `src/lib/nav.ts`. */
-export const ALL_MODULES = ["panel", "pos", "vencimientos", "inventario", "traslados", "compras", "clientes", "caja", "asistencia", "reportes", "ajustes"] as const;
+export const ALL_MODULES = ["panel", "pos", "vencimientos", "inventario", "traslados", "compras", "clientes", "caja", "comprobantes", "asistencia", "reportes", "ajustes"] as const;
 
 /** Día local de Lima (YYYY-MM-DD) de un instante. */
 export const limaDay = (now: number): string => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);

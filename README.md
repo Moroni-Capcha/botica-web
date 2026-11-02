@@ -62,6 +62,7 @@ src/
       compras/          Pedido sugerido, ingresos y proveedores
       traslados/        Traslados entre locales
       caja/             Turno de caja, movimientos, arqueo y cierres
+      comprobantes/     Comprobantes SUNAT: estado, reenvío, anulación y notas de crédito
       asistencia/       Asistencia del personal (administrador)
       clientes/         Clientes y recompras
       reportes/         Reportes de venta (administrador)
@@ -73,6 +74,7 @@ src/
   features/purchases/   Compras: pedido sugerido, ingreso de lotes, importación, proveedores
   features/transfers/   Traslados: en curso, sugeridos, historial, envío y pedido
   features/cash/        Caja: turno, movimientos, arqueo, historial de cierres
+  features/vouchers/    Comprobantes: lista y filtros, detalle, anular, nota de crédito, ticket de 80 mm, Excel
   features/attendance/  Asistencia: marcación, hoy, historial, resumen, personal
   features/dashboard/   Panel del día
   features/customers/   Clientes: cartera, ficha, tratamientos, recompras
@@ -83,7 +85,7 @@ src/
   components/charts/    Gráfico de columnas (tooltip, leyenda y vista de tabla)
   components/layout/    Barra lateral, barra superior, navegación móvil
   lib/api/              Tipos, contrato, cliente HTTP y API simulada
-  lib/domain/           Reglas de negocio puras: FEFO, presentaciones, IGV, comprobantes, riesgo de vencimiento, inventario, kardex, compras e importación, traslados, caja, asistencia, panel, clientes, reportes, ajustes
+  lib/domain/           Reglas de negocio puras: FEFO, presentaciones, IGV, comprobantes, riesgo de vencimiento, inventario, kardex, compras e importación, traslados, caja, asistencia, panel, clientes, reportes, ajustes, comprobantes electrónicos (plazo de baja, notas de crédito)
   lib/excel/            Generador y lector de .xlsx sin dependencias
   lib/auth/             Sesión y local donde se opera
 docs/API.md             Contrato con el backend
@@ -105,5 +107,6 @@ public/brand/           Logo e isotipo de Digi!HME (PNG transparente)
 - [x] Asistencia del personal: marcación con PIN personal (también desde la pantalla de ingreso), estado de hoy con línea del día, historial, resumen por trabajador con tardanzas, faltas, horas y extra, marcas manuales, personal y horarios, Excel
 - [x] Reportes: venta por periodo con comparación, por día u hora, por producto, laboratorio, tipo, local, quien atendió y método de pago; utilidad y margen; productos sin movimiento; libro de recetas; libro Excel completo
 - [x] Ajustes: datos y colores de la botica con vista previa y control de contraste, locales según el plan contratado (crear con su cuenta, desactivar sin perder historial, reactivar), series de comprobantes con el siguiente correlativo, cuentas y PIN (siempre queda un administrador activo), plazos de vencimiento, reglas de compra y de asistencia
+- [x] Comprobantes SUNAT: pantalla `/comprobantes` con filtros por fecha, tipo y estado (pendiente, aceptado, rechazado, anulado) y la respuesta de SUNAT; reenvío de pendientes y rechazados; anulación (comunicación de baja) dentro de 7 días con motivo y devolución opcional al stock; notas de crédito (catálogo 09: anulación, devolución total o por ítem, descuento, disminución) que devuelven la mercadería al kardex; ticket de 80 mm para imprimir (también desde la venta en el punto de venta); Excel. Pendiente del lado del backend: envío real a SUNAT, QR y hash del ticket; las notas aún no restan en reportes ni en el cierre de caja
 - [ ] SaaS (en curso): contrato y mock de botica por código (`X-Botica`), ingreso del dueño con correo y contraseña, estado de la cuenta (prueba, activa, vencida, suspendida) con módulos del plan y modo solo lectura
 - [x] Registro y primera configuración: `/registro` en 3 pasos (plan, datos, listo) crea la botica en prueba de 14 días; tarjeta de pasos pendientes en el panel (datos, local, series, usuario de mostrador, productos). El mock guarda cada botica nueva en `bh.mock.v1.<código>`
