@@ -14,15 +14,16 @@ Build the front-end side of the SaaS roadmap in `CLAUDE.md` (items 1-6), contrac
 - [x] T2+T3 done together (typecheck/build ok, 105 tests; NOT verified in browser). T2 Login UI: botica code + owner/counter modes; session carries tenant; PIN stays for counter.
 - [x] T3 (cf166f0, with T2) Ajustes "Plan y facturación" tab, account banner, read-only blocking, modules gated by plan (`nav.ts`).
 - [x] T4 (typecheck ok, 114 tests, build ok; NOT verified in browser) Guided signup (`/registro`) and first-run setup checklist on the panel. Mock: one dataset per botica code (`bh.mock.v1.<code>`), `VERSION` 13.
-- [ ] T5 SUNAT vouchers: status, resend, void, credit note, 80 mm ticket print.
+- [x] T5 (76bc25e, typecheck ok, 150 tests, build ok; NOT verified in browser or on a real 80 mm printer) SUNAT vouchers: status, resend, void (7-day rule), credit note (catalog 09: 01, 04, 06, 07, 09), 80 mm ticket print, `/comprobantes` screen + Excel. Mock `VERSION` 14. Notes do not yet subtract in reports/cash close.
 - [ ] T6 Offline POS (PWA + sales queue).
 - [ ] T7 Audit log, internal Digi!HME console, Sentry hook, server-side pagination.
 
 ## Route per task
-T1 delegated writer (contract/types/mock/http/domain/docs, 2+ files). Others decided at start.
+T1 delegated writer (contract/types/mock/http/domain/docs, 2+ files). T2-T4 delegated writer.
+T5, T6, T7: delegated writer each (2+ non-trivial files, preparation reading goes with the write). Goal set by user 2026-11-02: finish all front work so the backend team can work undisturbed (contract in `docs/API.md` complete for every module).
 
 ## Progress / evidence
 (branch created from master @3086017; typecheck + 93 tests green at start)
 
 ## Next step
-T1.
+T6, then T7.
