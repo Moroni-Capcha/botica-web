@@ -21,6 +21,8 @@ Abre http://localhost:3000. Sin backend, el sistema funciona en **modo de prueba
 | Cuenta Principal (Q.F. Daniel Rojas) | 1111 |
 | Cuenta Sucursal (Q.F. Lucía Ramos) | 2222 |
 
+**Consola interna de Digi!HME** (para el equipo de la plataforma, no para las boticas): http://localhost:3000/consola. Ingreso de prueba: `soporte@digi-hme.pe` · `Consola2026!` (solo existe en el modo de prueba). Es otra sesión: una cuenta de botica no entra ahí y el operador no entra a ninguna botica. Desde ahí se ven todas las boticas (plan, estado, creada, última actividad, locales y usuarios) y se cambia de plan, se extiende la prueba, se suspende o se reactiva, siempre con un motivo que queda en la auditoría de la botica.
+
 Marcación de asistencia (modo de prueba): Daniel 4101 · Milagros 4102 · José 4103 · Rocío 4104 · Lucía 4201 · Ana 4202 · Kevin 4203.
 
 Para volver a los datos iniciales, borra `bh.mock.v1` en el almacenamiento local del navegador. Cuando cambia la forma de los datos de prueba, se regeneran solos y hay que volver a ingresar con el PIN.
@@ -54,6 +56,7 @@ src/
   app/                  Rutas (App Router)
     login/              Ingreso con usuario y PIN
     registro/           Registro público de una botica nueva (3 pasos)
+    (platform)/consola/ Consola interna de Digi!HME (otra sesión, aparte de las boticas)
     (app)/              Zona protegida: barra lateral, barra superior
       panel/            Panel del día (inicio del administrador)
       pos/              Punto de venta
@@ -76,6 +79,7 @@ src/
   features/transfers/   Traslados: en curso, sugeridos, historial, envío y pedido
   features/cash/        Caja: turno, movimientos, arqueo, historial de cierres
   features/vouchers/    Comprobantes: lista y filtros, detalle, anular, nota de crédito, ticket de 80 mm, Excel
+  features/platform/    Consola interna de Digi!HME: ingreso del operador, boticas, plan y estado
   features/audit/       Auditoría: filtros, páginas en el servidor y Excel
   features/attendance/  Asistencia: marcación, hoy, historial, resumen, personal
   features/dashboard/   Panel del día
@@ -114,3 +118,4 @@ public/brand/           Logo e isotipo de Digi!HME (PNG transparente)
 - [ ] SaaS (en curso): contrato y mock de botica por código (`X-Botica`), ingreso del dueño con correo y contraseña, estado de la cuenta (prueba, activa, vencida, suspendida) con módulos del plan y modo solo lectura
 - [x] Registro y primera configuración: `/registro` en 3 pasos (plan, datos, listo) crea la botica en prueba de 14 días; tarjeta de pasos pendientes en el panel (datos, local, series, usuario de mostrador, productos). El mock guarda cada botica nueva en `bh.mock.v1.<código>`
 - [x] Auditoría (T7): pantalla `/auditoria` (solo administrador, desde el Plan Crece) con filtros por fecha, persona, acción y tipo, paginación en el servidor (`GET /audit`) y Excel. El mock registra en un solo lugar (`src/lib/api/mock/audit.ts`) los ingresos (también los fallidos), ventas, anulaciones y notas de crédito, cambios de precio y costo, bajas de stock, compras, traslados, caja, cuentas y roles, ajustes y locales; nunca guarda DNI, nombres de clientes ni PIN. Contrato y códigos de acción en `docs/API.md`
+- [x] Consola interna de Digi!HME (T7): `/consola` con ingreso propio del operador (`POST /platform/login`), lista de boticas por páginas con plan, estado de cuenta (prueba, activa, vencida, suspendida), fecha de creación, última actividad y conteo de locales y usuarios (`GET /platform/tenants`), y acciones con motivo: cambiar de plan (respeta el límite de locales), extender la prueba, suspender y reactivar (`PATCH /platform/tenants/:code`). Reutiliza las reglas de cuenta de `src/lib/domain/account.ts`; nueva lógica en `src/lib/domain/platform.ts` con pruebas

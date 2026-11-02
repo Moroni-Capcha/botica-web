@@ -823,17 +823,40 @@ function currentCode(): string {
   return code && (code === MOCK_BOTICA_CODE || load(code)) ? code : MOCK_BOTICA_CODE;
 }
 
-export function createMockClient(): ApiClient {
-  const cache = new Map<string, MockDb>();
-  /** Datos de una botica (en memoria una sola vez), o null si no existe. */
-  const tenant = (code: string): MockDb | null => {
-    let d = cache.get(code) ?? null;
-    if (!d) {
-      d = load(code);
-      if (d) cache.set(code, d);
+/** Datos de las boticas ya leídas, compartidos por la API de la botica y la consola de Digi!HME para que un cambio se vea en ambas. */
+const dbCache = new Map<string, MockDb>();
+
+/** Datos de una botica (en memoria una sola vez), o null si no existe. */
+export function tenantDb(code: string): MockDb | null {
+  let d = dbCache.get(code) ?? null;
+  if (!d) {
+    d = load(code);
+    if (d) dbCache.set(code, d);
+  }
+  return d;
+}
+
+/** Guarda en el navegador los cambios hechos a los datos de una botica. */
+export const commitTenantDb = (db: MockDb) => save(db);
+
+/** Códigos de todas las boticas del mock: la de ejemplo, las registradas en este navegador y las ya cargadas en memoria. */
+export function knownTenantCodes(): string[] {
+  const codes = new Set<string>([MOCK_BOTICA_CODE, ...dbCache.keys()]);
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k?.startsWith(`${KEY}.`)) codes.add(k.slice(KEY.length + 1));
     }
-    return d;
-  };
+  } catch {
+    /* sin almacenamiento: solo las de memoria */
+  }
+  return [...codes];
+}
+
+export type { MockDb };
+
+export function createMockClient(): ApiClient {
+  const tenant = tenantDb;
   const get = (): MockDb => tenant(currentCode())!;
   const commit = () => save(get());
   active = { get, commit };
@@ -900,7 +923,7 @@ export function createMockClient(): ApiClient {
       const owner = d.staff[0]!;
       const token = `mock.${owner.id}.${Date.now().toString(36)}`;
       d.sessions[token] = owner.id;
-      cache.set(code, d);
+      dbCache.set(code, d);
       appendAudit(d.audit, { action: "sesion_iniciada", entity: "sesion", entityId: owner.id, entityLabel: owner.name, after: { via: "correo" } }, { id: owner.id, name: owner.name, role: owner.role, branchId: null }, Date.now());
       save(d);
       const session: Session = { token, user: toUser(owner), expiresAt: new Date(Date.now() + 12 * 3600_000).toISOString() };

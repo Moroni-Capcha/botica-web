@@ -897,3 +897,60 @@ export interface AuditQuery extends PageQuery {
   action?: AuditAction;
   entity?: AuditEntity;
 }
+
+/* ------------------------------ Consola interna de Digi!HME (plataforma) ------------------------------ */
+
+/** Persona de Digi!HME que opera la plataforma. No es una cuenta de ninguna botica. */
+export interface PlatformOperator {
+  id: string;
+  name: string;
+  email: string;
+}
+
+export interface PlatformSession {
+  token: string;
+  operator: PlatformOperator;
+  /** ISO. La consola cierra la sesión al vencer. */
+  expiresAt: string;
+}
+
+/** Una botica cliente, vista desde la consola. */
+export interface TenantSummary {
+  /** Código de la botica: "botica-huanuco". */
+  code: string;
+  name: string;
+  /** `PlanOffer.id`; null si el plan ya no está en el catálogo. */
+  planId: string | null;
+  planName: string;
+  maxBranches: number;
+  /** Estado ya calculado (una prueba pasada de su último día llega como `overdue`). */
+  status: AccountStatus;
+  /** Día local YYYY-MM-DD (solo en prueba o si quedó guardado). */
+  trialEndsAt?: string;
+  renewsAt?: string;
+  createdAt: string; // ISO
+  /** Última vez que alguien de la botica hizo algo; null si nunca. */
+  lastActivityAt: string | null;
+  /** Locales activos. */
+  branches: number;
+  /** Cuentas de usuario activas. */
+  users: number;
+}
+
+export interface TenantsQuery extends PageQuery {
+  /** Busca en el nombre y el código. */
+  q?: string;
+  status?: AccountStatus;
+}
+
+/** Página de boticas, con cuántas hay por estado (de todas las que cumplen la búsqueda, no solo de la página). */
+export interface TenantPage extends Page<TenantSummary> {
+  counts: Record<AccountStatus, number>;
+}
+
+/** Lo que Digi!HME puede hacer con una botica. Siempre lleva un motivo (queda en la auditoría de la botica). */
+export type TenantAction =
+  | { action: "change_plan"; planId: string; reason: string }
+  | { action: "extend_trial"; days: number; reason: string }
+  | { action: "suspend"; reason: string }
+  | { action: "reactivate"; reason: string };

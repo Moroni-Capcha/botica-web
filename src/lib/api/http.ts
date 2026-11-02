@@ -1,41 +1,42 @@
 /** Implementación del contrato contra la API REST del backend. Endpoints: docs/API.md */
-import type { ApiClient, BranchStock, NewCustomer, PublicConfig } from "./contract";
+import type { ApiClient, BranchStock, NewCustomer, PlatformClient, PublicConfig } from "./contract";
 import { ApiError } from "./errors";
 import type { PlanOffer, SignUpInput, Setup, SetupStep, Account, AccountInput, BoticaPublic, Branch, BranchCreateInput, BranchCreated, BranchInput, BranchSeries, Pharmacy, RulesInput, StaffAccount, SalesReportLine, ContactRequest, CustomerInput, CustomerPurchase, CustomerSummary, RefillInfo, Dashboard, AttendanceMark, ClockRequest, KioskWorker, ManualMarkRequest, Worker, WorkerInput } from "./types";
 import type { ApiErrorBody, BranchId, CashCloseRequest, CashClosing, CashMovement, CashMovementRequest, CashSession, CashSummary, Customer, Kardex, Lot, Product, ProductInput, ProductVelocity, Purchase, PurchaseRequest, Supplier, SupplierInput, Transfer, TransferAskRequest, TransferSendRequest, Sale, SaleRequest, Session, StaffSummary, User, WriteOffRequest } from "./types";
-import type { CreditNote, CreditNoteRequest, Voucher, VoidRequest, SaleSyncRequest, SaleSyncResponse, AuditEntry, AuditQuery, Page } from "./types";
+import type { CreditNote, CreditNoteRequest, Voucher, VoidRequest, SaleSyncRequest, SaleSyncResponse, AuditEntry, AuditQuery, Page, PlatformSession, TenantAction, TenantPage, TenantSummary, TenantsQuery } from "./types";
 import { tenantStore } from "./tenant";
-import { tokenStore } from "./token";
+import { platformTokenStore, tokenStore, type TokenStore } from "./token";
 import { connection } from "./connection";
 
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
-export function createHttpClient(baseUrl: string): ApiClient {
-  const base = baseUrl.replace(/\/$/, "");
+type Requester = <T>(method: Method, path: string, body?: unknown, timeoutMs?: number) => Promise<T>;
 
-  /** Tiempo máximo de espera de las ventas: con internet débil, mejor guardar la venta sin conexión que dejar al cajero esperando. */
-  const SALE_TIMEOUT_MS = 20_000;
-
-  async function request<T>(method: Method, path: string, body?: unknown, timeoutMs?: number): Promise<T> {
+/**
+ * Arma la función que hace las peticiones. La API de la botica lleva `X-Botica` y su token, y avisa el estado de la conexión;
+ * la de la consola de Digi!HME lleva su propio token y no elige botica.
+ */
+function makeRequester(base: string, { tenant, store }: { tenant: boolean; store: TokenStore }): Requester {
+  return async function request<T>(method: Method, path: string, body?: unknown, timeoutMs?: number): Promise<T> {
     const headers: Record<string, string> = { Accept: "application/json" };
     if (body !== undefined) headers["Content-Type"] = "application/json";
-    const botica = tenantStore.get();
+    const botica = tenant ? tenantStore.get() : null;
     if (botica) headers["X-Botica"] = botica;
-    const token = tokenStore.get();
+    const token = store.get();
     if (token) headers.Authorization = `Bearer ${token}`;
 
     let res: Response;
     try {
       res = await fetch(`${base}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined });
     } catch {
-      connection.reportUnreachable();
+      if (tenant) connection.reportUnreachable();
       throw new ApiError({ code: "SIN_CONEXION", message: "No hay conexión con el servidor. Revisa el internet del local." }, 0);
     }
 
-    connection.reportReachable();
+    if (tenant) connection.reportReachable();
     if (res.status === 401) {
-      tokenStore.clear();
-      tokenStore.notifyExpired();
+      store.clear();
+      store.notifyExpired();
     }
     if (res.status === 204) return undefined as T;
 
@@ -45,7 +46,30 @@ export function createHttpClient(baseUrl: string): ApiClient {
       throw new ApiError({ code: err.code ?? `HTTP_${res.status}`, message: err.message ?? "El servidor no pudo completar la operación.", details: err.details }, res.status);
     }
     return data as T;
-  }
+  };
+}
+
+const query = (params: Record<string, string>) => `?${new URLSearchParams(params).toString()}`;
+
+/** Implementación de la consola interna de Digi!HME contra `/platform/*`. */
+export function createHttpPlatformClient(baseUrl: string): PlatformClient {
+  const request = makeRequester(baseUrl.replace(/\/$/, ""), { tenant: false, store: platformTokenStore });
+  return {
+    login: (email, password) => request<PlatformSession>("POST", "/platform/login", { email, password }),
+    logout: () => request<void>("POST", "/platform/logout"),
+    listTenants: ({ q, status, page, pageSize }: TenantsQuery = {}) =>
+      request<TenantPage>("GET", `/platform/tenants${query({ ...(q ? { q } : {}), ...(status ? { status } : {}), ...(page ? { page: String(page) } : {}), ...(pageSize ? { pageSize: String(pageSize) } : {}) })}`),
+    updateTenant: (code, input: TenantAction) => request<TenantSummary>("PATCH", `/platform/tenants/${encodeURIComponent(code)}`, input),
+  };
+}
+
+export function createHttpClient(baseUrl: string): ApiClient {
+  const base = baseUrl.replace(/\/$/, "");
+
+  /** Tiempo máximo de espera de las ventas: con internet débil, mejor guardar la venta sin conexión que dejar al cajero esperando. */
+  const SALE_TIMEOUT_MS = 20_000;
+
+  const request = makeRequester(base, { tenant: true, store: tokenStore });
 
   const q = (params: Record<string, string>) => `?${new URLSearchParams(params).toString()}`;
 

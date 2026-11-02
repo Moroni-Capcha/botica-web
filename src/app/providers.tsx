@@ -2,6 +2,7 @@
 
 import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { Toaster, notify } from "@/components/ui/toast";
 import { useConfig } from "@/lib/queries";
 import { isApiError } from "@/lib/api";
@@ -10,13 +11,15 @@ import { RegisterServiceWorker } from "@/features/offline/register-sw";
 
 /** Aplica los colores de la botica (vienen de la API) a las variables CSS. */
 function BrandStyle() {
-  const { data } = useConfig();
+  // La consola de Digi!HME no es de ninguna botica: no pide su configuración ni usa sus colores.
+  const inConsole = usePathname().startsWith("/consola");
+  const { data } = useConfig(!inConsole);
   useEffect(() => {
-    if (!data) return;
+    if (!data || inConsole) return;
     const root = document.documentElement;
     root.style.setProperty("--brand", data.pharmacy.brand);
     root.style.setProperty("--accent", data.pharmacy.accent);
-  }, [data]);
+  }, [data, inConsole]);
   return null;
 }
 

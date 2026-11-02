@@ -641,6 +641,43 @@ Pantalla `Auditoría` (módulo `auditoria`, solo `admin`, incluido desde el Plan
 
 - Solo se registran las acciones que **se completaron**; la excepción es `sesion_fallida`. Una escritura rechazada (por ejemplo `CUENTA_SUSPENDIDA`) no deja entrada.
 
+### Consola interna de Digi!HME (décima entrega)
+
+Pantalla `/consola` para el equipo de Digi!HME (el operador de la plataforma). **No es parte de ninguna botica**: tiene su propio ingreso, su propio token y no envía `X-Botica`. Una sesión de botica no sirve aquí y la del operador no sirve en las rutas de una botica (el backend debe rechazarla con `401 NO_AUTORIZADO`). Ninguna pantalla de la botica enlaza a la consola. Tipos en `src/lib/api/types.ts` (`PlatformSession`, `TenantSummary`, `TenantAction`, `TenantPage`) y contrato en `PlatformClient` (`src/lib/api/contract.ts`). Las reglas de las acciones están en `src/lib/domain/platform.ts`, con pruebas; reutilizan el estado de cuenta de `account.ts`.
+
+`POST /platform/login` con `{ "email": "soporte@digi-hme.pe", "password": "…" }` → `PlatformSession` `{ token, operator: { id, name, email }, expiresAt }`. `401 CREDENCIALES_INVALIDAS` si no coinciden. Las cuentas de operador son distintas de las de las boticas (otra tabla o realm); un correo de dueño de botica no entra aquí.
+
+`POST /platform/logout` → `204`. Invalida el token del operador.
+
+`GET /platform/tenants?q=sol&status=trial&page=1&pageSize=25` → `TenantPage`: una `Page<TenantSummary>` (ver "Paginación en el servidor") más `counts` por estado.
+
+```json
+{
+  "items": [{
+    "code": "botica-huanuco", "name": "Botica Huánuco", "planId": "crece", "planName": "Plan Crece", "maxBranches": 3,
+    "status": "active", "renewsAt": "2026-12-01", "createdAt": "2026-07-05T09:00:00-05:00",
+    "lastActivityAt": "2026-11-02T08:41:00-05:00", "branches": 2, "users": 3
+  }],
+  "total": 1, "page": 1, "pageSize": 25,
+  "counts": { "trial": 0, "active": 1, "overdue": 0, "suspended": 0 }
+}
+```
+
+- `q` busca en el nombre y el código sin importar mayúsculas ni tildes. `status` filtra la lista; `counts` cuenta por estado todas las que cumplen `q` (no solo la página ni el `status`), para las tarjetas de arriba. Orden por nombre.
+- `status` llega ya calculado (`effectiveStatus`): una prueba pasada de su último día es `overdue`. `lastActivityAt` es la última acción de una persona de la botica (no cuenta los intentos fallidos ni las acciones de Digi!HME), `null` si nunca. `branches` son los locales activos y `users` las cuentas activas.
+
+`PATCH /platform/tenants/:code` con una `TenantAction` → `TenantSummary` actualizado. Todas llevan `reason` (5 a 200 caracteres, `400 DATOS_INVALIDOS`), que el backend guarda en la auditoría de esa botica (entrada con `userId: null`, `userName: "Digi!HME"`, `entity: "plan"` y el motivo en `after.reason`):
+
+| `action` | Cuerpo | Efecto y errores |
+| --- | --- | --- |
+| `change_plan` | `{ "planId": "cadena", "reason": "…" }` | Cambia el plan, el límite de locales y los módulos (`Account.modules`) al plan nuevo. `400` si el plan no existe; `409 ESTADO_INVALIDO` si ya lo tiene; `409 LIMITE_DEL_PLAN` si tiene más locales activos de los que permite el plan nuevo (debe desactivarlos antes). Auditoría: `plan_cambiado`. |
+| `extend_trial` | `{ "days": 7, "reason": "…" }` | Solo una botica en prueba (también si ya venció): suma de 1 a 60 días desde el fin de la prueba, o desde hoy si ya pasó, y vuelve a `trial`. `409 ESTADO_INVALIDO` en otro estado (si está suspendida, reactivarla primero). Auditoría: `prueba_extendida`. |
+| `suspend` | `{ "reason": "…" }` | Pasa a `suspended` (solo lectura: toda escritura de la botica responde `403 CUENTA_SUSPENDIDA`). Conserva las fechas. `409 ESTADO_INVALIDO` si ya lo está. Auditoría: `cuenta_suspendida`. |
+| `reactivate` | `{ "reason": "…" }` | Solo desde `suspended`. Vuelve a `trial` si tenía fecha de prueba (si ya pasó, se ve como `overdue`) y, si no, a `active` (con `renewsAt` a 30 días si no tenía). Auditoría: `cuenta_reactivada`. |
+
+- `404 BOTICA_NO_ENCONTRADA` si el código no existe.
+- **Operador de prueba del mock (no existe en producción):** `soporte@digi-hme.pe` · `Consola2026!`. El token vive en `sessionStorage` bajo `bh.platform.session`, aparte de `bh.session` (la botica).
+
 ## Próximas entregas
 
 Todos los módulos del front están definidos. Los cambios al contrato se agregan a este documento antes de construir la pantalla.

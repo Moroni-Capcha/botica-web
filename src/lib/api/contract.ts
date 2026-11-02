@@ -10,7 +10,7 @@ import type {
   AccountInput, BranchCreateInput, BranchCreated, Plan, BranchInput, BranchSeries, RulesInput, StaffAccount,
   StaffSummary, Supplier, SupplierInput, Transfer, TransferAskRequest, TransferSendRequest, User, BranchId, WriteOffRequest,
   CreditNote, CreditNoteRequest, Voucher, VoidRequest, SaleSyncRequest, SaleSyncResponse,
-  AuditEntry, AuditQuery, Page,
+  AuditEntry, AuditQuery, Page, PlatformSession, TenantAction, TenantPage, TenantSummary, TenantsQuery,
 } from "./types";
 
 export interface PublicConfig {
@@ -184,4 +184,18 @@ export interface ApiClient {
   /* Auditoría (solo administrador) */
   /** Quién hizo qué y cuándo, del más reciente al más antiguo, siempre por páginas. */
   listAudit(query: AuditQuery): Promise<Page<AuditEntry>>;
+}
+
+/**
+ * API de la consola interna de Digi!HME. Es otra puerta, separada de `ApiClient`: otro inicio de sesión, otro token
+ * y ninguna botica elegida (no lleva `X-Botica`). Una sesión de botica nunca sirve aquí, ni al revés.
+ */
+export interface PlatformClient {
+  /** Ingreso del operador con correo y contraseña. CREDENCIALES_INVALIDAS (401) si no coinciden. */
+  login(email: string, password: string): Promise<PlatformSession>;
+  logout(): Promise<void>;
+  /** Boticas clientes, siempre por páginas, con el conteo por estado. */
+  listTenants(query?: TenantsQuery): Promise<TenantPage>;
+  /** Cambiar de plan, extender la prueba, suspender o reactivar. Devuelve la botica ya actualizada. */
+  updateTenant(code: string, input: TenantAction): Promise<TenantSummary>;
 }
