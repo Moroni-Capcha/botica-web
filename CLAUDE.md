@@ -94,5 +94,3 @@ Reglas nuevas al tocar estas piezas:
 - **Listas largas:** `page` y `pageSize` según "Paginación en el servidor" de `docs/API.md`; en endpoints existentes, opcional y compatible hacia atrás.
 
 Detalles menores pendientes: copiar los stock mínimos de otro local al crear uno, sugerir en el POS lo que el cliente "suele llevar", quitar la ruta `[module]`.
-
-Detalles menores: copiar los stock mínimos de otro local al crear uno, sugerir en el POS lo que el cliente "suele llevar", quitar la ruta `[module]`.

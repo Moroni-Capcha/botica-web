@@ -29,5 +29,12 @@ T5, T6, T7: delegated writer each (2+ non-trivial files, preparation reading goe
 ## Progress / evidence
 (branch created from master @3086017; typecheck + 93 tests green at start)
 
+Browser check 2026-11-02 (dev server, Chrome, mock `bh-huanuco` data, no console errors on any page):
+- Login (PIN), panel, `/comprobantes` (resend pending -> accepted, detail dialog with 80 mm ticket and actions), `/auditoria` (filters, paging, 55 -> 56 entries), `/consola` (operator login, tenant table), `/pos`.
+- Offline POS simulated with `navigator.onLine = false`: banner "Sin conexión", sale saved as provisional `OFF-0001` ("1 por enviar"), back online it synced on its own and appeared as `B001-003128` in Comprobantes.
+- Bug found and fixed: login with PIN re-submitted on every render after success (PIN stayed full while navigating), writing ~18 "Ingresó al sistema" audit entries per login. Fixed with a `sentPin` ref guard in `src/app/login/page.tsx`; re-tested: one login = one entry.
+- NOT checked: real service worker install (prod build only), real 80 mm printer, Excel downloads, error boundary, real Sentry.
+- Known gap: resending a voucher is not recorded in the audit log.
+
 ## Next step
-Front work is complete (T1-T7). Remaining: user review of the branch (push/PR decision is the user's), manual browser checks listed in T5-T7 notes, and the backend implementing `docs/API.md`.
+Front work is complete (T1-T7). Remaining: PR decision, remaining manual checks above, and the backend implementing `docs/API.md`.
