@@ -9,7 +9,7 @@
 const VERSION = "v1";
 const PAGES = `digihme-pages-${VERSION}`;
 const ASSETS = `digihme-assets-${VERSION}`;
-const PRECACHE = ["/", "/login", "/pos", "/manifest.webmanifest", "/brand/digihme-icon.png", "/brand/digihme-logo.png"];
+const PRECACHE = ["/", "/login", "/pos", "/manifest.webmanifest", "/brand/digihme-icon.png", "/brand/digihme-icon-72.png", "/brand/digihme-logo.png", "/brand/digihme-logo-480.png"];
 const NAV_TIMEOUT_MS = 4000;
 
 self.addEventListener("install", (event) => {
