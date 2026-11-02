@@ -16,13 +16,17 @@ export const DIGIHME = { name: "Digi!HME", navy: "#313572", ink: "#0C1136", cyan
 /** Isotipo de Digi!HME (la D con circuitos). Funciona sobre fondos claros y oscuros. */
 export function DigiHmeIcon({ size = 24, className }: { size?: number; className?: string }) {
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src="/brand/digihme-icon.png" width={size} height={size} alt="" aria-hidden className={className} />;
+  // El archivo de 256 px reducido a ~18 px se ve borroso: para tamaños chicos hay uno de 72 px.
+  const src = size <= 36 ? "/brand/digihme-icon-72.png" : "/brand/digihme-icon.png";
+  return <img src={src} width={size} height={size} alt="" aria-hidden className={className} />;
 }
 
 /** Logo completo de Digi!HME. Solo sobre fondo claro: las letras son azul oscuro. */
 export function DigiHmeLogo({ height = 28, className }: { height?: number; className?: string }) {
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src="/brand/digihme-logo.png" height={height} style={{ height, width: "auto" }} alt="Digi!HME" className={className} />;
+  // El original mide 1200 px; en pantalla se usa a 26-34 px de alto y reducirlo tanto en el navegador lo deja áspero.
+  const src = height <= 60 ? "/brand/digihme-logo-480.png" : "/brand/digihme-logo.png";
+  return <img src={src} width={Math.round(height * 4.1)} height={height} style={{ height, width: "auto" }} alt="Digi!HME" className={className} />;
 }
 
 /** Nombre escrito con el "!" en cian. Sobre fondo oscuro va en blanco. */

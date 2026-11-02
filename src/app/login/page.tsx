@@ -286,7 +286,7 @@ export default function LoginPage() {
           </button>
 
           <div className="mt-10 flex flex-col items-center gap-1.5 border-t border-zinc-100 pt-6">
-            <DigiHmeLogo height={26} />
+            <DigiHmeLogo height={36} />
             <p className="text-[11px] text-zinc-400">Plataforma para boticas y farmacias</p>
           </div>
         </div>
