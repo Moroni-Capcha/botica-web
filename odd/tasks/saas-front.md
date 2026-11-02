@@ -35,7 +35,7 @@ Browser check 2026-11-02 (dev server, Chrome, mock `bh-huanuco` data, no console
 - Offline POS simulated with `navigator.onLine = false`: banner "Sin conexión", sale saved as provisional `OFF-0001` ("1 por enviar"), back online it synced on its own and appeared as `B001-003128` in Comprobantes.
 - Bug found and fixed: login with PIN re-submitted on every render after success (PIN stayed full while navigating), writing ~18 "Ingresó al sistema" audit entries per login. Fixed with a `sentPin` ref guard in `src/app/login/page.tsx`; re-tested: one login = one entry.
 - NOT checked: real service worker install (prod build only), real 80 mm printer, Excel downloads, error boundary, real Sentry.
-- Known gap: resending a voucher is not recorded in the audit log.
+- Known gap (closed after T8): resending a voucher or credit note was not in the audit log; now `comprobante_reenviado` / `nota_credito_reenviada` (mock rule + test + `docs/API.md`).
 
 Browser check T8 (2026-11-02, fresh `.next`, mock `VERSION` 16, no console errors): partial credit note BC01-000001 of S/ 1.80 on a cash boleta (a pending voucher correctly offered no credit note until resent; a voucher with a note cannot be voided). Cash screen: cash S/ 31.40 -> S/ 29.60, expected S/ 169.40 -> S/ 167.60, "vendido 52.80 - devoluciones 1.80 = neta 51.00". Panel today S/ 51.00 and cash S/ 167.60; reports "vendido 7,554.60 - devoluciones 1.80 = neta 7,552.80"; customers page loads. NOT checked: customer totals with a named customer, Excel downloads, closing the cash with returns.
 - Env note: running `npm run build` while `npm run dev` is open corrupts `.next` (MODULE_NOT_FOUND, pages stuck on "Cargando…"); stop dev and delete `.next` before restarting.

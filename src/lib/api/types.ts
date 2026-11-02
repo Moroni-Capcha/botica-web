@@ -915,7 +915,7 @@ export interface CustomersQuery extends PageQuery {
 
 export type AuditAction =
   | "sesion_iniciada" | "sesion_fallida"
-  | "venta_registrada" | "comprobante_anulado" | "nota_credito_emitida"
+  | "venta_registrada" | "comprobante_anulado" | "nota_credito_emitida" | "comprobante_reenviado" | "nota_credito_reenviada"
   | "producto_creado" | "producto_editado" | "precio_cambiado" | "costo_cambiado"
   | "compra_registrada" | "baja_registrada" | "descuento_lote"
   | "traslado_enviado" | "traslado_pedido" | "traslado_despachado" | "traslado_recibido" | "traslado_anulado"

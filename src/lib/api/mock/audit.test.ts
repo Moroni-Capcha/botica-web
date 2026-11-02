@@ -120,6 +120,17 @@ describe("mock: auditoría", () => {
     expect(off?.after).toMatchObject({ qty: qtyBefore - 1, type: "merma", units: 1, reason: "Frasco roto" });
   });
 
+  it("reenviar un comprobante a SUNAT queda registrado con su estado nuevo", async () => {
+    asEncargado();
+    const day = (t: number) => new Date(t).toLocaleDateString("en-CA");
+    const list = await run(api.listVouchers({ from: day(Date.now() - 2 * 86_400_000), to: day(Date.now() + 86_400_000) }));
+    const open = list.find((v) => v.status === "pendiente" || v.status === "rechazado")!;
+    expect(open).toBeDefined();
+    await run(api.resendVoucher(open.id));
+    const entry = (await audit({ action: "comprobante_reenviado" })).items.find((x) => x.entityId === open.id);
+    expect(entry).toMatchObject({ entityLabel: open.number, after: { status: "aceptado", attempts: open.attempts + 1 } });
+  });
+
   describe("precios y costos", () => {
     const input = (p: Product): ProductInput => {
       const { id: _id, ...rest } = p;

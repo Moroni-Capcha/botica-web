@@ -654,7 +654,7 @@ Pantalla `Auditoría` (módulo `auditoria`, solo `admin`, incluido desde el Plan
 | Grupo | `action` |
 | --- | --- |
 | Acceso | `sesion_iniciada`, `sesion_fallida` |
-| Ventas | `venta_registrada`, `comprobante_anulado`, `nota_credito_emitida` |
+| Ventas | `venta_registrada`, `comprobante_anulado`, `nota_credito_emitida`, `comprobante_reenviado`, `nota_credito_reenviada` |
 | Precios y catálogo | `producto_creado`, `producto_editado`, `precio_cambiado`, `costo_cambiado` |
 | Stock | `compra_registrada`, `baja_registrada`, `descuento_lote`, `traslado_enviado`, `traslado_pedido`, `traslado_despachado`, `traslado_recibido`, `traslado_anulado` |
 | Caja | `caja_abierta`, `caja_cerrada`, `movimiento_caja` |

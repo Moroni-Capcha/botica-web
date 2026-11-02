@@ -16,7 +16,7 @@ export const ACTION_GROUPS: { id: string; label: string; actions: { id: AuditAct
   },
   {
     id: "ventas", label: "Ventas y comprobantes",
-    actions: [{ id: "venta_registrada", label: "Registró una venta" }, { id: "comprobante_anulado", label: "Anuló un comprobante" }, { id: "nota_credito_emitida", label: "Emitió una nota de crédito" }],
+    actions: [{ id: "venta_registrada", label: "Registró una venta" }, { id: "comprobante_anulado", label: "Anuló un comprobante" }, { id: "nota_credito_emitida", label: "Emitió una nota de crédito" }, { id: "comprobante_reenviado", label: "Reenvió un comprobante a SUNAT" }, { id: "nota_credito_reenviada", label: "Reenvió una nota de crédito a SUNAT" }],
   },
   {
     id: "precios", label: "Productos y precios",

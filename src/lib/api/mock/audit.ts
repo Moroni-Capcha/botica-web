@@ -146,6 +146,13 @@ export const AUDIT_RULES: { [K in keyof ApiClient]?: Rule<K, any> } = {
     ok: ({ result }) => ({ action: "nota_credito_emitida", entity: "nota_credito", entityId: result.id, entityLabel: result.number, branchId: result.branchId, after: { total: result.total, reason: result.reasonLabel, voucher: result.voucherNumber } }),
   }),
 
+  resendVoucher: rule<"resendVoucher">({
+    ok: ({ result }) => ({ action: "comprobante_reenviado", entity: "comprobante", entityId: result.id, entityLabel: result.number, branchId: result.branchId, after: { status: result.status, attempts: result.attempts, sunatCode: result.sunat?.code ?? null } }),
+  }),
+  resendCreditNote: rule<"resendCreditNote">({
+    ok: ({ result }) => ({ action: "nota_credito_reenviada", entity: "nota_credito", entityId: result.id, entityLabel: result.number, branchId: result.branchId, after: { status: result.status, attempts: result.attempts, sunatCode: result.sunat?.code ?? null } }),
+  }),
+
   /* Catálogo, precios y costos */
   createProduct: rule<"createProduct">({
     ok: ({ result }) => ({ action: "producto_creado", entity: "producto", entityId: String(result.id), entityLabel: productName(result), after: { ...pricesOf(result), ...costOf(result) } }),
