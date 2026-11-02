@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowLeftRight, CalendarClock, FileSpreadsheet, Fingerprint, Pill, TrendingUp } from "lucide-react";
@@ -108,8 +108,14 @@ export default function LoginPage() {
     [sel, signIn, router],
   );
 
+  // Un PIN completo se envía una sola vez: tras entrar, el PIN sigue lleno mientras navega.
+  const sentPin = useRef("");
   useEffect(() => {
-    if (pin.length === 4 && !busy) void submit(pin);
+    if (pin.length < 4) sentPin.current = "";
+    else if (!busy && sentPin.current !== pin) {
+      sentPin.current = pin;
+      void submit(pin);
+    }
   }, [pin, busy, submit]);
 
   const press = useCallback(
