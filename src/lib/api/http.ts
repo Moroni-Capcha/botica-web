@@ -3,7 +3,7 @@ import type { ApiClient, BranchStock, NewCustomer, PublicConfig } from "./contra
 import { ApiError } from "./errors";
 import type { PlanOffer, SignUpInput, Setup, SetupStep, Account, AccountInput, BoticaPublic, Branch, BranchCreateInput, BranchCreated, BranchInput, BranchSeries, Pharmacy, RulesInput, StaffAccount, SalesReportLine, ContactRequest, CustomerInput, CustomerPurchase, CustomerSummary, RefillInfo, Dashboard, AttendanceMark, ClockRequest, KioskWorker, ManualMarkRequest, Worker, WorkerInput } from "./types";
 import type { ApiErrorBody, BranchId, CashCloseRequest, CashClosing, CashMovement, CashMovementRequest, CashSession, CashSummary, Customer, Kardex, Lot, Product, ProductInput, ProductVelocity, Purchase, PurchaseRequest, Supplier, SupplierInput, Transfer, TransferAskRequest, TransferSendRequest, Sale, SaleRequest, Session, StaffSummary, User, WriteOffRequest } from "./types";
-import type { CreditNote, CreditNoteRequest, Voucher, VoidRequest, SaleSyncRequest, SaleSyncResponse } from "./types";
+import type { CreditNote, CreditNoteRequest, Voucher, VoidRequest, SaleSyncRequest, SaleSyncResponse, AuditEntry, AuditQuery, Page } from "./types";
 import { tenantStore } from "./tenant";
 import { tokenStore } from "./token";
 import { connection } from "./connection";
@@ -131,5 +131,8 @@ export function createHttpClient(baseUrl: string): ApiClient {
     resendCreditNote: (id: string) => request<CreditNote>("POST", `/credit-notes/${encodeURIComponent(id)}/resend`),
     voidVoucher: (id: string, input: VoidRequest) => request<Voucher>("POST", `/vouchers/${encodeURIComponent(id)}/void`, input),
     createCreditNote: (voucherId: string, input: CreditNoteRequest) => request<CreditNote>("POST", `/vouchers/${encodeURIComponent(voucherId)}/credit-notes`, input),
+
+    listAudit: ({ from, to, userId, action, entity, page, pageSize }: AuditQuery) =>
+      request<Page<AuditEntry>>("GET", `/audit${q({ from, to, ...(userId ? { userId } : {}), ...(action ? { action } : {}), ...(entity ? { entity } : {}), ...(page ? { page: String(page) } : {}), ...(pageSize ? { pageSize: String(pageSize) } : {}) })}`),
   };
 }

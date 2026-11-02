@@ -834,3 +834,66 @@ export interface CreditNoteRequest {
   /** Solo motivos con mercadería (01, 06, 07). Por defecto true. */
   returnStock?: boolean;
 }
+
+/* ------------------------------ Paginación ------------------------------ */
+
+/** Parámetros opcionales de las listas paginadas en el servidor (ver "Paginación en el servidor" en docs/API.md). */
+export interface PageQuery {
+  /** Desde 1. */
+  page?: number;
+  /** Por defecto 25, máximo 100. */
+  pageSize?: number;
+}
+
+export interface Page<T> {
+  items: T[];
+  /** Todo lo que cumple los filtros, no solo esta página. */
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+/* ------------------------------ Auditoría ------------------------------ */
+
+export type AuditAction =
+  | "sesion_iniciada" | "sesion_fallida"
+  | "venta_registrada" | "comprobante_anulado" | "nota_credito_emitida"
+  | "producto_creado" | "producto_editado" | "precio_cambiado" | "costo_cambiado"
+  | "compra_registrada" | "baja_registrada" | "descuento_lote"
+  | "traslado_enviado" | "traslado_pedido" | "traslado_despachado" | "traslado_recibido" | "traslado_anulado"
+  | "caja_abierta" | "caja_cerrada" | "movimiento_caja"
+  | "cuenta_creada" | "cuenta_editada"
+  | "botica_editada" | "reglas_editadas" | "local_creado" | "local_editado" | "local_desactivado" | "local_activado"
+  | "plan_cambiado" | "prueba_extendida" | "cuenta_suspendida" | "cuenta_reactivada";
+
+export type AuditEntity = "sesion" | "venta" | "comprobante" | "nota_credito" | "producto" | "lote" | "compra" | "traslado" | "caja" | "cuenta" | "local" | "botica" | "reglas" | "plan";
+
+export type AuditValue = string | number | boolean | null;
+/** Resumen corto de un estado (antes o después). Nunca lleva DNI, nombres de clientes, PIN ni contraseñas. */
+export type AuditFields = Record<string, AuditValue>;
+
+export interface AuditEntry {
+  id: string;
+  at: string; // ISO
+  /** null = sin cuenta (intento fallido con un usuario inexistente) o una acción de Digi!HME. */
+  userId: string | null;
+  userName: string;
+  role: Role | null;
+  branchId: BranchId | null;
+  action: AuditAction;
+  entity: AuditEntity;
+  entityId: string | null;
+  /** Nombre legible de lo afectado: "Boleta B001-000123", "Losartán 50 mg". */
+  entityLabel: string;
+  before: AuditFields | null;
+  after: AuditFields | null;
+}
+
+export interface AuditQuery extends PageQuery {
+  /** Días locales YYYY-MM-DD, ambos incluidos. */
+  from: string;
+  to: string;
+  userId?: string;
+  action?: AuditAction;
+  entity?: AuditEntity;
+}

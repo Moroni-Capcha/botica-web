@@ -14,6 +14,22 @@ Los tipos exactos están en `src/lib/api/types.ts`. Si algo cambia, se actualiza
 - Botica (multi-cliente): el front envía `X-Botica: <código>` (p. ej. `botica-huanuco`) en cada petición, una vez elegida la botica. El backend resuelve a qué cliente pertenecen los datos con ese header (o por subdominio).
 - CORS: permitir el dominio del front y los headers `Authorization` y `X-Botica`.
 
+### Paginación en el servidor
+
+Las listas que pueden crecer sin límite (auditoría, kardex, clientes) se pueden pedir **por páginas**. Convención común, aditiva y compatible hacia atrás:
+
+- Parámetros opcionales: `page` (desde 1) y `pageSize` (por defecto 25, máximo 100). Una página fuera de rango no es un error: se corrige a la última página con datos (o la 1 si no hay nada).
+- Un endpoint que **ya existía** sigue respondiendo lo mismo de siempre si no recibe `page`. Con `page`, responde la misma lista recortada y trae los totales (ver cada endpoint). Los endpoints nuevos de lista (p. ej. `/audit`) siempre responden por páginas.
+- La respuesta paginada de una lista simple es `Page<T>`:
+
+```json
+{ "items": [ ], "total": 187, "page": 2, "pageSize": 25 }
+```
+
+  `total` cuenta todo lo que cumple los filtros, no solo la página. Orden estable (el mismo en todas las páginas) para que no se repitan ni se salten filas.
+- Las reglas (`normalizePage`, `paginate`, `pageWindow`) están en `src/lib/domain/pagination.ts`, con pruebas; el backend puede aplicar los mismos casos.
+- Los filtros se envían al servidor junto con la página (p. ej. `q`, `userId`), porque el front ya no tiene la lista completa para filtrar.
+
 ### Errores
 
 Cualquier respuesta 4xx o 5xx trae este cuerpo. El front muestra `message` tal cual, así que debe estar en español y ser claro para el personal de la botica.
@@ -588,6 +604,42 @@ Pantalla `Comprobantes` (módulo `comprobantes`, incluido en todos los planes). 
 - Fuera de alcance por ahora: las notas todavía no restan en reportes ni en el cierre de caja; el reembolso se registra a mano como egreso de caja.
 
 **Ticket de 80 mm.** La impresión se hace en el front (`@media print`, 80 mm de ancho) para la venta y la nota de crédito; el backend no genera PDF. El código QR y el hash de la representación impresa los entrega el proveedor de facturación y se agregarán al ticket cuando el contrato los incluya.
+
+### Auditoría (décima entrega)
+
+Pantalla `Auditoría` (módulo `auditoria`, solo `admin`, incluido desde el Plan Crece). Registra **quién hizo qué y cuándo**. El backend escribe cada entrada en el mismo lugar donde ejecuta la acción (un solo punto, no repartido por cada endpoint) y nunca la edita ni la borra. El mock lo hace con un envoltorio único (`src/lib/api/mock/audit.ts`).
+
+`GET /audit?from=2026-10-01&to=2026-10-27&userId=u2&action=precio_cambiado&entity=producto&page=1&pageSize=25` → `Page<AuditEntry>`
+
+- Solo `admin` (`403 SIN_PERMISO` para un encargado). `from` y `to` son días locales (America/Lima), ambos incluidos, máximo 370 días (`400 DATOS_INVALIDOS`). `userId`, `action` y `entity` son opcionales. Del más reciente al más antiguo. Leer la auditoría no deja registro.
+
+```json
+{
+  "id": "a412", "at": "2026-10-26T10:15:00-05:00",
+  "userId": "u1", "userName": "Carmen Salazar", "role": "admin", "branchId": null,
+  "action": "precio_cambiado", "entity": "producto", "entityId": "17", "entityLabel": "Losartán 50 mg",
+  "before": { "priceUnit": 0.5, "priceBox": 12 },
+  "after": { "priceUnit": 0.6, "priceBox": 15 }
+}
+```
+
+- `before` / `after`: resumen corto con valores simples (texto, número, sí/no, `null`) o `null` si no aplica (una venta solo trae `after`). Las claves se traducen en el front (`FIELD_LABELS` de `src/lib/domain/audit.ts`); una clave desconocida se muestra tal cual. **Nunca** se guardan DNI, RUC de clientes, nombres de clientes, PIN ni contraseñas: de un cambio de PIN solo queda `pinChanged: true`.
+- `userId` es `null` cuando no hay cuenta: un intento de ingreso con un usuario que no existe, o una acción de Digi!HME (`role: null`, `userName: "Digi!HME"`).
+- `entity`: `sesion`, `venta`, `comprobante`, `nota_credito`, `producto`, `lote`, `compra`, `traslado`, `caja`, `cuenta`, `local`, `botica`, `reglas`, `plan`.
+- `action` (el front muestra la etiqueta en español; un código nuevo se muestra tal cual):
+
+| Grupo | `action` |
+| --- | --- |
+| Acceso | `sesion_iniciada`, `sesion_fallida` |
+| Ventas | `venta_registrada`, `comprobante_anulado`, `nota_credito_emitida` |
+| Precios y catálogo | `producto_creado`, `producto_editado`, `precio_cambiado`, `costo_cambiado` |
+| Stock | `compra_registrada`, `baja_registrada`, `descuento_lote`, `traslado_enviado`, `traslado_pedido`, `traslado_despachado`, `traslado_recibido`, `traslado_anulado` |
+| Caja | `caja_abierta`, `caja_cerrada`, `movimiento_caja` |
+| Cuentas | `cuenta_creada`, `cuenta_editada` (incluye cambios de rol, local, estado y PIN) |
+| Ajustes | `botica_editada`, `reglas_editadas`, `local_creado`, `local_editado`, `local_desactivado`, `local_activado` |
+| Digi!HME | `plan_cambiado`, `prueba_extendida`, `cuenta_suspendida`, `cuenta_reactivada` (con el motivo en `after.reason`) |
+
+- Solo se registran las acciones que **se completaron**; la excepción es `sesion_fallida`. Una escritura rechazada (por ejemplo `CUENTA_SUSPENDIDA`) no deja entrada.
 
 ## Próximas entregas
 

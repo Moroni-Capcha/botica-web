@@ -6,6 +6,7 @@ import { effectiveStatus, isReadOnly, limaDay } from "@/lib/domain/account";
 import type { SetupStep, ClockRequest, ContactRequest, CustomerInput, ManualMarkRequest, WorkerInput } from "@/lib/api";
 import type { CreditNote, CreditNoteRequest, Voucher, VoidRequest } from "@/lib/api";
 import type { BranchId, CashCloseRequest, CashMovementRequest, Lot, Product, ProductInput, PurchaseRequest, SaleRequest, Supplier, SupplierInput, Transfer, TransferAskRequest, TransferSendRequest, WriteOffRequest } from "@/lib/api";
+import type { AuditQuery } from "@/lib/api";
 import type { NewCustomer, AccountInput, BranchCreateInput, BranchInput, Pharmacy, RulesInput, PublicConfig } from "@/lib/api";
 
 export const qk = {
@@ -38,6 +39,7 @@ export const qk = {
   kardex: (productId: number, branchId: BranchId | null, days: number) => ["kardex", productId, branchId, days] as const,
   vouchers: (from: string, to: string, branchId: BranchId | null) => ["vouchers", from, to, branchId] as const,
   creditNotes: (from: string, to: string, branchId: BranchId | null) => ["credit-notes", from, to, branchId] as const,
+  audit: (q: AuditQuery) => ["audit", q.from, q.to, q.userId ?? null, q.action ?? null, q.entity ?? null, q.page ?? 1, q.pageSize ?? null] as const,
 };
 
 export const useConfig = () => useQuery({ queryKey: qk.config, queryFn: api.getPublicConfig, staleTime: 10 * 60_000 });
@@ -391,3 +393,9 @@ export function useSaveAccount() {
     },
   });
 }
+
+/* ------------------------------ Auditoría ------------------------------ */
+
+/** Una página del registro de auditoría. Mientras llega la siguiente se sigue mostrando la anterior. */
+export const useAuditLog = (query: AuditQuery, enabled = true) =>
+  useQuery({ queryKey: qk.audit(query), queryFn: () => api.listAudit(query), staleTime: 15_000, enabled, placeholderData: (prev) => prev });

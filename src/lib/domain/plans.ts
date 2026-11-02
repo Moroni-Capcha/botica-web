@@ -21,7 +21,7 @@ const INICIO = ["panel", "pos", "vencimientos", "inventario", "compras", "client
 
 export const PLAN_CATALOG: readonly PlanDef[] = [
   { id: "inicio", name: "Plan Inicio", basePrice: 50, maxBranches: 1, modules: INICIO },
-  { id: "crece", name: "Plan Crece", basePrice: 110, maxBranches: 3, modules: [...INICIO, "traslados", "reportes"] },
+  { id: "crece", name: "Plan Crece", basePrice: 110, maxBranches: 3, modules: [...INICIO, "traslados", "reportes", "auditoria"] },
   { id: "cadena", name: "Plan Cadena", basePrice: 210, maxBranches: 10, modules: ALL_MODULES },
 ];
 

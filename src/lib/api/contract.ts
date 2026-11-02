@@ -10,6 +10,7 @@ import type {
   AccountInput, BranchCreateInput, BranchCreated, Plan, BranchInput, BranchSeries, RulesInput, StaffAccount,
   StaffSummary, Supplier, SupplierInput, Transfer, TransferAskRequest, TransferSendRequest, User, BranchId, WriteOffRequest,
   CreditNote, CreditNoteRequest, Voucher, VoidRequest, SaleSyncRequest, SaleSyncResponse,
+  AuditEntry, AuditQuery, Page,
 } from "./types";
 
 export interface PublicConfig {
@@ -179,4 +180,8 @@ export interface ApiClient {
   voidVoucher(id: string, input: VoidRequest): Promise<Voucher>;
   /** Emite una nota de crédito sobre un comprobante aceptado. Devuelve la nota. */
   createCreditNote(voucherId: string, input: CreditNoteRequest): Promise<CreditNote>;
+
+  /* Auditoría (solo administrador) */
+  /** Quién hizo qué y cuándo, del más reciente al más antiguo, siempre por páginas. */
+  listAudit(query: AuditQuery): Promise<Page<AuditEntry>>;
 }

@@ -64,6 +64,7 @@ src/
       caja/             Turno de caja, movimientos, arqueo y cierres
       comprobantes/     Comprobantes SUNAT: estado, reenvío, anulación y notas de crédito
       asistencia/       Asistencia del personal (administrador)
+      auditoria/        Auditoría: quién hizo qué y cuándo (administrador)
       clientes/         Clientes y recompras
       reportes/         Reportes de venta (administrador)
       ajustes/          Ajustes (administrador)
@@ -75,6 +76,7 @@ src/
   features/transfers/   Traslados: en curso, sugeridos, historial, envío y pedido
   features/cash/        Caja: turno, movimientos, arqueo, historial de cierres
   features/vouchers/    Comprobantes: lista y filtros, detalle, anular, nota de crédito, ticket de 80 mm, Excel
+  features/audit/       Auditoría: filtros, páginas en el servidor y Excel
   features/attendance/  Asistencia: marcación, hoy, historial, resumen, personal
   features/dashboard/   Panel del día
   features/customers/   Clientes: cartera, ficha, tratamientos, recompras
@@ -85,7 +87,7 @@ src/
   components/charts/    Gráfico de columnas (tooltip, leyenda y vista de tabla)
   components/layout/    Barra lateral, barra superior, navegación móvil
   lib/api/              Tipos, contrato, cliente HTTP y API simulada
-  lib/domain/           Reglas de negocio puras: FEFO, presentaciones, IGV, comprobantes, riesgo de vencimiento, inventario, kardex, compras e importación, traslados, caja, asistencia, panel, clientes, reportes, ajustes, comprobantes electrónicos (plazo de baja, notas de crédito)
+  lib/domain/           Reglas de negocio puras (incluye auditoría y paginación): FEFO, presentaciones, IGV, comprobantes, riesgo de vencimiento, inventario, kardex, compras e importación, traslados, caja, asistencia, panel, clientes, reportes, ajustes, comprobantes electrónicos (plazo de baja, notas de crédito)
   lib/excel/            Generador y lector de .xlsx sin dependencias
   lib/auth/             Sesión y local donde se opera
 docs/API.md             Contrato con el backend
@@ -111,3 +113,4 @@ public/brand/           Logo e isotipo de Digi!HME (PNG transparente)
 - [x] Punto de venta sin internet (T6): app instalable (manifiesto + service worker propio, solo en producción) que abre sin conexión; cola persistente de ventas con clave de idempotencia (`clientSaleId`) y ticket provisional `OFF-0001`; envío FIFO automático al volver la conexión y con "Sincronizar ahora"; indicador de conexión en la barra superior y lista "Ventas por enviar" (reintentar y, solo el administrador, descartar las que fallaron); stock reservado localmente para no vender dos veces el mismo lote. Contrato: `clientSaleId`, `soldAt`, `offlineTicket` en `POST /sales` y `POST /sales/sync` (`docs/API.md`)
 - [ ] SaaS (en curso): contrato y mock de botica por código (`X-Botica`), ingreso del dueño con correo y contraseña, estado de la cuenta (prueba, activa, vencida, suspendida) con módulos del plan y modo solo lectura
 - [x] Registro y primera configuración: `/registro` en 3 pasos (plan, datos, listo) crea la botica en prueba de 14 días; tarjeta de pasos pendientes en el panel (datos, local, series, usuario de mostrador, productos). El mock guarda cada botica nueva en `bh.mock.v1.<código>`
+- [x] Auditoría (T7): pantalla `/auditoria` (solo administrador, desde el Plan Crece) con filtros por fecha, persona, acción y tipo, paginación en el servidor (`GET /audit`) y Excel. El mock registra en un solo lugar (`src/lib/api/mock/audit.ts`) los ingresos (también los fallidos), ventas, anulaciones y notas de crédito, cambios de precio y costo, bajas de stock, compras, traslados, caja, cuentas y roles, ajustes y locales; nunca guarda DNI, nombres de clientes ni PIN. Contrato y códigos de acción en `docs/API.md`

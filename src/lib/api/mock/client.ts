@@ -8,9 +8,12 @@ import type {
   SalesReportLine, AttendanceMark, AttendanceSettings, KioskWorker, Worker, CustomerPurchase, CustomerInput,
   Branch, CashClosing, CashMovement, CashSession, Customer, ExpiryThresholds, KardexEntry, Lot, MoveType, Product, ProductInput, ProductVelocity, Purchase, PurchasingSettings, Sale, SaleRequest, Session,
   StaffSummary, Supplier, SupplierInput, Transfer, TransferItem, User, Role, StaffAccount, AccountInput, BranchInput, RulesInput, Pharmacy, Plan, Account, AccountStatus, BoticaPublic, PlanOffer, SignUpInput, Setup, SetupStep,
-  CreditNote, ElectronicState, Voucher, VoidInfo, SaleSyncResult,
+  CreditNote, ElectronicState, Voucher, VoidInfo, SaleSyncResult, AuditEntry, AuditQuery, Page,
 } from "../types";
 import { SYNC_BATCH_MAX } from "@/lib/domain/offline-sales";
+import { auditRangeError } from "@/lib/domain/audit";
+import { paginate } from "@/lib/domain/pagination";
+import { appendAudit, auditWrites, seedAudit, type AuditActor, type AuditLookup } from "./audit";
 import { tokenStore } from "../token";
 import { tenantStore } from "../tenant";
 import { allocateFefo, daysUntil, findPresentation, isValidCmp, documentIsValid, parseDay, round2, IGV, weightedDiscount } from "@/lib/domain/pharmacy";
@@ -29,7 +32,7 @@ import { acceptedResponse, allocateReturn, canResend, creditableLines, creditNot
 import { SEED_DAILY_UNITS, SEED_LOT_PLAN, SEED_PRODUCTS, SEED_SUC_MISSING } from "./seed-data";
 
 const KEY = "bh.mock.v1";
-const VERSION = 14; // subir cuando cambie la forma de los datos: se regeneran
+const VERSION = 15; // subir cuando cambie la forma de los datos: se regeneran
 const DAY = 86_400_000;
 
 /**
@@ -105,10 +108,14 @@ interface MockDb {
   /** Correlativos de series que un local dejó de usar: "principal:001" → último emitido. Si vuelve a esa serie, sigue desde ahí. */
   seriesArchive: Record<string, { b: number; f: number }>;
   sessions: Record<string, string>; // token → userId
+  /** Auditoría: quién hizo qué y cuándo, de la más antigua a la más reciente (ver `audit.ts`). */
+  audit: AuditEntry[];
+  /** Cuándo se creó la botica (la ve la consola de Digi!HME). */
+  createdAt: string;
 }
 
 const PERMISSIONS: Record<Role, string[]> = {
-  admin: ["panel", "pos", "vencimientos", "inventario", "traslados", "compras", "clientes", "caja", "comprobantes", "asistencia", "reportes", "ajustes"],
+  admin: ["panel", "pos", "vencimientos", "inventario", "traslados", "compras", "clientes", "caja", "comprobantes", "asistencia", "reportes", "auditoria", "ajustes"],
   encargado: ["panel", "pos", "vencimientos", "inventario", "traslados", "compras", "clientes", "caja", "comprobantes"],
 };
 
@@ -220,12 +227,15 @@ function seed(now: number): MockDb {
     seq: { principal: { b: 3120, f: 236 }, sucursal: { b: 1288, f: 54 } },
     seriesArchive: {},
     sessions: {},
+    audit: [],
+    createdAt: new Date(t0 - 120 * DAY).toISOString(),
   };
   seedTodaySales(db, t0, now, rnd);
   db.closings = seedClosings(db, t0, rnd);
   db.marks = seedMarks(db.workers, t0, now);
   seedCustomers(db, t0);
   seedVouchers(db);
+  db.audit = seedAudit({ closings: db.closings, staff: db.staff, branches: db.branches, t0 });
   return db;
 }
 
@@ -653,6 +663,8 @@ function seedEmpty(input: SignUpInput, now: number): MockDb {
     seq: { principal: { b: 0, f: 0 } },
     seriesArchive: {},
     sessions: {},
+    audit: [],
+    createdAt: new Date(now).toISOString(),
   };
 }
 
@@ -889,9 +901,25 @@ export function createMockClient(): ApiClient {
       const token = `mock.${owner.id}.${Date.now().toString(36)}`;
       d.sessions[token] = owner.id;
       cache.set(code, d);
+      appendAudit(d.audit, { action: "sesion_iniciada", entity: "sesion", entityId: owner.id, entityLabel: owner.name, after: { via: "correo" } }, { id: owner.id, name: owner.name, role: owner.role, branchId: null }, Date.now());
       save(d);
       const session: Session = { token, user: toUser(owner), expiresAt: new Date(Date.now() + 12 * 3600_000).toISOString() };
       return session;
+    },
+    async listAudit(query: AuditQuery): Promise<Page<AuditEntry>> {
+      await wait(160);
+      requireAdmin(currentUser(), "el registro de auditoría");
+      const rangeError = auditRangeError(query.from, query.to);
+      if (rangeError) fail("DATOS_INVALIDOS", rangeError);
+      const a = parseDay(query.from);
+      const b = parseDay(query.to) + DAY;
+      const rows = get()
+        .audit.filter((e) => {
+          const t = Date.parse(e.at);
+          return t >= a && t < b && (!query.userId || e.userId === query.userId) && (!query.action || e.action === query.action) && (!query.entity || e.entity === query.entity);
+        })
+        .sort((x, y) => y.at.localeCompare(x.at) || y.id.localeCompare(x.id, undefined, { numeric: true }));
+      return paginate(rows, query);
     },
     async getSetup(): Promise<Setup> {
       await wait(60);
@@ -1933,7 +1961,25 @@ export function createMockClient(): ApiClient {
       return note;
     },
   };
-  return guardWrites(client, () => get().account);
+  /* Auditoría: un solo envoltorio para todos los endpoints (las reglas están en audit.ts). */
+  const actor = (): AuditActor | null => {
+    const d = get();
+    const token = tokenStore.get();
+    const s = token ? d.staff.find((x) => x.id === d.sessions[token] && x.active) : undefined;
+    return s ? { id: s.id, name: s.name, role: s.role, branchId: s.branchId } : null;
+  };
+  const look = (): AuditLookup => {
+    const d = get();
+    return {
+      staff: (id) => d.staff.find((x) => x.id === id),
+      product: (id) => d.products.find((x) => x.id === id),
+      branch: (id) => d.branches.find((x) => x.id === id),
+      lot: (id) => d.lots.find((x) => x.id === id),
+      pharmacy: () => d.pharmacy,
+      rules: () => ({ expiry: d.expiry, purchasing: d.purchasing, attendance: d.attendanceSettings }),
+    };
+  };
+  return guardWrites(auditWrites(client, { log: () => get().audit, actor, look, commit }), () => get().account);
 }
 
 /** Para la pantalla de ajustes o pruebas: borra los datos simulados. */

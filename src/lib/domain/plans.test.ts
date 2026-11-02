@@ -15,6 +15,8 @@ describe("planes", () => {
     expect(offers.map((o) => o.maxBranches)).toEqual([1, 3, 10]);
     for (const o of offers) for (const m of o.modules) expect(ALL_MODULES).toContain(m);
     expect(offers[0]!.modules).not.toContain("reportes");
+    expect(offers[0]!.modules).not.toContain("auditoria");
+    expect(offers[1]!.modules).toContain("auditoria");
   });
 
   it("busca un plan por id", () => {
