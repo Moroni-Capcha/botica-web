@@ -437,7 +437,7 @@ Cada fase termina cuando **las pantallas listadas funcionan contra tu backend si
 
 ### 8.1 Contrato
 
-1. **Cualquier 401 cierra la sesión** (`http.ts`: borra el token y avisa al layout). No uses 401 para reglas de negocio. Ojo con `POST /public/attendance/clock`: `API.md` dice `401 PIN_INVALIDO` y esa marcación también se abre desde la barra superior con la sesión puesta, así que un PIN equivocado cerraría la sesión (duda 10.1).
+1. **Un 401 cierra la sesión** (`http.ts`: borra el token y avisa al layout), salvo que el cuerpo traiga `code` `PIN_INVALIDO` o `CREDENCIALES_INVALIDAS` (`isSessionExpiry` en `src/lib/api/errors.ts`). Por eso el 401 de `POST /public/attendance/clock` con PIN malo no saca al usuario. Mantén siempre el campo `code` en el cuerpo de los 401 y no uses 401 para reglas de negocio.
 2. **Un mismo endpoint, dos formas de respuesta:** `GET /customers/all` devuelve un arreglo sin `page` y un `Page<CustomerSummary>` con `page`; `GET /kardex` suma `total`, `page`, `pageClosing`, `summary` solo con `page`. Respeta ambas.
 3. **`ESTADO_INVALIDO` sirve para tres cosas:** traslados fuera de estado, comprobantes (reenviar uno aceptado, anular uno pendiente, nota sobre uno no aceptado) y acciones sobre boticas. El plazo de anulación vencido es `PLAZO_VENCIDO` (otro código).
 4. **`created` vs `replayed` en `/sales/sync`:** una venta repetida es `replayed` (no se toca stock ni correlativo). Un error pasajero va como `failed` con `ERROR_INTERNO` y el front la reintenta sola; cualquier otro código es rechazo definitivo.
@@ -501,7 +501,7 @@ Antes de dar un cambio por bueno, en el front: `npm run typecheck` sin errores y
 
 Cosas que no se pudieron confirmar con el código ni con `API.md`. Cada una trae mi propuesta.
 
-1. **`POST /public/attendance/clock` con PIN malo → `401 PIN_INVALIDO` cierra la sesión** si la marcación se hace con una sesión abierta (barra superior), porque `http.ts` trata cualquier 401 como sesión vencida. Propuesta: devolver otro status (`403`) o que el front ignore el 401 de ese endpoint. Decide el front.
+1. ~~`POST /public/attendance/clock` con PIN malo cerraba la sesión~~ **Resuelta en el front**: un 401 con `code` `PIN_INVALIDO` o `CREDENCIALES_INVALIDAS` ya no cierra la sesión. Condición: el backend debe enviar siempre ese `code` en el cuerpo.
 2. **Códigos de error fuera de la tabla de `API.md`** (`CODIGO_EN_USO`, `CORREO_EN_USO`, `LIMITE_DEL_PLAN`, `LOCAL_NO_SE_PUEDE_CERRAR`, `LOCAL_INACTIVO`, `CUENTA_PROTEGIDA`, `SERIE_NO_AUTORIZADA`, `LOCAL_NO_EXISTE`, `CUENTA_NO_EXISTE`, `VENTA_VACIA`): hay que sumarlos a la tabla con su HTTP status. El texto de `API.md` y el mock dan 409/404/400 como en la sección 3.2.
 3. **`SaleRequest.approverPin`** existe en `types.ts` ("PIN de un Q.F. cuando quien cobra no puede dispensar controlados") pero no está en `API.md` ni lo usa el mock (el mock da por hecho que todas las cuentas de local son Q.F.). ¿Se usa? ¿Cómo se valida?
 4. **Plazo de DNI:** `API.md` y `CLAUDE.md` dicen "obligatorio desde S/ 700", pero `documentIsValid` exige DNI solo cuando `total > 700` (exactamente S/ 700 no lo pide). ¿Cuál vale? La norma habla de montos mayores a 700.
