@@ -6,13 +6,14 @@ import type { ApiClient, BranchStock, NewCustomer, PublicConfig } from "../contr
 import { ApiError } from "../errors";
 import type {
   SalesReportLine, AttendanceMark, AttendanceSettings, KioskWorker, Worker, CustomerPurchase, CustomerInput,
-  Branch, CashClosing, CashMovement, CashSession, Customer, ExpiryThresholds, KardexEntry, Lot, MoveType, Product, ProductInput, ProductVelocity, Purchase, PurchasingSettings, Sale, SaleRequest, Session,
+  Branch, CashClosing, CashMovement, CashSession, Customer, CustomerSummary, ExpiryThresholds, KardexEntry, Lot, MoveType, Product, ProductInput, ProductVelocity, Purchase, PurchasingSettings, Sale, SaleRequest, Session,
   StaffSummary, Supplier, SupplierInput, Transfer, TransferItem, User, Role, StaffAccount, AccountInput, BranchInput, RulesInput, Pharmacy, Plan, Account, AccountStatus, BoticaPublic, PlanOffer, SignUpInput, Setup, SetupStep,
   CreditNote, ElectronicState, Voucher, VoidInfo, SaleSyncResult, AuditEntry, AuditQuery, Page,
 } from "../types";
 import { SYNC_BATCH_MAX } from "@/lib/domain/offline-sales";
 import { auditRangeError } from "@/lib/domain/audit";
 import { paginate } from "@/lib/domain/pagination";
+import { kardexSummary } from "@/lib/domain/inventory";
 import { appendAudit, auditWrites, seedAudit, type AuditActor, type AuditLookup } from "./audit";
 import { tokenStore } from "../token";
 import { tenantStore } from "../tenant";
@@ -21,7 +22,7 @@ import { normalizeProduct, validateProduct } from "@/lib/domain/inventory";
 import { isValidLotCode, isValidSupplierDocument, normalizeLotCode } from "@/lib/domain/purchasing";
 import { transferActions, transferCode } from "@/lib/domain/transfers";
 import { allowedMarks, scheduleError, MARK_LABEL } from "@/lib/domain/attendance";
-import { pointsFor, validateCustomer } from "@/lib/domain/customers";
+import { byRecentPurchase, matchesCustomer, pointsFor, validateCustomer } from "@/lib/domain/customers";
 import { closeDifference, countDenominations, expectedCash, movementError, movementTotals, paymentTotals } from "@/lib/domain/cash";
 import { ALL_MODULES, effectiveStatus, isReadOnly, limaDay } from "@/lib/domain/account";
 import { isValidBoticaCode, isValidEmail, normalizeBoticaCode, normalizeEmail, passwordError } from "@/lib/domain/auth";
@@ -332,6 +333,14 @@ function purchasesOf(d: MockDb, customerId: number): CustomerPurchase[] {
   const idPrefix = [`h${customerId}-`, `x${customerId}-`];
   const history = d.customerHistory.filter((h) => idPrefix.some((p) => h.saleId.startsWith(p)) || (h as CustomerPurchase & { customerId?: number }).customerId === customerId);
   return [...fromSales, ...history].sort((a, b) => b.at.localeCompare(a.at));
+}
+
+/** Cartera con los totales de compra de cada cliente. */
+function customerSummaries(d: MockDb): CustomerSummary[] {
+  return d.customers.map((c) => {
+    const ps = purchasesOf(d, c.id);
+    return { ...c, purchases: ps.length, totalSpent: round2(ps.reduce((a, p) => a + p.total, 0)), lastPurchaseAt: ps[0]?.at ?? null };
+  });
 }
 
 const SEED_WORKERS: (Worker & { pin: string })[] = [
@@ -1307,7 +1316,7 @@ export function createMockClient(): ApiClient {
       commit();
       return product;
     },
-    async getKardex(productId, { branchId, days }) {
+    async getKardex(productId, { branchId, days, page, pageSize }) {
       await wait(180);
       const u = currentUser();
       if (branchId) assertBranch(u, branchId);
@@ -1335,7 +1344,12 @@ export function createMockClient(): ApiClient {
       }
       entries.sort((a, b) => b.at.localeCompare(a.at));
       const closing = d.lots.filter((l) => l.productId === productId && inScope(l.branchId)).reduce((sum, l) => sum + l.qty, 0);
-      return { productId, branchId: branchId ?? null, from: new Date(from).toISOString(), to: new Date(to).toISOString(), closing, entries };
+      const head = { productId, branchId: branchId ?? null, from: new Date(from).toISOString(), to: new Date(to).toISOString(), closing };
+      if (page === undefined) return { ...head, entries };
+      /* Con página: solo esos movimientos, más el total, el saldo con el que parte la página y las cifras de todo el periodo */
+      const slice = paginate(entries, { page, pageSize });
+      const newer = entries.slice(0, (slice.page - 1) * slice.pageSize).reduce((sum, e) => sum + e.delta, 0);
+      return { ...head, entries: slice.items, total: slice.total, page: slice.page, pageSize: slice.pageSize, pageClosing: closing - newer, summary: kardexSummary(entries, closing) };
     },
 
     async listSuppliers() {
@@ -1663,11 +1677,12 @@ export function createMockClient(): ApiClient {
     async listCustomers() {
       await wait(160);
       currentUser();
-      const d = get();
-      return d.customers.map((c) => {
-        const ps = purchasesOf(d, c.id);
-        return { ...c, purchases: ps.length, totalSpent: round2(ps.reduce((a, p) => a + p.total, 0)), lastPurchaseAt: ps[0]?.at ?? null };
-      });
+      return customerSummaries(get());
+    },
+    async listCustomersPage({ q, page, pageSize }) {
+      await wait(160);
+      currentUser();
+      return paginate(customerSummaries(get()).filter((c) => matchesCustomer(c, q ?? "")).sort(byRecentPurchase), { page, pageSize });
     },
     async updateCustomer(id, input) {
       await wait(220);

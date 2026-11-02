@@ -189,8 +189,17 @@ export interface Kardex {
   to: string; // ISO
   /** Stock actual en unidades, incluidos lotes vencidos: es el saldo final del periodo. */
   closing: number;
-  /** Del más reciente al más antiguo. */
+  /** Del más reciente al más antiguo. Con `page`, solo las de esa página. */
   entries: KardexEntry[];
+  /* Solo cuando se pidió con `page` (paginación en el servidor): */
+  /** Total de movimientos del periodo, no solo los de esta página. */
+  total?: number;
+  page?: number;
+  pageSize?: number;
+  /** Saldo después del movimiento más reciente de esta página (en la primera página es `closing`). */
+  pageClosing?: number;
+  /** Cifras del periodo completo: entradas, salidas, unidades vendidas y saldo inicial. */
+  summary?: { inUnits: number; outUnits: number; sold: number; opening: number };
 }
 
 /** Saca unidades de un lote: baja (vencido, roto, deteriorado) o devolución/canje al proveedor. */
@@ -851,6 +860,11 @@ export interface Page<T> {
   total: number;
   page: number;
   pageSize: number;
+}
+
+/** Búsqueda de clientes por páginas (nombre, DNI, RUC o celular). */
+export interface CustomersQuery extends PageQuery {
+  q?: string;
 }
 
 /* ------------------------------ Auditoría ------------------------------ */

@@ -28,6 +28,8 @@ export const qk = {
   workers: ["workers"] as const,
   dashboard: (days: number) => ["dashboard", days] as const,
   customersAll: ["customers-all"] as const,
+  /** Cuelga de `customersAll`: lo que refresca la cartera completa refresca también sus páginas. */
+  customersPage: (q: string, page: number, pageSize: number) => ["customers-all", "page", q, page, pageSize] as const,
   salesReport: (from: string, to: string, branchId: BranchId | null) => ["sales-report", from, to, branchId] as const,
   refills: ["refills"] as const,
   accounts: ["accounts"] as const,
@@ -36,7 +38,7 @@ export const qk = {
   marks: (from: string, to: string) => ["marks", from, to] as const,
   transfers: (days: number) => ["transfers", days] as const,
   purchases: (branchId: BranchId | null, days: number) => ["purchases", branchId, days] as const,
-  kardex: (productId: number, branchId: BranchId | null, days: number) => ["kardex", productId, branchId, days] as const,
+  kardex: (productId: number, branchId: BranchId | null, days: number, page?: number, pageSize?: number) => ["kardex", productId, branchId, days, page ?? null, pageSize ?? null] as const,
   vouchers: (from: string, to: string, branchId: BranchId | null) => ["vouchers", from, to, branchId] as const,
   creditNotes: (from: string, to: string, branchId: BranchId | null) => ["credit-notes", from, to, branchId] as const,
   tenants: (q: TenantsQuery) => ["platform-tenants", q.q ?? "", q.status ?? null, q.page ?? 1, q.pageSize ?? null] as const,
@@ -69,8 +71,14 @@ export const useProducts = () => useQuery({ queryKey: qk.products, queryFn: api.
 export const useLots = (branchId: BranchId) => useQuery({ queryKey: qk.lots(branchId), queryFn: () => api.listLots(branchId), staleTime: 30_000 });
 export const useBranchStock = () => useQuery({ queryKey: qk.branchStock, queryFn: api.listBranchStock, staleTime: 60_000 });
 export const useVelocity = (days = 30) => useQuery({ queryKey: qk.velocity(days), queryFn: () => api.listVelocity(days), staleTime: 5 * 60_000 });
-export const useKardex = (productId: number, branchId: BranchId | null, days = 30) =>
-  useQuery({ queryKey: qk.kardex(productId, branchId, days), queryFn: () => api.getKardex(productId, { branchId: branchId ?? undefined, days }), staleTime: 30_000 });
+/** Sin `page`, todos los movimientos del periodo. Con `page`, solo esa página (más el total y las cifras del periodo). */
+export const useKardex = (productId: number, branchId: BranchId | null, days = 30, page?: number, pageSize?: number) =>
+  useQuery({
+    queryKey: qk.kardex(productId, branchId, days, page, pageSize),
+    queryFn: () => api.getKardex(productId, { branchId: branchId ?? undefined, days, page, pageSize }),
+    staleTime: 30_000,
+    placeholderData: page ? (prev) => prev : undefined,
+  });
 export const useTransfers = (days: number) => useQuery({ queryKey: qk.transfers(days), queryFn: () => api.listTransfers(days), staleTime: 20_000, refetchInterval: 60_000 });
 export const useCashSummary = (branchId: BranchId) => useQuery({ queryKey: qk.cashSummary(branchId), queryFn: () => api.getCashSummary(branchId), refetchInterval: 60_000 });
 export const useCashClosings = (branchId: BranchId | null, days: number) =>
@@ -82,6 +90,9 @@ export const useDashboard = (days: number) => useQuery({ queryKey: qk.dashboard(
 export const useSalesReport = (from: string, to: string, branchId: BranchId | null, enabled = true) =>
   useQuery({ queryKey: qk.salesReport(from, to, branchId), queryFn: () => api.getSalesReport({ from, to, branchId: branchId ?? undefined }), staleTime: 60_000, enabled, placeholderData: (prev) => prev });
 export const useCustomers = () => useQuery({ queryKey: qk.customersAll, queryFn: api.listCustomers, staleTime: 30_000 });
+/** Una página de la cartera, con la búsqueda hecha en el servidor. Mientras llega la siguiente se sigue mostrando la anterior. */
+export const useCustomersPage = (q: string, page: number, pageSize: number, enabled = true) =>
+  useQuery({ queryKey: qk.customersPage(q, page, pageSize), queryFn: () => api.listCustomersPage({ q, page, pageSize }), staleTime: 30_000, enabled, placeholderData: (prev) => prev });
 export const useRefills = () => useQuery({ queryKey: qk.refills, queryFn: api.listRefills, staleTime: 30_000 });
 export const useCustomerPurchases = (id: number | null) => useQuery({ queryKey: qk.customerPurchases(id ?? 0), queryFn: () => api.listCustomerPurchases(id!), enabled: id !== null, staleTime: 30_000 });
 export const useSuppliers = () => useQuery({ queryKey: qk.suppliers, queryFn: api.listSuppliers, staleTime: 5 * 60_000 });

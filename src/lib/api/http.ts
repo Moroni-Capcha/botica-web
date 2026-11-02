@@ -3,7 +3,7 @@ import type { ApiClient, BranchStock, NewCustomer, PlatformClient, PublicConfig 
 import { ApiError } from "./errors";
 import type { PlanOffer, SignUpInput, Setup, SetupStep, Account, AccountInput, BoticaPublic, Branch, BranchCreateInput, BranchCreated, BranchInput, BranchSeries, Pharmacy, RulesInput, StaffAccount, SalesReportLine, ContactRequest, CustomerInput, CustomerPurchase, CustomerSummary, RefillInfo, Dashboard, AttendanceMark, ClockRequest, KioskWorker, ManualMarkRequest, Worker, WorkerInput } from "./types";
 import type { ApiErrorBody, BranchId, CashCloseRequest, CashClosing, CashMovement, CashMovementRequest, CashSession, CashSummary, Customer, Kardex, Lot, Product, ProductInput, ProductVelocity, Purchase, PurchaseRequest, Supplier, SupplierInput, Transfer, TransferAskRequest, TransferSendRequest, Sale, SaleRequest, Session, StaffSummary, User, WriteOffRequest } from "./types";
-import type { CreditNote, CreditNoteRequest, Voucher, VoidRequest, SaleSyncRequest, SaleSyncResponse, AuditEntry, AuditQuery, Page, PlatformSession, TenantAction, TenantPage, TenantSummary, TenantsQuery } from "./types";
+import type { CreditNote, CreditNoteRequest, Voucher, VoidRequest, SaleSyncRequest, SaleSyncResponse, AuditEntry, AuditQuery, CustomersQuery, Page, PlatformSession, TenantAction, TenantPage, TenantSummary, TenantsQuery } from "./types";
 import { tenantStore } from "./tenant";
 import { platformTokenStore, tokenStore, type TokenStore } from "./token";
 import { connection } from "./connection";
@@ -106,8 +106,8 @@ export function createHttpClient(baseUrl: string): ApiClient {
     listBranchStock: () => request<BranchStock[]>("GET", "/stock/summary"),
     createProduct: (input: ProductInput) => request<Product>("POST", "/products", input),
     updateProduct: (id: number, input: ProductInput) => request<Product>("PUT", `/products/${id}`, input),
-    getKardex: (productId: number, { branchId, days }: { branchId?: BranchId; days: number }) =>
-      request<Kardex>("GET", `/kardex${q({ productId: String(productId), days: String(days), ...(branchId ? { branchId } : {}) })}`),
+    getKardex: (productId: number, { branchId, days, page, pageSize }: { branchId?: BranchId; days: number; page?: number; pageSize?: number }) =>
+      request<Kardex>("GET", `/kardex${q({ productId: String(productId), days: String(days), ...(branchId ? { branchId } : {}), ...(page ? { page: String(page) } : {}), ...(pageSize ? { pageSize: String(pageSize) } : {}) })}`),
 
     listVelocity: (days: number) => request<ProductVelocity[]>("GET", `/sales/velocity${q({ days: String(days) })}`),
     setLotDiscount: (branchId: BranchId, lotIds: number[], discount: number) => request<Lot[]>("PATCH", "/lots/discount", { branchId, lotIds, discount }),
@@ -135,6 +135,8 @@ export function createHttpClient(baseUrl: string): ApiClient {
     searchCustomers: (query: string) => request<Customer[]>("GET", `/customers${q({ q: query })}`),
     createCustomer: (input: NewCustomer) => request<Customer>("POST", "/customers", input),
     listCustomers: () => request<CustomerSummary[]>("GET", "/customers/all"),
+    listCustomersPage: ({ q: text, page, pageSize }: CustomersQuery) =>
+      request<Page<CustomerSummary>>("GET", `/customers/all${q({ page: String(page ?? 1), ...(pageSize ? { pageSize: String(pageSize) } : {}), ...(text?.trim() ? { q: text.trim() } : {}) })}`),
     updateCustomer: (id: number, input: CustomerInput) => request<Customer>("PUT", `/customers/${id}`, input),
     listCustomerPurchases: (id: number) => request<CustomerPurchase[]>("GET", `/customers/${id}/purchases`),
     listRefills: () => request<RefillInfo[]>("GET", "/customers/refills"),

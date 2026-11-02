@@ -27,6 +27,7 @@ Las listas que pueden crecer sin límite (auditoría, kardex, clientes) se puede
 ```
 
   `total` cuenta todo lo que cumple los filtros, no solo la página. Orden estable (el mismo en todas las páginas) para que no se repitan ni se salten filas.
+- Hoy usan esta convención: `GET /audit` y `GET /platform/tenants` (siempre por páginas), y `GET /kardex` y `GET /customers/all` (opcional, con `page`). **Todavía sin paginar a propósito:** `GET /vouchers` y `GET /credit-notes` (la pantalla filtra por estado y tipo y cuenta pendientes sobre todo el periodo, de hasta un año; paginarlos exige filtros en el servidor, `status`, `type` y `q`, y un conteo por estado) y los reportes (se calculan sobre el periodo completo). Cuando el volumen lo pida se paginan con esta misma convención.
 - Las reglas (`normalizePage`, `paginate`, `pageWindow`) están en `src/lib/domain/pagination.ts`, con pruebas; el backend puede aplicar los mismos casos.
 - Los filtros se envían al servidor junto con la página (p. ej. `q`, `userId`), porque el front ya no tiene la lista completa para filtrar.
 
@@ -230,6 +231,18 @@ El inventario valorizado se arma en el front con `GET /products` y `GET /lots` (
 - `closing` es el stock actual del producto en el alcance pedido, **incluidos los lotes vencidos**. El front calcula el saldo de cada línea hacia atrás desde ese número (`kardexBalances`), así que `closing` y los movimientos tienen que cuadrar.
 - Las ventas salen de `POST /sales` (una línea por ítem, con los lotes usados en `lotCode` separados por coma). Los ingresos, bajas y devoluciones salen de la tabla de movimientos.
 - Sin `branchId`: todos los locales, solo `admin`. Un encargado debe mandar el suyo, si no `403 SIN_PERMISO`. `days` entre 1 y 365.
+- **Por páginas (opcional):** `GET /kardex?productId=7&days=90&page=2&pageSize=20`. Sin `page` responde como se describió arriba. Con `page`, `entries` trae solo esa página (mismo orden, del más reciente al más antiguo) y la respuesta suma estos campos:
+
+```json
+{
+  "closing": 680, "entries": [ ],
+  "total": 143, "page": 2, "pageSize": 20,
+  "pageClosing": 512,
+  "summary": { "inUnits": 900, "outUnits": 220, "sold": 180, "opening": 0 }
+}
+```
+
+  `total` cuenta todos los movimientos del periodo; `closing` sigue siendo el stock actual; `pageClosing` es el saldo **después del movimiento más reciente de la página** (en la página 1 es igual a `closing`; en las siguientes, `closing` menos la suma de `delta` de las páginas anteriores): con él el front calcula el saldo de cada línea de la página (`kardexView` en `src/lib/domain/inventory.ts`). `summary` trae las cifras de **todo el periodo**: entradas, salidas, unidades vendidas y saldo inicial (`opening`), para no tener que bajar todos los movimientos solo para sumarlos. El Excel del kardex se pide sin `page` (completo).
 
 ### Compras (cuarta entrega)
 
@@ -292,6 +305,8 @@ Código del traslado: `T-` y el id con 4 dígitos (`T-0012`). El administrador p
 `Customer` ahora trae `treatments: [{ productId, everyDays }]` (medicamentos de uso continuo con su ciclo), `contactConsent` (aceptó recibir avisos), `notes` y `createdAt`. Reemplaza a `chronicProductIds`. Validación (la misma de `validateCustomer`): nombre de 3 letras o más; DNI de 8 dígitos y RUC válido, ambos sin repetir; para marcar `contactConsent` hace falta un celular peruano (9 dígitos que empiezan en 9); medicamentos sin repetir y ciclo de 1 a 365 días.
 
 `GET /customers/all` → `CustomerSummary[]`: todos los clientes con `purchases`, `totalSpent` y `lastPurchaseAt`. Declárala antes de `/customers/:id`.
+
+`GET /customers/all?q=rosa&page=1&pageSize=25` → `Page<CustomerSummary>` (ver "Paginación en el servidor"). Con `page`, la misma cartera pero recortada y con la búsqueda hecha en el servidor: `q` coincide con el nombre (sin importar mayúsculas) o, si trae números, con los dígitos del DNI, RUC o celular (`matchesCustomer` en `src/lib/domain/customers.ts`). Orden: compra más reciente primero y, al final, quienes nunca compraron, por nombre (`byRecentPurchase`). Sin `page` responde el arreglo completo de siempre, que las recompras siguen usando.
 
 `PUT /customers/:id` con `CustomerInput` → `Customer`. Los puntos no se editan aquí: los suma la venta (1 por cada S/ 10).
 

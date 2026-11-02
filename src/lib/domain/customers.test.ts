@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Customer, CustomerInput, Product } from "@/lib/api/types";
-import { peruMobile, refillMessage, refillRows, suggestedCycle, toNotify, validateCustomer, whatsappLink } from "./customers";
+import { byRecentPurchase, matchesCustomer, peruMobile, refillMessage, refillRows, suggestedCycle, toNotify, validateCustomer, whatsappLink } from "./customers";
 
 const NOW = new Date(2026, 9, 27, 10, 0).getTime(); // 27/10/2026
 const at = (d: number, m = 9) => new Date(2026, m, d, 11, 0).toISOString();
@@ -90,3 +90,35 @@ describe("ficha del cliente", () => {
     expect(validateCustomer(input(), [customer(5)], 5).dni).toBeUndefined();
   });
 });
+
+describe("búsqueda de la cartera", () => {
+  const rosa = { name: "Rosa Huamán Quispe", dni: "40125588", ruc: "", phone: "987 112 334" };
+  const empresa = { name: "Inversiones Salud Total S.A.C.", dni: "", ruc: "20601122334", phone: "01 330 4455" };
+
+  it("busca por nombre sin importar mayúsculas y por los dígitos del documento o celular", () => {
+    expect(matchesCustomer(rosa, "rosa")).toBe(true);
+    expect(matchesCustomer(rosa, "  HUAMÁN ")).toBe(true);
+    expect(matchesCustomer(rosa, "40125")).toBe(true);
+    expect(matchesCustomer(rosa, "987-112")).toBe(true);
+    expect(matchesCustomer(empresa, "2060112")).toBe(true);
+    expect(matchesCustomer(rosa, "20601122334")).toBe(false);
+    expect(matchesCustomer(rosa, "pedro")).toBe(false);
+  });
+
+  it("sin texto, o con texto sin letras ni números, depende del nombre; vacío deja pasar a todos", () => {
+    expect(matchesCustomer(rosa, "")).toBe(true);
+    expect(matchesCustomer(rosa, "   ")).toBe(true);
+    expect(matchesCustomer(rosa, "--")).toBe(false);
+  });
+
+  it("ordena por compra más reciente y deja al final a quien no ha comprado", () => {
+    const list = [
+      { name: "Zoila", lastPurchaseAt: null },
+      { name: "Ana", lastPurchaseAt: "2026-10-20T10:00:00Z" },
+      { name: "Beto", lastPurchaseAt: "2026-10-25T10:00:00Z" },
+      { name: "Abel", lastPurchaseAt: null },
+    ];
+    expect([...list].sort(byRecentPurchase).map((c) => c.name)).toEqual(["Beto", "Ana", "Abel", "Zoila"]);
+  });
+});
+

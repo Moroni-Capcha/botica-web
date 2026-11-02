@@ -10,7 +10,7 @@ import type {
   AccountInput, BranchCreateInput, BranchCreated, Plan, BranchInput, BranchSeries, RulesInput, StaffAccount,
   StaffSummary, Supplier, SupplierInput, Transfer, TransferAskRequest, TransferSendRequest, User, BranchId, WriteOffRequest,
   CreditNote, CreditNoteRequest, Voucher, VoidRequest, SaleSyncRequest, SaleSyncResponse,
-  AuditEntry, AuditQuery, Page, PlatformSession, TenantAction, TenantPage, TenantSummary, TenantsQuery,
+  AuditEntry, AuditQuery, CustomersQuery, Page, PlatformSession, TenantAction, TenantPage, TenantSummary, TenantsQuery,
 } from "./types";
 
 export interface PublicConfig {
@@ -97,8 +97,11 @@ export interface ApiClient {
   /** Alta y edición del catálogo (solo administrador). */
   createProduct(input: ProductInput): Promise<Product>;
   updateProduct(id: number, input: ProductInput): Promise<Product>;
-  /** Movimientos de un producto en los últimos `days` días. Sin `branchId`, todos los locales (solo administrador). */
-  getKardex(productId: number, options: { branchId?: BranchId; days: number }): Promise<Kardex>;
+  /**
+   * Movimientos de un producto en los últimos `days` días. Sin `branchId`, todos los locales (solo administrador).
+   * Con `page` (y `pageSize`) devuelve solo esa página de movimientos más el total y las cifras del periodo (`Kardex.summary`).
+   */
+  getKardex(productId: number, options: { branchId?: BranchId; days: number; page?: number; pageSize?: number }): Promise<Kardex>;
 
   /* Vencimientos */
   /** Unidades vendidas por local y producto en los últimos `days` días (todos los locales; sirve para sugerir traslados). */
@@ -144,6 +147,8 @@ export interface ApiClient {
   createCustomer(input: NewCustomer): Promise<Customer>;
   /** Cartera completa con totales de compra. */
   listCustomers(): Promise<CustomerSummary[]>;
+  /** La misma cartera por páginas y con búsqueda en el servidor, de la compra más reciente a la más antigua. */
+  listCustomersPage(query: CustomersQuery): Promise<Page<CustomerSummary>>;
   updateCustomer(id: number, input: CustomerInput): Promise<Customer>;
   /** Compras del cliente, de la más reciente a la más antigua (máximo 50). */
   listCustomerPurchases(id: number): Promise<CustomerPurchase[]>;

@@ -1,14 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { BellOff, CircleCheck, FileSpreadsheet, MessageCircle, Phone, Search, TriangleAlert, UserPlus, Users } from "lucide-react";
 import type { CustomerSummary } from "@/lib/api/types";
 import { errorMessage } from "@/lib/api";
-import { useConfig, useCustomers, useLogContact, useProducts, useRefills } from "@/lib/queries";
+import { useConfig, useCustomers, useCustomersPage, useLogContact, useProducts, useRefills } from "@/lib/queries";
 import { peruMobile, refillMessage, refillRows, toNotify, whatsappLink, type RefillRow, type RefillStatus } from "@/lib/domain/customers";
 import { Button } from "@/components/ui/button";
 import { Empty } from "@/components/ui/empty";
 import { Input } from "@/components/ui/field";
+import { Pagination } from "@/components/ui/pagination";
 import { Segmented } from "@/components/ui/segmented";
 import { Table, td } from "@/components/ui/table";
 import { notify } from "@/components/ui/toast";
@@ -16,6 +17,9 @@ import { dateShort, initials, soles } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { CustomerDialog } from "./customer-dialog";
 import { exportCustomers } from "./export";
+
+/** Clientes por página de la lista: el servidor entrega solo estos. */
+const CUSTOMERS_PAGE_SIZE = 25;
 
 type Tab = "recompras" | "clientes";
 type RefillFilter = "avisar" | "todos";
@@ -38,6 +42,9 @@ export function CustomersScreen() {
   const [tab, setTab] = useState<Tab>("recompras");
   const [filter, setFilter] = useState<RefillFilter>("avisar");
   const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
+  const query = useDeferredValue(q.trim());
+  const pageData = useCustomersPage(query, page, CUSTOMERS_PAGE_SIZE, tab === "clientes");
   const [editing, setEditing] = useState<CustomerSummary | "new" | null>(null);
 
   const list = customers.data ?? [];
@@ -47,13 +54,8 @@ export function CustomersScreen() {
   const pending = useMemo(() => toNotify(rows), [rows]);
   const shown = filter === "avisar" ? pending : rows;
 
-  const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    const digits = s.replace(/\D/g, "");
-    return list
-      .filter((c) => !s || c.name.toLowerCase().includes(s) || (digits !== "" && (c.dni.includes(digits) || c.ruc.includes(digits) || c.phone.replace(/\D/g, "").includes(digits))))
-      .sort((a, b) => (b.lastPurchaseAt ?? "").localeCompare(a.lastPurchaseAt ?? ""));
-  }, [list, q]);
+  /** La búsqueda, el orden y el recorte por páginas los hace el servidor (ver "Paginación en el servidor" en docs/API.md). */
+  const filtered = pageData.data?.items ?? [];
 
   const register = (r: RefillRow, channel: "whatsapp" | "llamada") =>
     logContact.mutate(
@@ -180,10 +182,26 @@ export function CustomersScreen() {
           <div className="border-b border-zinc-100 p-4 sm:px-5">
             <div className="relative max-w-md">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nombre, DNI, RUC o celular" className="pl-9" aria-label="Buscar cliente" />
+              <Input
+                value={q}
+                onChange={(e) => {
+                  setQ(e.target.value);
+                  setPage(1);
+                }}
+                placeholder="Nombre, DNI, RUC o celular"
+                className="pl-9"
+                aria-label="Buscar cliente"
+              />
             </div>
           </div>
-          {loading ? (
+          {pageData.error ? (
+            <Empty icon={TriangleAlert} title="No se pudo cargar la lista de clientes">
+              {errorMessage(pageData.error)}{" "}
+              <button type="button" className="font-semibold underline" onClick={() => void pageData.refetch()}>
+                Reintentar
+              </button>
+            </Empty>
+          ) : loading || pageData.isLoading ? (
             <div className="grid gap-2 p-4">{Array.from({ length: 6 }, (_, i) => <div key={i} className="h-12 animate-pulse rounded-xl bg-zinc-100" />)}</div>
           ) : filtered.length === 0 ? (
             <Empty icon={Users} title="Sin clientes para esa búsqueda" />
@@ -208,6 +226,7 @@ export function CustomersScreen() {
               ))}
             </Table>
           )}
+          {pageData.data && <Pagination page={pageData.data.page} pageSize={pageData.data.pageSize} total={pageData.data.total} onPage={setPage} busy={pageData.isFetching} noun="clientes" />}
         </section>
       )}
 

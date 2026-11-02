@@ -40,6 +40,43 @@ NEXT_PUBLIC_API_URL=http://localhost:4000/api
 
 El contrato está en [docs/API.md](docs/API.md).
 
+## Monitoreo de errores (Sentry)
+
+El front trae el enlace listo, **sin el SDK de Sentry** (no se agregó ninguna dependencia). Mientras no haya `NEXT_PUBLIC_SENTRY_DSN` y un SDK conectado, `src/lib/monitoring.ts` no hace nada.
+
+Qué ya está conectado:
+
+- `captureException`, `captureMessage`, `setMonitoringUser` y `setMonitoringReporter` en `src/lib/monitoring.ts`.
+- Pantallas de error: `src/app/error.tsx` (cualquier ruta) y `src/app/global-error.tsx` (si se rompe el diseño raíz) avisan al monitoreo y muestran un mensaje claro en español.
+- El manejador global de TanStack Query (consultas y escrituras en `src/app/providers.tsx`) y los errores sin atrapar de la ventana (`error` y `unhandledrejection`). Solo se reportan los 5xx y los errores de código: las reglas del negocio (4xx: stock insuficiente, PIN incorrecto…) y "sin conexión" no.
+- Cada reporte lleva las etiquetas `tenant` (código de la botica), `role` y `branch`, y como usuario solo el id interno de la cuenta.
+- **Nunca** sale un DNI, RUC, celular, correo, nombre de cliente, PIN ni token: todo texto y contexto pasa antes por `src/lib/domain/privacy.ts` (con pruebas).
+
+Cómo conecta el SDK real el equipo de backend / DevOps (unos 10 minutos):
+
+1. `npm i @sentry/browser` (o `@sentry/nextjs` si también quieren el servidor).
+2. En el entorno de despliegue: `NEXT_PUBLIC_SENTRY_DSN=https://…@….ingest.sentry.io/…`.
+3. Crear un módulo cliente de arranque y montarlo una vez en `src/app/providers.tsx`:
+
+```tsx
+"use client";
+import * as Sentry from "@sentry/browser";
+import { setMonitoringReporter } from "@/lib/monitoring";
+
+Sentry.init({
+  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+  environment: process.env.NEXT_PUBLIC_APP_ENV, // "produccion" | "pruebas"
+  sendDefaultPii: false, // no enviar IP ni datos del usuario
+  tracesSampleRate: 0.1,
+});
+setMonitoringReporter(Sentry); // el SDK ya cumple la interfaz MonitoringReporter
+```
+
+   Alternativa sin código: cargar el script "loader" de Sentry, que deja `window.Sentry`; el front lo toma solo.
+4. Opcional: subir los mapas de código fuente en el despliegue (`sentry-cli`) para ver las trazas legibles.
+
+Para probarlo, definir el DSN y provocar un error en una pantalla (por ejemplo lanzar una excepción desde un componente en desarrollo): debe aparecer en Sentry con las etiquetas `tenant` y `role`, sin datos personales.
+
 ## Scripts
 
 | Comando | Qué hace |
@@ -87,11 +124,12 @@ src/
   features/reports/     Reportes: periodo, cortes, márgenes, sin movimiento, recetas, Excel
   features/settings/    Ajustes: botica, locales y series, cuentas y PIN, reglas
   features/shared/      Alcance por local (solo un local o ambos) y lotes de varios locales
-  components/ui/        Botones, campos, diálogos, insignias, avisos
+  components/ui/        Botones, campos, diálogos, insignias, avisos, paginación
   components/charts/    Gráfico de columnas (tooltip, leyenda y vista de tabla)
   components/layout/    Barra lateral, barra superior, navegación móvil
   lib/api/              Tipos, contrato, cliente HTTP y API simulada
-  lib/domain/           Reglas de negocio puras (incluye auditoría y paginación): FEFO, presentaciones, IGV, comprobantes, riesgo de vencimiento, inventario, kardex, compras e importación, traslados, caja, asistencia, panel, clientes, reportes, ajustes, comprobantes electrónicos (plazo de baja, notas de crédito)
+  lib/monitoring.ts     Enlace con Sentry (apagado hasta conectar el SDK; ver "Monitoreo de errores")
+  lib/domain/           Reglas de negocio puras (incluye auditoría, paginación y privacidad de los reportes de error): FEFO, presentaciones, IGV, comprobantes, riesgo de vencimiento, inventario, kardex, compras e importación, traslados, caja, asistencia, panel, clientes, reportes, ajustes, comprobantes electrónicos (plazo de baja, notas de crédito)
   lib/excel/            Generador y lector de .xlsx sin dependencias
   lib/auth/             Sesión y local donde se opera
 docs/API.md             Contrato con el backend
@@ -115,7 +153,24 @@ public/brand/           Logo e isotipo de Digi!HME (PNG transparente)
 - [x] Ajustes: datos y colores de la botica con vista previa y control de contraste, locales según el plan contratado (crear con su cuenta, desactivar sin perder historial, reactivar), series de comprobantes con el siguiente correlativo, cuentas y PIN (siempre queda un administrador activo), plazos de vencimiento, reglas de compra y de asistencia
 - [x] Comprobantes SUNAT: pantalla `/comprobantes` con filtros por fecha, tipo y estado (pendiente, aceptado, rechazado, anulado) y la respuesta de SUNAT; reenvío de pendientes y rechazados; anulación (comunicación de baja) dentro de 7 días con motivo y devolución opcional al stock; notas de crédito (catálogo 09: anulación, devolución total o por ítem, descuento, disminución) que devuelven la mercadería al kardex; ticket de 80 mm para imprimir (también desde la venta en el punto de venta); Excel. Pendiente del lado del backend: envío real a SUNAT, QR y hash del ticket; las notas aún no restan en reportes ni en el cierre de caja
 - [x] Punto de venta sin internet (T6): app instalable (manifiesto + service worker propio, solo en producción) que abre sin conexión; cola persistente de ventas con clave de idempotencia (`clientSaleId`) y ticket provisional `OFF-0001`; envío FIFO automático al volver la conexión y con "Sincronizar ahora"; indicador de conexión en la barra superior y lista "Ventas por enviar" (reintentar y, solo el administrador, descartar las que fallaron); stock reservado localmente para no vender dos veces el mismo lote. Contrato: `clientSaleId`, `soldAt`, `offlineTicket` en `POST /sales` y `POST /sales/sync` (`docs/API.md`)
-- [ ] SaaS (en curso): contrato y mock de botica por código (`X-Botica`), ingreso del dueño con correo y contraseña, estado de la cuenta (prueba, activa, vencida, suspendida) con módulos del plan y modo solo lectura
+- [x] SaaS: contrato y mock de botica por código (`X-Botica`), ingreso del dueño con correo y contraseña, estado de la cuenta (prueba, activa, vencida, suspendida) con módulos del plan y modo solo lectura
 - [x] Registro y primera configuración: `/registro` en 3 pasos (plan, datos, listo) crea la botica en prueba de 14 días; tarjeta de pasos pendientes en el panel (datos, local, series, usuario de mostrador, productos). El mock guarda cada botica nueva en `bh.mock.v1.<código>`
 - [x] Auditoría (T7): pantalla `/auditoria` (solo administrador, desde el Plan Crece) con filtros por fecha, persona, acción y tipo, paginación en el servidor (`GET /audit`) y Excel. El mock registra en un solo lugar (`src/lib/api/mock/audit.ts`) los ingresos (también los fallidos), ventas, anulaciones y notas de crédito, cambios de precio y costo, bajas de stock, compras, traslados, caja, cuentas y roles, ajustes y locales; nunca guarda DNI, nombres de clientes ni PIN. Contrato y códigos de acción en `docs/API.md`
 - [x] Consola interna de Digi!HME (T7): `/consola` con ingreso propio del operador (`POST /platform/login`), lista de boticas por páginas con plan, estado de cuenta (prueba, activa, vencida, suspendida), fecha de creación, última actividad y conteo de locales y usuarios (`GET /platform/tenants`), y acciones con motivo: cambiar de plan (respeta el límite de locales), extender la prueba, suspender y reactivar (`PATCH /platform/tenants/:code`). Reutiliza las reglas de cuenta de `src/lib/domain/account.ts`; nueva lógica en `src/lib/domain/platform.ts` con pruebas
+- [x] Monitoreo y paginación (T7): enlace con Sentry sin agregar el SDK (`src/lib/monitoring.ts`, `app/error.tsx`, `app/global-error.tsx`, manejador global de TanStack Query; sin datos personales), con la guía para que DevOps conecte el SDK real. Paginación en el servidor con la convención `Page<T>` (`page`, `pageSize`) en `docs/API.md`: obligatoria en `GET /audit` y `GET /platform/tenants`, opcional y compatible hacia atrás en `GET /kardex` (ficha del producto) y `GET /customers/all` (lista de clientes); componente `Pagination` en `src/components/ui/`. Comprobantes y reportes siguen sin paginar a propósito (ver `docs/API.md`)
+
+## Hoja de ruta SaaS · estado
+
+El front de los seis puntos está terminado contra el contrato (`docs/API.md`) y el modo de prueba. Lo que falta es del backend y de la puesta en producción:
+
+| # | Punto | Front | Falta del lado del backend / DevOps |
+| --- | --- | --- | --- |
+| 1 | Varias boticas, ingreso del dueño con correo y contraseña | Hecho (`X-Botica`, `/login`) | Resolver la botica por `X-Botica` o subdominio; cuentas del dueño con hash de contraseña |
+| 2 | Plan, facturación y estado de la cuenta | Hecho (Ajustes, aviso, solo lectura, módulos) y consola de Digi!HME | Cobro real y renovación; rechazar endpoints de módulos fuera del plan |
+| 3 | Registro y configuración inicial | Hecho (`/registro`, pasos en el panel) | `POST /public/signup` y envío de correos |
+| 4 | Comprobantes con SUNAT | Hecho (estado, reenvío, baja, nota de crédito, ticket de 80 mm) | Envío real a SUNAT con el proveedor de facturación, QR y hash del ticket |
+| 5 | Punto de venta sin internet | Hecho (PWA, cola, `clientSaleId`) | `POST /sales/sync` idempotente |
+| 6 | Auditoría, consola interna, monitoreo, paginación | Hecho (`/auditoria`, `/consola`, `monitoring.ts`, `Page<T>`) | Registrar la auditoría en un solo punto del servidor, cuentas de operador y `/platform/*`, conectar el SDK de Sentry (ver arriba) |
+
+Sin probar en navegador real: instalación de la PWA y cola sin conexión, impresión en ticketera de 80 mm y el envío real a Sentry.
+

@@ -1,7 +1,7 @@
 /**
  * Inventario y kardex (reglas puras, se prueban con Vitest).
  */
-import type { BranchId, KardexEntry, Lot, Product, ProductInput } from "@/lib/api/types";
+import type { BranchId, Kardex, KardexEntry, Lot, Product, ProductInput } from "@/lib/api/types";
 import { IGV, parseDay, round2, sellableLots } from "./pharmacy";
 
 /* ------------------------------ Stock mínimo ------------------------------ */
@@ -120,6 +120,20 @@ export function kardexBalances(entries: KardexEntry[], closing: number): { lines
     return line;
   });
   return { lines, opening: run };
+}
+
+/** Cifras de todo el periodo a partir de todos sus movimientos y el saldo actual. Es lo que `Kardex.summary` trae cuando se pagina. */
+export function kardexSummary(entries: KardexEntry[], closing: number): NonNullable<Kardex["summary"]> {
+  return { ...kardexTotals(entries), opening: kardexBalances(entries, closing).opening };
+}
+
+/**
+ * Lo que muestra la ficha del producto, venga el kardex completo o una sola página. Los saldos de cada línea parten del saldo
+ * de la página (`pageClosing`); las cifras del periodo salen de `summary` si viene, y si no, de los movimientos recibidos.
+ */
+export function kardexView(k: Pick<Kardex, "entries" | "closing" | "pageClosing" | "summary">) {
+  const { lines, opening } = kardexBalances(k.entries, k.pageClosing ?? k.closing);
+  return { lines, opening: k.summary?.opening ?? opening, totals: k.summary ?? { ...kardexTotals(k.entries), opening } };
 }
 
 export const MOVE_LABEL: Record<KardexEntry["type"], string> = {
