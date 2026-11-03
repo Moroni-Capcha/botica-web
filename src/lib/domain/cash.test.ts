@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { closeDifference, countDenominations, expectedCash, movementError, paymentTotals } from "./cash";
+import { closeDifference, describeDifference, countDenominations, expectedCash, movementError, paymentTotals } from "./cash";
 
 describe("caja", () => {
   it("suma billetes y monedas sin errores de redondeo", () => {
@@ -33,5 +33,23 @@ describe("caja", () => {
     expect(movementError("egreso", 0, "x", 10)).toBe("Escribe el monto");
     expect(movementError("egreso", 5, "", 10)).toBe("Escribe el motivo");
     expect(movementError("egreso", 1.234, "Útiles", 10)).toBe("Máximo dos decimales");
+  });
+});
+
+describe("describeDifference", () => {
+  it("cuadra: cero y menos de 5 céntimos, tono éxito y sin signo", () => {
+    expect(describeDifference(100, 100)).toMatchObject({ kind: "cuadra", tone: "success", sign: "", text: "Cuadra" });
+    expect(describeDifference(100.03, 100)).toMatchObject({ tone: "success", text: "Cuadra" });
+  });
+  it("sobra poco: advertencia con signo +", () => {
+    expect(describeDifference(100.6, 100)).toMatchObject({ kind: "sobrante", tone: "warning", sign: "+", label: "Sobra", text: "Sobra S/ 0.60" });
+  });
+  it("falta poco: advertencia con signo −", () => {
+    expect(describeDifference(99.5, 100)).toMatchObject({ kind: "faltante", tone: "warning", sign: "−", text: "Falta S/ 0.50" });
+  });
+  it("diferencia grande (S/ 1 o más): peligro, en ambos sentidos", () => {
+    expect(describeDifference(95, 100)).toMatchObject({ tone: "danger", sign: "−", text: "Falta S/ 5.00", difference: -5 });
+    expect(describeDifference(112.5, 100)).toMatchObject({ tone: "danger", sign: "+", text: "Sobra S/ 12.50" });
+    expect(describeDifference(99, 100)).toMatchObject({ tone: "danger", text: "Falta S/ 1.00" });
   });
 });

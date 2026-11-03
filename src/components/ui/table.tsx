@@ -7,17 +7,17 @@ export interface HeadCell {
   className?: string;
 }
 
-/** Tabla con desplazamiento horizontal en pantallas chicas y encabezado fijo dentro de su contenedor. */
-export function Table({ head, children, minWidth = 720, className }: { head: (HeadCell | string)[]; children: ReactNode; minWidth?: number; className?: string }) {
+/** Tabla con desplazamiento horizontal en pantallas chicas. Con `maxHeight` se desplaza por dentro y el encabezado queda fijo arriba. */
+export function Table({ head, children, minWidth = 720, maxHeight, className }: { head: (HeadCell | string)[]; children: ReactNode; minWidth?: number; maxHeight?: number; className?: string }) {
   return (
-    <div className={cn("overflow-x-auto", className)}>
+    <div className={cn(maxHeight ? "overflow-auto" : "overflow-x-auto", className)} style={maxHeight ? { maxHeight } : undefined}>
       <table className="w-full border-collapse text-sm" style={{ minWidth }}>
         <thead>
           <tr className="border-b border-line text-left text-micro font-semibold uppercase tracking-wide text-muted">
             {head.map((h, i) => {
               const cell = typeof h === "string" ? { label: h } : h;
               return (
-                <th key={i} scope="col" className={cn("whitespace-nowrap px-3 py-2.5 font-semibold first:pl-4 last:pr-4 sm:first:pl-5 sm:last:pr-5", cell.align === "right" && "text-right", cell.className)}>
+                <th key={i} scope="col" className={cn("whitespace-nowrap px-3 py-2.5 font-semibold first:pl-4 last:pr-4 sm:first:pl-5 sm:last:pr-5", cell.align === "right" && "text-right", maxHeight && "sticky top-0 z-10 bg-surface shadow-[inset_0_-1px_0_var(--color-line)]", cell.className)}>
                   {cell.label}
                 </th>
               );
