@@ -39,5 +39,7 @@ Browser check I1 (2026-11-02, dev server, no console errors): `/inventario` show
 
 Browser check I2: pending (parent).
 
+Browser check I2 (2026-11-02, dev server, no console errors): `/vencimientos` shows the focal brand card "Pérdida estimada si no se actúa S/ 642.62" and four semaphore cards (Vencido 3, Crítico 7, Por vencer 12, Vigente 35) with counts, ranges, units and cost; "Prioridad de venta" list with day chips (icon + text), tabular figures, red loss column and per-row actions (primary "Vender", secondary "Baja o canje"); the write-off dialog opens in "Devolver al proveedor" mode with the preview ("Se devuelve, a costo: S/ 282.00", "Quedarán en el lote: 0 unidades") and a button with the exact action ("Devolver 6 unidades"); closed with Esc without saving. NOT checked: semaphore card filtering, "Todos los lotes" group headers, merma mode and its confirmation, the bulk discount bar, row exit after an action, mobile card list, reduced motion. Visual nits: the "Baja o canje" button is tight/clipped at the right edge of the table; the inventory filter selects truncate their text.
+
 ## Next step
 Browser check of I2; then final review and delivery decision (push/PR are the user's).
