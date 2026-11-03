@@ -8,9 +8,11 @@ import { DEFAULT_CATEGORIES, marginPct, normalizeProduct, validateProduct } from
 import { useSaveProduct } from "@/lib/queries";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { sectionLabelClass } from "@/components/ui/section-label";
 import { Field, Input, Select } from "@/components/ui/field";
 import { notify } from "@/components/ui/toast";
 import { soles } from "@/lib/format";
+import { cn } from "@/lib/cn";
 import { RX_LABEL } from "./export";
 
 const EMPTY: ProductInput = {
@@ -95,13 +97,13 @@ export function ProductFormDialog({ product, products, branches, onClose, onSave
       footer={
         <>
           {(save.error || (touched && hasErrors)) && (
-            <p className="mr-auto text-sm text-rose-600" role="alert">
+            <p className="mr-auto text-small text-danger-fg" role="alert">
               {save.error ? errorMessage(save.error) : "Revisa los campos marcados."}
             </p>
           )}
           <Button onClick={onClose}>Cancelar</Button>
           <Button variant="primary" loading={save.isPending} onClick={submit}>
-            <Save className="h-4 w-4" /> Guardar
+            <Save className="h-4 w-4" aria-hidden /> {product ? "Guardar cambios" : "Crear producto"}
           </Button>
         </>
       }
@@ -114,7 +116,7 @@ export function ProductFormDialog({ product, products, branches, onClose, onSave
         }}
       >
         <fieldset className="grid gap-3 sm:grid-cols-6">
-          <legend className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Producto</legend>
+          <legend className={cn(sectionLabelClass, "mb-2")}>Producto</legend>
           <Field label="Nombre comercial" error={err("name")} className="sm:col-span-3">
             <Input value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="Panadol Forte" aria-invalid={!!err("name")} />
           </Field>
@@ -159,7 +161,7 @@ export function ProductFormDialog({ product, products, branches, onClose, onSave
         </fieldset>
 
         <fieldset className="grid gap-3 sm:grid-cols-6">
-          <legend className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Presentaciones y precios (con IGV)</legend>
+          <legend className={cn(sectionLabelClass, "mb-2")}>Presentaciones y precios (con IGV)</legend>
           <Field label="Nombre de la unidad" hint="tableta, frasco, sobre…" className="sm:col-span-2">
             <Input value={f.unitName} onChange={(e) => set("unitName", e.target.value)} />
           </Field>
@@ -185,9 +187,9 @@ export function ProductFormDialog({ product, products, branches, onClose, onSave
             {presentations.filter((x) => x.price > 0).map((x) => {
               const m = marginPct(x.price, x.units, draft.cost);
               return (
-                <span key={x.label} className="rounded-xl bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
-                  {x.label}: <b className="tabular-nums text-zinc-900">{soles(x.price)}</b> · margen{" "}
-                  <b className={m < 15 ? "text-rose-600" : "text-emerald-700"}>{m.toFixed(0)} %</b>
+                <span key={x.label} className="rounded-xl bg-subtle px-3 py-2 text-caption text-fg-2">
+                  {x.label}: <b className="tabular-nums text-fg">{soles(x.price)}</b> · margen{" "}
+                  <b className={m < 15 ? "text-danger-fg" : "text-success-fg"}>{m.toFixed(0)} %</b>
                 </span>
               );
             })}
@@ -195,7 +197,7 @@ export function ProductFormDialog({ product, products, branches, onClose, onSave
         </fieldset>
 
         <fieldset className="grid gap-3 sm:grid-cols-6">
-          <legend className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Stock mínimo (unidades)</legend>
+          <legend className={cn(sectionLabelClass, "mb-2")}>Stock mínimo (unidades)</legend>
           <Field label="General" error={err("minStock")} hint="Se usa si el local no tiene uno propio" className="sm:col-span-2">
             <Input {...num("minStock", false)} />
           </Field>

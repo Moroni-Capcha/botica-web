@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, Banknote, ChevronRight, CreditCard, FileSpreadsheet, History, Lock, Plus, Receipt, Smartphone, Stethoscope, TriangleAlert, Wallet, type LucideIcon } from "lucide-react";
-import type { CashClosing, CashMovementType, PaymentMethod } from "@/lib/api/types";
+import type { CashClosing, CashMovementType, CashSaleRow, PaymentMethod } from "@/lib/api/types";
 import { netPayments, sumPayments } from "@/lib/domain/returns";
 import { errorMessage } from "@/lib/api";
 import { useAddCashMovement, useCashClosings, useCashSummary, useConfig, useOpenCash } from "@/lib/queries";
@@ -172,18 +172,7 @@ export function CashScreen() {
               ) : (
                 <Table maxHeight={460} minWidth={520} head={["Hora", "Comprobante", "Pago", "Atendió", { label: "Total", align: "right" }]}>
                   {data.sales.map((s) => (
-                    <tr key={s.id} className="h-11">
-                      <td className={cn(td, "py-1.5 tabular-nums text-muted")}>{timeShort(s.createdAt)}</td>
-                      <td className={cn(td, "whitespace-nowrap py-1.5 tabular-nums text-fg-2")}>
-                        {s.number}
-                        {s.hasPrescription && <Stethoscope className="ml-1.5 inline h-3.5 w-3.5 text-info-fg" role="img" aria-label="Con receta" />}
-                      </td>
-                      <td className={cn(td, "py-1.5")}>
-                        <PaymentChip method={s.method} />
-                      </td>
-                      <td className={cn(td, "py-1.5 text-caption text-fg-2")}>{s.sellerName}</td>
-                      <td className={cn(td, "py-1.5 text-right font-semibold tabular-nums")}>{soles(s.total)}</td>
-                    </tr>
+                    <SaleRow key={s.id} sale={s} />
                   ))}
                 </Table>
               )}
@@ -294,45 +283,9 @@ export function CashScreen() {
           <Empty icon={History} title={`Sin cierres en ${days} días`} />
         ) : (
           <Table maxHeight={480} minWidth={multi ? 1060 : 980} head={["Fecha", ...(multi ? ["Local"] : []), "Cerró", { label: "Tickets", align: "right" }, { label: "Efectivo", align: "right" }, { label: "Yape / Plin", align: "right" }, { label: "Tarjeta", align: "right" }, { label: "Devuelto", align: "right" }, { label: "Debe haber", align: "right" }, { label: "Contado", align: "right" }, { label: "Diferencia", align: "right" }, { label: <span className="sr-only">Ver</span> }]}>
-            {closings.data.map((c, i) => {
-              const diff = describeDifference(c.counted, c.expected);
-              return (
-                <tr
-                  key={c.id}
-                  tabIndex={0}
-                  onClick={() => setDetail(c)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      setDetail(c);
-                    }
-                  }}
-                  className={cn(rowButtonClass, "h-11", i < 8 && "animate-stagger-in")}
-                  style={i < 8 ? stagger(i) : undefined}
-                  aria-label={`Ver cierre del ${dateShort(c.closedAt)}`}
-                >
-                  <td className={cn(td, "whitespace-nowrap py-1.5 tabular-nums")}>
-                    {dateShort(c.closedAt)} <span className="text-caption text-muted">{timeShort(c.closedAt)}</span>
-                  </td>
-                  {multi && <td className={cn(td, "py-1.5 text-caption font-semibold")}>{branchName(c.branchId)}</td>}
-                  <td className={cn(td, "py-1.5 text-caption text-fg-2")}>{c.closedBy}</td>
-                  <td className={cn(td, "py-1.5 text-right tabular-nums text-fg-2")}>{c.tickets}</td>
-                  <td className={cn(td, "whitespace-nowrap py-1.5 text-right tabular-nums")}>{soles(c.sales.efectivo)}</td>
-                  <td className={cn(td, "whitespace-nowrap py-1.5 text-right tabular-nums")}>{soles(c.sales.yape)}</td>
-                  <td className={cn(td, "whitespace-nowrap py-1.5 text-right tabular-nums")}>{soles(c.sales.tarjeta)}</td>
-                  <td className={cn(td, "whitespace-nowrap py-1.5 text-right tabular-nums")}>{c.returns.count ? `−${soles(sumPayments(c.returns))}` : "—"}</td>
-                  <td className={cn(td, "whitespace-nowrap py-1.5 text-right tabular-nums")}>{soles(c.expected)}</td>
-                  <td className={cn(td, "whitespace-nowrap py-1.5 text-right tabular-nums")}>{soles(c.counted)}</td>
-                  <td className={cn(td, "whitespace-nowrap py-1.5 text-right font-semibold tabular-nums", TONE_CLASS[diff.tone].text)}>
-                    {c.difference > 0 ? "+" : ""}
-                    {soles(c.difference)} <span className="text-micro">{diff.label}</span>
-                  </td>
-                  <td className={cn(td, "py-1.5 text-right")}>
-                    <ChevronRight className="ml-auto h-4 w-4 text-muted" aria-hidden />
-                  </td>
-                </tr>
-              );
-            })}
+            {closings.data.map((c, i) => (
+              <ClosingRow key={c.id} closing={c} index={i} branchLabel={multi ? branchName(c.branchId) : null} onOpen={setDetail} />
+            ))}
           </Table>
         )}
       </Card>
@@ -466,3 +419,60 @@ function Kpi({ icon: Icon, label, value, hint, strong }: { icon: LucideIcon; lab
     </Card>
   );
 }
+
+const SaleRow = memo(function SaleRow({ sale: s }: { sale: CashSaleRow }) {
+  return (
+    <tr className="h-11">
+      <td className={cn(td, "py-1.5 tabular-nums text-muted")}>{timeShort(s.createdAt)}</td>
+      <td className={cn(td, "whitespace-nowrap py-1.5 tabular-nums text-fg-2")}>
+        {s.number}
+        {s.hasPrescription && <Stethoscope className="ml-1.5 inline h-3.5 w-3.5 text-info-fg" role="img" aria-label="Con receta" />}
+      </td>
+      <td className={cn(td, "py-1.5")}>
+        <PaymentChip method={s.method} />
+      </td>
+      <td className={cn(td, "py-1.5 text-caption text-fg-2")}>{s.sellerName}</td>
+      <td className={cn(td, "py-1.5 text-right font-semibold tabular-nums")}>{soles(s.total)}</td>
+    </tr>
+  );
+});
+
+/** Fila del historial de cierres. `memo` + `onOpen` estable: escribir un movimiento o cambiar el periodo no repinta las filas que siguen igual. */
+const ClosingRow = memo(function ClosingRow({ closing: c, index: i, branchLabel, onOpen }: { closing: CashClosing; index: number; branchLabel: string | null; onOpen: (c: CashClosing) => void }) {
+  const diff = describeDifference(c.counted, c.expected);
+  return (
+    <tr
+      tabIndex={0}
+      onClick={() => onOpen(c)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen(c);
+        }
+      }}
+      className={cn(rowButtonClass, "h-11", i < 8 && "animate-stagger-in")}
+      style={i < 8 ? stagger(i) : undefined}
+      aria-label={`Ver cierre del ${dateShort(c.closedAt)}`}
+    >
+      <td className={cn(td, "whitespace-nowrap py-1.5 tabular-nums")}>
+        {dateShort(c.closedAt)} <span className="text-caption text-muted">{timeShort(c.closedAt)}</span>
+      </td>
+      {branchLabel !== null && <td className={cn(td, "py-1.5 text-caption font-semibold")}>{branchLabel}</td>}
+      <td className={cn(td, "py-1.5 text-caption text-fg-2")}>{c.closedBy}</td>
+      <td className={cn(td, "py-1.5 text-right tabular-nums text-fg-2")}>{c.tickets}</td>
+      <td className={cn(td, "whitespace-nowrap py-1.5 text-right tabular-nums")}>{soles(c.sales.efectivo)}</td>
+      <td className={cn(td, "whitespace-nowrap py-1.5 text-right tabular-nums")}>{soles(c.sales.yape)}</td>
+      <td className={cn(td, "whitespace-nowrap py-1.5 text-right tabular-nums")}>{soles(c.sales.tarjeta)}</td>
+      <td className={cn(td, "whitespace-nowrap py-1.5 text-right tabular-nums")}>{c.returns.count ? `−${soles(sumPayments(c.returns))}` : "—"}</td>
+      <td className={cn(td, "whitespace-nowrap py-1.5 text-right tabular-nums")}>{soles(c.expected)}</td>
+      <td className={cn(td, "whitespace-nowrap py-1.5 text-right tabular-nums")}>{soles(c.counted)}</td>
+      <td className={cn(td, "whitespace-nowrap py-1.5 text-right font-semibold tabular-nums", TONE_CLASS[diff.tone].text)}>
+        {c.difference > 0 ? "+" : ""}
+        {soles(c.difference)} <span className="text-micro">{diff.label}</span>
+      </td>
+      <td className={cn(td, "py-1.5 text-right")}>
+        <ChevronRight className="ml-auto h-4 w-4 text-muted" aria-hidden />
+      </td>
+    </tr>
+  );
+});

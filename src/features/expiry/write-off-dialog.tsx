@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { PackageMinus } from "lucide-react";
+import { PackageMinus, Undo2 } from "lucide-react";
 import type { WriteOffType } from "@/lib/api/types";
 import { errorMessage } from "@/lib/api";
 import type { LotRisk } from "@/lib/domain/expiry";
@@ -13,6 +13,7 @@ import { Field, Input } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
 import { notify } from "@/components/ui/toast";
 import { dateShort, soles } from "@/lib/format";
+import { unitsText } from "./expiry-view";
 
 const DEFAULT_NOTE: Record<WriteOffType, (expired: boolean) => string> = {
   merma: (expired) => (expired ? "Producto vencido retirado de anaquel" : "Producto deteriorado"),
@@ -29,6 +30,10 @@ export function WriteOffDialog({ row, onClose }: { row: LotRisk; onClose: () => 
 
   const n = Math.min(row.lot.qty, Math.max(0, Number.parseInt(units, 10) || 0));
   const ok = n > 0 && note.trim().length >= 3;
+  const unitsError = n === 0 ? "Escribe cuántas unidades salen (al menos 1)." : undefined;
+  const noteError = note.trim().length < 3 ? "Escribe el motivo (al menos 3 letras)." : undefined;
+  const typed = Number.parseInt(units, 10) || 0;
+  const isMerma = type === "merma";
 
   const switchType = (t: WriteOffType) => {
     if (note === DEFAULT_NOTE[type](expired)) setNote(DEFAULT_NOTE[t](expired));
@@ -41,7 +46,7 @@ export function WriteOffDialog({ row, onClose }: { row: LotRisk; onClose: () => 
       { lotId: row.lot.id, input: { type, units: n, note: note.trim() } },
       {
         onSuccess: () => {
-          notify(type === "merma" ? `Baja de ${n} unid. registrada` : `Devolución de ${n} unid. registrada`);
+          notify(isMerma ? `Baja de ${n} unid. registrada` : `Devolución de ${n} unid. registrada`);
           onClose();
         },
       },
@@ -55,10 +60,15 @@ export function WriteOffDialog({ row, onClose }: { row: LotRisk; onClose: () => 
       onClose={onClose}
       footer={
         <>
-          {writeOff.error && <p className="mr-auto text-sm text-rose-600" role="alert">{errorMessage(writeOff.error)}</p>}
+          {writeOff.error && (
+            <p className="mr-auto text-sm text-danger-fg" role="alert">
+              {errorMessage(writeOff.error)}
+            </p>
+          )}
           <Button onClick={onClose}>Cancelar</Button>
-          <Button variant="dark" disabled={!ok} loading={writeOff.isPending} onClick={submit}>
-            <PackageMinus className="h-4 w-4" /> Registrar {n} unid.
+          <Button variant={isMerma ? "danger" : "primary"} disabled={!ok} loading={writeOff.isPending} onClick={submit}>
+            {isMerma ? <PackageMinus className="h-4 w-4" aria-hidden /> : <Undo2 className="h-4 w-4" aria-hidden />}
+            {isMerma ? "Dar de baja" : "Devolver"} {n} {n === 1 ? "unidad" : "unidades"}
           </Button>
         </>
       }
@@ -70,23 +80,42 @@ export function WriteOffDialog({ row, onClose }: { row: LotRisk; onClose: () => 
           submit();
         }}
       >
-        <Segmented<WriteOffType> full label="Tipo de salida" value={type} onChange={switchType} options={[{ id: "merma", label: "Baja / merma" }, { id: "devolucion", label: "Devolver al proveedor" }]} />
-        <p className="rounded-xl bg-zinc-50 p-3 text-xs leading-relaxed text-zinc-600">
-          {type === "merma"
+        <Segmented<WriteOffType>
+          full
+          label="Tipo de salida"
+          value={type}
+          onChange={switchType}
+          options={[
+            { id: "merma", label: "Baja / merma" },
+            { id: "devolucion", label: "Devolver al proveedor" },
+          ]}
+        />
+        <p className="rounded-xl bg-sunken p-3 text-caption leading-relaxed text-fg-2">
+          {isMerma
             ? "Las unidades salen del stock y quedan registradas con el motivo (vencido, roto o deteriorado). Guarda el producto para la destrucción según la norma de DIGEMID."
             : `Registra el canje con ${row.lot.supplier ?? "el proveedor"}. Las unidades salen del stock y quedan registradas como devolución.`}
         </p>
         <div className="grid grid-cols-[120px_1fr] gap-3">
-          <Field label="Unidades" hint={`Máx. ${row.lot.qty}`}>
-            <Input inputMode="numeric" value={units} onChange={(e) => setUnits(e.target.value.replace(/\D/g, ""))} className="tabular-nums" aria-invalid={n === 0} />
+          <Field label="Unidades" hint={typed > row.lot.qty ? `Máx. ${row.lot.qty}: se registrarán ${row.lot.qty}` : `Máx. ${row.lot.qty}`} error={unitsError}>
+            <Input data-autofocus inputMode="numeric" value={units} onChange={(e) => setUnits(e.target.value.replace(/\D/g, ""))} className="tabular-nums" aria-invalid={n === 0} />
           </Field>
-          <Field label="Motivo">
-            <Input value={note} onChange={(e) => setNote(e.target.value)} />
+          <Field label="Motivo" error={noteError}>
+            <Input value={note} onChange={(e) => setNote(e.target.value)} aria-invalid={!!noteError} />
           </Field>
         </div>
-        <p className="text-xs text-zinc-500">
-          Valor a costo: <b className="tabular-nums text-zinc-800">{soles(n * row.lot.cost)}</b>
-        </p>
+        <div className="grid gap-1 rounded-xl border border-line p-3 text-caption text-muted">
+          <p>
+            {isMerma ? "Se pierde, a costo" : "Se devuelve, a costo"}: <b className="text-small tabular-nums text-fg">{soles(n * row.lot.cost)}</b>
+          </p>
+          <p>
+            Quedarán en el lote: <b className="tabular-nums text-fg">{row.lot.qty - n}</b> {row.lot.qty - n === 1 ? "unidad" : "unidades"}
+          </p>
+        </div>
+        {isMerma && ok && (
+          <p className="text-caption text-danger-fg" role="status">
+            Vas a dar de baja {unitsText(n)} de {row.product.name}. Queda en el kardex y no se puede deshacer.
+          </p>
+        )}
         <button type="submit" className="hidden" aria-hidden tabIndex={-1} />
       </form>
     </Dialog>

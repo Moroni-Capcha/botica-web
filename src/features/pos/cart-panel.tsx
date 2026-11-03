@@ -1,5 +1,6 @@
 "use client";
 
+import { memo, useRef } from "react";
 import { Banknote, Box, Minus, Plus, ScanBarcode, ShoppingCart, Sparkles, Stethoscope, Trash2, X } from "lucide-react";
 import type { Customer, Product } from "@/lib/api/types";
 import type { CartLine, Totals } from "@/lib/domain/pharmacy";
@@ -13,6 +14,7 @@ import { dateShort, soles } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { useAnimatedList } from "@/lib/use-animated-list";
 import { useValuePulse } from "@/lib/use-value-pulse";
+import { useFlipList } from "@/lib/use-flip-list";
 import { stagger } from "@/lib/motion";
 
 interface CartPanelProps {
@@ -35,8 +37,10 @@ interface CartPanelProps {
   staggerLines?: boolean;
 }
 
-export function CartPanel({ lines, totals, customer, onCustomer, onQty, onClear, onCharge, canCharge, writable = true, cashOpen, equivalents, onAddEquivalent, onClose, titleId, staggerLines }: CartPanelProps) {
+export const CartPanel = memo(function CartPanel({ lines, totals, customer, onCustomer, onQty, onClear, onCharge, canCharge, writable = true, cashOpen, equivalents, onAddEquivalent, onClose, titleId, staggerLines }: CartPanelProps) {
   const rows = useAnimatedList(lines);
+  const listRef = useRef<HTMLUListElement>(null);
+  useFlipList(listRef, rows);
   const totalRef = useValuePulse<HTMLSpanElement>(totals.total);
   const chargeRef = useValuePulse<HTMLSpanElement>(totals.total);
   return (
@@ -69,63 +73,9 @@ export function CartPanel({ lines, totals, customer, onCustomer, onQty, onClear,
             <p className="-mt-6 pb-8 text-center text-caption text-muted">F2 para buscar · Enter para agregar</p>
           </>
         ) : (
-          <ul className="divide-y divide-line-soft">
-            {rows.map(({ key, item: l, exiting, isNew }, idx) => (
-              <li
-                key={key}
-                inert={exiting}
-                aria-hidden={exiting || undefined}
-                className={cn(
-                  "grid transition-[grid-template-rows,opacity,transform] duration-[var(--dur-fast)] ease-[var(--ease-out)]",
-                  exiting ? "-translate-x-3 grid-rows-[0fr] opacity-0" : "grid-rows-[1fr]",
-                  isNew && "animate-line-in",
-                  staggerLines && !isNew && !exiting && idx < 6 && "animate-stagger-in",
-                )}
-                style={staggerLines && !isNew && idx < 6 ? stagger(idx) : undefined}
-              >
-                <div className="min-h-0 overflow-hidden">
-                  <div className="px-4 py-3">
-                    <div className="flex items-start gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold leading-tight">
-                          {l.product.name} <span className="font-normal text-muted">{l.product.conc}</span>
-                        </p>
-                        <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted">
-                          {l.pres.label} · {soles(l.pres.price)} <RxBadge rx={l.product.rx} />
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold tabular-nums">{soles(l.total)}</p>
-                        {l.discount > 0 && <p className="text-micro tabular-nums text-muted line-through">{soles(l.gross)}</p>}
-                      </div>
-                    </div>
-                    <div className="mt-2 flex items-center gap-2">
-                      <div className="flex items-center rounded-lg border border-line">
-                        <IconButton size="sm" onClick={() => onQty(l.key, l.qty - 1)} className="rounded-r-none text-fg-2" aria-label="Quitar uno">
-                          <Minus className="h-3.5 w-3.5" aria-hidden />
-                        </IconButton>
-                        <span className="w-8 text-center text-sm font-semibold tabular-nums" aria-live="polite">{l.qty}</span>
-                        <IconButton size="sm" onClick={() => onQty(l.key, l.qty + 1)} className="rounded-l-none text-fg-2" aria-label="Agregar uno">
-                          <Plus className="h-3.5 w-3.5" aria-hidden />
-                        </IconButton>
-                      </div>
-                      <span className="text-micro text-muted">{l.units} unid.</span>
-                      <IconButton size="sm" tone="danger" onClick={() => onQty(l.key, 0)} className="ml-auto" aria-label={`Quitar ${l.product.name}`}>
-                        <Trash2 className="h-4 w-4" aria-hidden />
-                      </IconButton>
-                    </div>
-                    <div className="mt-2 grid gap-1">
-                      {l.alloc.map((a) => (
-                        <p key={a.lotId} className="flex items-center gap-1.5 text-micro text-muted">
-                          <Box className="h-3 w-3" aria-hidden /> Lote {a.code} · vence {dateShort(a.expiresOn)} · {a.units} u
-                          {a.discount > 0 && <Chip tone="danger" className="rounded px-1 py-0">-{Math.round(a.discount * 100)} %</Chip>}
-                        </p>
-                      ))}
-                      {l.missing > 0 && <p className="text-micro font-semibold text-danger-fg">Faltan {l.missing} unidades en este local</p>}
-                    </div>
-                  </div>
-                </div>
-              </li>
+          <ul ref={listRef} className="divide-y divide-line-soft">
+            {rows.map(({ key, item, exiting, isNew }, idx) => (
+              <CartLineRow key={key} line={item} exiting={exiting} isNew={isNew} intro={staggerLines && !isNew && !exiting && idx < 6 ? idx : undefined} onQty={onQty} />
             ))}
           </ul>
         )}
@@ -189,4 +139,75 @@ export function CartPanel({ lines, totals, customer, onCustomer, onQty, onClear,
       </div>
     </div>
   );
+});
+
+interface CartLineRowProps {
+  line: CartLine;
+  exiting: boolean;
+  isNew: boolean;
+  /** Posición para la entrada escalonada (solo la hoja del móvil); sin valor, no se escalona. */
+  intro: number | undefined;
+  onQty: (key: string, qty: number) => void;
 }
+
+/**
+ * Una línea del carrito. Con `memo` y `onQty` estable, escribir en el buscador o cambiar otra línea no la vuelve a pintar.
+ * La salida es solo opacidad + translate3d; el resto de la lista sube con FLIP (`useFlipList`), nunca animando alto ni márgenes.
+ */
+const CartLineRow = memo(function CartLineRow({ line, exiting, isNew, intro, onQty }: CartLineRowProps) {
+  return (
+    <li
+      data-flip-key={line.key}
+      inert={exiting}
+      aria-hidden={exiting || undefined}
+      className={cn(
+        "transition-[opacity,transform] duration-[var(--dur-fast)] ease-[var(--ease-out)]",
+        exiting && "will-change-[transform,opacity] opacity-0 [transform:translate3d(-12px,0,0)]",
+        isNew && "animate-line-in",
+        intro !== undefined && "animate-stagger-in",
+      )}
+      style={intro !== undefined ? stagger(intro) : undefined}
+    >
+      <div className="px-4 py-3">
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold leading-tight">
+              {line.product.name} <span className="font-normal text-muted">{line.product.conc}</span>
+            </p>
+            <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted">
+              {line.pres.label} · {soles(line.pres.price)} <RxBadge rx={line.product.rx} />
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm font-semibold tabular-nums">{soles(line.total)}</p>
+            {line.discount > 0 && <p className="text-micro tabular-nums text-muted line-through">{soles(line.gross)}</p>}
+          </div>
+        </div>
+        <div className="mt-2 flex items-center gap-2">
+          <div className="flex items-center rounded-lg border border-line">
+            <IconButton size="sm" onClick={() => onQty(line.key, line.qty - 1)} className="rounded-r-none text-fg-2" aria-label="Quitar uno">
+              <Minus className="h-3.5 w-3.5" aria-hidden />
+            </IconButton>
+            <span className="w-8 text-center text-sm font-semibold tabular-nums" aria-live="polite">{line.qty}</span>
+            <IconButton size="sm" onClick={() => onQty(line.key, line.qty + 1)} className="rounded-l-none text-fg-2" aria-label="Agregar uno">
+              <Plus className="h-3.5 w-3.5" aria-hidden />
+            </IconButton>
+          </div>
+          <span className="text-micro text-muted">{line.units} unid.</span>
+          <IconButton size="sm" tone="danger" onClick={() => onQty(line.key, 0)} className="ml-auto" aria-label={`Quitar ${line.product.name}`}>
+            <Trash2 className="h-4 w-4" aria-hidden />
+          </IconButton>
+        </div>
+        <div className="mt-2 grid gap-1">
+          {line.alloc.map((a) => (
+            <p key={a.lotId} className="flex items-center gap-1.5 text-micro text-muted">
+              <Box className="h-3 w-3" aria-hidden /> Lote {a.code} · vence {dateShort(a.expiresOn)} · {a.units} u
+              {a.discount > 0 && <Chip tone="danger" className="rounded px-1 py-0">-{Math.round(a.discount * 100)} %</Chip>}
+            </p>
+          ))}
+          {line.missing > 0 && <p className="text-micro font-semibold text-danger-fg">Faltan {line.missing} unidades en este local</p>}
+        </div>
+      </div>
+    </li>
+  );
+});

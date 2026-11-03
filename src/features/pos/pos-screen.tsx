@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Search, TriangleAlert, Wallet, WifiOff, X } from "lucide-react";
-import type { Lot, Product, Sale, SaleRequest } from "@/lib/api/types";
+import type { Customer, Lot, Product, Sale, SaleRequest } from "@/lib/api/types";
 import { errorMessage } from "@/lib/api";
 import { useBranchStock, useCash, useConfig, useCreateSale, useLots, useOpenCash, useProducts, useWritable } from "@/lib/queries";
 import { useOperatingBranch, useSessionStore } from "@/lib/auth/session-store";
@@ -20,7 +20,8 @@ import { Input, Select, inputClass } from "@/components/ui/field";
 import { notify } from "@/components/ui/toast";
 import { soles } from "@/lib/format";
 import { cn } from "@/lib/cn";
-import { animateIn } from "@/lib/motion";
+import { animateIn, POP_KEYFRAMES } from "@/lib/motion";
+import { useStableCallback } from "@/lib/use-stable-callback";
 import { useBranchCart, useCartStore } from "./cart-store";
 import { ProductCard } from "./product-card";
 import { CartPanel } from "./cart-panel";
@@ -104,6 +105,13 @@ export function PosScreen() {
     return m;
   }, [branchStock.data, branchId, branches]);
 
+  /** Por producto, el otro local ya con su nombre; el objeto no cambia entre renders para que `ProductCard` (memo) no se repinte. */
+  const otherBranchOf = useMemo(() => {
+    const m = new Map<number, { id: string; name: string; units: number; toId: string }>();
+    for (const [productId, o] of otherStock) m.set(productId, { id: o.branchId, name: branches.find((b) => b.id === o.branchId)?.name ?? o.branchId, units: o.units, toId: branchId });
+    return m;
+  }, [otherStock, branches, branchId]);
+
   const results = useMemo(() => {
     const s = q.trim().toLowerCase();
     return productList.filter((p) => {
@@ -137,7 +145,7 @@ export function PosScreen() {
       }
       addToCart(branchId, p.id, pres.id, qty);
       setLastAdded(p.id);
-      animateIn(el, [{ transform: "scale(0.94)" }, { transform: "scale(1)" }], { duration: 200 });
+      animateIn(el, POP_KEYFRAMES, { duration: 200 });
     },
     [stockInfo, lines, addToCart, branchId],
   );
@@ -153,6 +161,10 @@ export function PosScreen() {
     }
     setQty(branchId, key, qty);
   };
+
+  /* Manejadores con identidad fija: escribir en el buscador o agregar un producto no repinta todas las tarjetas ni todas las líneas. */
+  const onAddCard = useStableCallback((prod: Product, pres: Parameters<typeof findPresentation>[1], el: HTMLElement) => add(prod, pres, el));
+  const onQtyStable = useStableCallback(changeQty);
 
   const onSearchKey = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.nativeEvent.isComposing) return;
@@ -201,10 +213,14 @@ export function PosScreen() {
     hadDialog.current = dialogOpen;
   }, [dialogOpen]);
 
-  const closeCart = () => {
+  const closeCart = useStableCallback(() => {
     setCartOpen(false);
     fabRef.current?.focus();
-  };
+  });
+  const openPaymentStable = useStableCallback(openPayment);
+  const onCustomerStable = useStableCallback((c: Customer | null) => setCustomer(branchId, c));
+  const onClearStable = useStableCallback(() => clear(branchId));
+  const onAddEquivalent = useStableCallback((p: Product) => add(p, "unidad"));
 
   const finishSale = () => {
     attempt.current = null;
@@ -270,15 +286,15 @@ export function PosScreen() {
       lines={lines}
       totals={totals}
       customer={cart.customer}
-      onCustomer={(c) => setCustomer(branchId, c)}
-      onQty={changeQty}
-      onClear={() => clear(branchId)}
-      onCharge={openPayment}
+      onCustomer={onCustomerStable}
+      onQty={onQtyStable}
+      onClear={onClearStable}
+      onCharge={openPaymentStable}
       canCharge={canCharge}
       writable={writable}
       cashOpen={cashOpen}
       equivalents={equivalents}
-      onAddEquivalent={(p) => add(p, "unidad")}
+      onAddEquivalent={onAddEquivalent}
       onClose={closeCart}
       titleId={titleId}
       staggerLines={!!titleId}
@@ -361,13 +377,10 @@ export function PosScreen() {
                 minStock={minFor(p, branchId)}
                 nextLot={next}
                 hasExpiredOnly={info?.expiredOnly ?? false}
-                otherBranch={(() => {
-                  const o = otherStock.get(p.id);
-                  return o ? { id: o.branchId, name: branches.find((b) => b.id === o.branchId)?.name ?? o.branchId, units: o.units, toId: branchId } : null;
-                })()}
+                otherBranch={otherBranchOf.get(p.id) ?? null}
                 sellFirst={!!next && (next.discount > 0 || (days !== null && days <= DEFAULT_THRESHOLDS.red))}
                 now={now}
-                onAdd={(prod, pres, el) => add(prod, pres, el)}
+                onAdd={onAddCard}
                 introIndex={intro instanceof Map ? intro.get(p.id) : undefined}
               />
             );

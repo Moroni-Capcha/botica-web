@@ -58,7 +58,7 @@ export function PaymentDialog({ totals, itemsCount, customer, yapeNumber, submit
   const changeRef = useRef<HTMLDivElement>(null);
   const wasEnough = useRef(false);
   useEffect(() => {
-    if (enough && !wasEnough.current) animateIn(changeRef.current, [{ opacity: 0.4, transform: "scale(0.97)" }, { opacity: 1, transform: "none" }], { duration: 200 });
+    if (enough && !wasEnough.current) animateIn(changeRef.current, [{ opacity: 0.4, transform: "scale3d(0.97, 0.97, 1)" }, { opacity: 1, transform: "scale3d(1, 1, 1)" }], { duration: 200 });
     wasEnough.current = enough;
   }, [enough]);
 

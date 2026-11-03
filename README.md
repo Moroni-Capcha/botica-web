@@ -86,12 +86,16 @@ El movimiento se siente, no se mira: rápido, con un propósito y sin estorbar a
 | `--dur-fast` | 140 ms | Salidas (diálogo, aviso, hoja), cambios de color, cambio de contenido (`animate-swap-in`) |
 | `--dur-base` | 200 ms | Entradas (`animate-pop`, `animate-fade`, `animate-line-in`, `animate-stagger-in`) |
 | `--dur-slow` | 320 ms | Solo el temblor de error (`animate-shake`). Nunca en la interfaz normal |
-| `--ease-out` | `cubic-bezier(0.23, 1, 0.32, 1)` | Todo. En JavaScript, `EASE_OUT` |
+| `--ease-out` | `cubic-bezier(0.16, 1, 0.3, 1)` | Todo (también es la curva por defecto de `transition`). En JavaScript, `EASE_OUT` |
 
 Reglas:
 
 - Menos de 300 ms. Las salidas son más rápidas y suaves que las entradas.
-- Solo `transform` y `opacity`; nunca `transition: all`. Nada nace de `scale(0)`: se parte de 0,95 o más y con opacidad 0.
+- Solo `transform` (`translate3d`, `scale3d`) y `opacity`, que corren en la GPU. Nunca `width`, `height`, `margin`, `padding`, `top/left` ni `grid-template-rows`, ni `transition: all`. Las barras de avance usan `transform: scaleX` con `origin-left`. Nada nace de `scale(0)`: se parte de 0,95 o más y con opacidad 0.
+- Curva `--ease-out` (expo-out) en todo; sin curvas propias. Un "resorte" corto se hace con un rebote de escala (0,96 → 1,01 → 1, `POP_KEYFRAMES`) solo donde aporta, como al agregar al carrito.
+- Lo que sale de una lista hace fundido + `translate3d`; lo que queda sube con FLIP (`useFlipList` / `playFlip` de `src/lib/motion.ts`), nunca animando el alto.
+- `will-change` solo mientras anima (`animateIn` lo pone y lo quita), nunca fijo en una clase.
+- Sin renders de más: `Pulse`, `useValuePulse` y `useFlipList` usan refs y la API de animaciones (no estado); las filas de listas van en `memo` con manejadores estables (`useStableCallback`).
 - "Reducir movimiento" se respeta en CSS (queda solo el cambio de opacidad) y en JavaScript: usa `animateIn`, `stagger` y `usePresence` de `src/lib/motion.ts` y `ui/presence.ts`, nunca `.animate()` directo.
 - El `Dialog` hace su salida solo, aunque quien lo usa lo desmonte. Un aviso o una hoja propios usan `usePresence(open, ms)`.
 - El escalonado (`stagger`) es solo para listas cortas que aparecen tras cargar datos, una vez; nunca en lo que cambia seguido.

@@ -1,44 +1,46 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { FileSpreadsheet, Package, PackageX, Plus, Search, Snowflake, Tag, TriangleAlert, Wallet, type LucideIcon } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { CalendarClock, FileSpreadsheet, PackageX, Plus, Search, Tag, TriangleAlert, Wallet, X } from "lucide-react";
 import type { Product } from "@/lib/api/types";
 import { errorMessage } from "@/lib/api";
 import { useConfig, useProducts } from "@/lib/queries";
-import { groupInventory, inventoryRows, minFor, type InventoryRow } from "@/lib/domain/inventory";
-import { daysUntil, DEFAULT_THRESHOLDS, round2, stockLabel } from "@/lib/domain/pharmacy";
+import { groupInventory, inventoryRows } from "@/lib/domain/inventory";
+import { DEFAULT_THRESHOLDS, round2 } from "@/lib/domain/pharmacy";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Empty } from "@/components/ui/empty";
 import { Input, Select } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
 import { Table, rowButtonClass, td } from "@/components/ui/table";
-import { ExpiryBadge, RxBadge } from "@/components/ui/badges";
 import { notify } from "@/components/ui/toast";
 import { soles } from "@/lib/format";
 import { cn } from "@/lib/cn";
+import { useMediaQuery } from "@/lib/use-media-query";
+import { useStableCallback } from "@/lib/use-stable-callback";
 import { ScopeToggle, useBranchLots, useBranchScope } from "@/features/shared/branch-scope";
-import { exportInventory, STATUS_LABEL } from "./export";
+import { exportInventory } from "./export";
+import { Kpi, ProductCard, ProductRow, type RowShared } from "./inventory-rows";
 import { ProductDetailDialog } from "./product-detail-dialog";
 import { ProductFormDialog } from "./product-form-dialog";
+import { BRANCH_STOCK_CLASS, branchStockTone, shouldFocusSearch } from "./stock-tone";
 
 type GroupBy = "producto" | "lab" | "category";
 type StatusFilter = "todos" | "bajo" | "agotado" | "vencido" | "receta";
 
-const STATUS_CLASS: Record<InventoryRow["status"], string> = {
-  agotado: "bg-zinc-900 text-white",
-  bajo: "bg-amber-100 text-amber-800",
-  ok: "bg-emerald-50 text-emerald-700",
-};
 const fmtInt = (n: number) => n.toLocaleString("es-PE");
+const isEditable = (el: Element | null) =>
+  !!el && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement || (el instanceof HTMLElement && el.isContentEditable));
 
 export function InventoryScreen() {
   const scope = useBranchScope();
-  const { allBranches, ids: branchIds, multi, isAdmin, operating, branches, branchName } = scope;
+  const { allBranches, ids: branchIds, multi, isAdmin, operating, branchName } = scope;
   const config = useConfig();
   const products = useProducts();
   const lotsQ = useBranchLots(branchIds);
   const [now] = useState(() => Date.now());
   const thresholds = config.data?.expiry ?? DEFAULT_THRESHOLDS;
+  const wide = useMediaQuery("(min-width: 768px)");
 
   const [q, setQ] = useState("");
   const [lab, setLab] = useState("Todos");
@@ -48,13 +50,15 @@ export function InventoryScreen() {
   const [groupBy, setGroupBy] = useState<GroupBy>("producto");
   const [detailId, setDetailId] = useState<number | null>(null);
   const [editing, setEditing] = useState<Product | "new" | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
-  const productList = products.data ?? [];
+  const productList = useMemo(() => products.data ?? [], [products.data]);
   const all = useMemo(() => inventoryRows(productList, lotsQ.lots, branchIds, now), [productList, lotsQ.lots, branchIds, now]);
   const options = useMemo(() => {
     const uniq = (f: (p: Product) => string) => [...new Set(productList.map(f))].sort((a, b) => a.localeCompare(b));
     return { labs: uniq((p) => p.lab), categories: uniq((p) => p.category), forms: uniq((p) => p.form) };
   }, [productList]);
+  const names = useMemo(() => Object.fromEntries(allBranches.map((b) => [b.id, b.name])), [allBranches]);
 
   /* Laboratorio, tipo, forma y búsqueda filtran todo (tarjetas, tabla y Excel) */
   const base = useMemo(() => {
@@ -98,27 +102,86 @@ export function InventoryScreen() {
   const error = products.error ?? lotsQ.error;
   const detail = detailId !== null ? productList.find((p) => p.id === detailId) : undefined;
 
+  /* Escalonado de la primera carga: solo las primeras 8 filas y una vez por montaje. Filtrar o buscar no lo repite. */
+  const staggerIds = useRef<Map<number, number> | null>(null);
+  if (!isLoading && staggerIds.current === null) staggerIds.current = new Map(rows.slice(0, 8).map((r, i) => [r.product.id, i]));
+
+  /* F2 o / llevan al buscador (no con un diálogo abierto ni mientras se escribe en otro campo) */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const active = document.activeElement;
+      if (!shouldFocusSearch(e, { dialogOpen: !!document.querySelector('[aria-modal="true"]'), inEditable: isEditable(active), inSearch: !!active && active === searchRef.current })) return;
+      e.preventDefault();
+      searchRef.current?.focus();
+      searchRef.current?.select();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
+  const hasFilters = q.trim() !== "" || lab !== "Todos" || category !== "Todos" || form !== "Todos" || (groupBy === "producto" && status !== "todos");
+  const clearFilters = () => {
+    setQ("");
+    setLab("Todos");
+    setCategory("Todos");
+    setForm("Todos");
+    setStatus("todos");
+  };
+  const quickFilter = (f: StatusFilter) => {
+    setGroupBy("producto");
+    setStatus(status === f ? "todos" : f);
+  };
+
   const doExport = () => {
     exportInventory({ rows: base, lots: lotsQ.lots, branches: allBranches, branchIds, scopeLabel: scope.label, pharmacy: config.data?.pharmacy });
     notify("Inventario valorizado descargado");
   };
 
+  const onOpen = useStableCallback((id: number) => setDetailId(id));
+  const onEdit = useStableCallback((p: Product) => setEditing(p));
+  const shared: RowShared = { multi, branchIds, names, operating, thresholds, now, canEdit: isAdmin, onOpen, onEdit };
+  const stagFor = (id: number) => staggerIds.current?.get(id) ?? -1;
+
   if (error) {
     return (
-      <Empty icon={TriangleAlert} title="No se pudo cargar el inventario">
-        {errorMessage(error)}{" "}
-        <button type="button" className="font-semibold underline" onClick={() => void Promise.all([products.refetch(), lotsQ.refetch()])}>
-          Reintentar
-        </button>
-      </Empty>
+      <div className="mx-auto max-w-7xl p-4 sm:p-6">
+        <Card padding="none">
+          <Empty icon={TriangleAlert} title="No se pudo cargar el inventario">
+            {errorMessage(error)}{" "}
+            <button type="button" className="font-semibold underline" onClick={() => void Promise.all([products.refetch(), lotsQ.refetch()])}>
+              Reintentar
+            </button>
+          </Empty>
+        </Card>
+      </div>
     );
   }
 
+  const countText = isLoading
+    ? ""
+    : groupBy === "producto"
+      ? `${fmtInt(rows.length)}${rows.length !== kpi.products ? ` de ${fmtInt(kpi.products)}` : ""} ${kpi.products === 1 ? "producto" : "productos"}`
+      : `${fmtInt(groups.length)} ${groups.length === 1 ? "grupo" : "grupos"}`;
+
   return (
     <div className="mx-auto grid max-w-7xl gap-4 p-4 sm:p-6">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi icon={Package} label="Productos" value={fmtInt(kpi.products)} hint={`${fmtInt(kpi.lots)} lotes con stock${multi ? ` en ${branchIds.length} locales` : ""}`} loading={isLoading} />
+      <div className="flex flex-wrap items-center gap-2">
+        {isAdmin && <ScopeToggle scope={scope.scope} onChange={scope.setScope} operatingName={branchName(operating)} />}
+        <div className="flex flex-wrap gap-2 sm:ml-auto">
+          <Button onClick={doExport} disabled={isLoading || base.length === 0}>
+            <FileSpreadsheet className="h-4 w-4 text-success-fg" aria-hidden /> Inventario valorizado
+          </Button>
+          {isAdmin && (
+            <Button variant="primary" onClick={() => setEditing("new")}>
+              <Plus className="h-4 w-4" aria-hidden /> Nuevo producto
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-[minmax(0,1.6fr)_repeat(4,minmax(0,1fr))]" aria-busy={isLoading}>
         <Kpi
+          strong
           icon={Wallet}
           label="Inventario a costo"
           value={soles(kpi.valueCost)}
@@ -127,38 +190,82 @@ export function InventoryScreen() {
         />
         <Kpi icon={Tag} label="A precio de venta" value={soles(kpi.valueRetail)} hint="Solo stock vigente, por unidad" loading={isLoading} />
         <Kpi
-          icon={PackageX}
-          label="Agotados o bajo mínimo"
-          value={fmtInt(kpi.alerts)}
-          hint={kpi.out ? `${kpi.out} agotados` : "Ninguno agotado"}
-          tone={kpi.alerts ? "amber" : undefined}
+          icon={TriangleAlert}
+          label="Bajo mínimo"
+          value={fmtInt(kpi.count("bajo"))}
+          hint="Productos por reponer"
+          valueClass={kpi.count("bajo") ? "text-warning-fg" : undefined}
           loading={isLoading}
-          onClick={() => {
-            setGroupBy("producto");
-            setStatus(status === "bajo" ? "todos" : "bajo");
-          }}
+          active={groupBy === "producto" && status === "bajo"}
+          onClick={() => quickFilter("bajo")}
+        />
+        <Kpi
+          icon={PackageX}
+          label="Agotados"
+          value={fmtInt(kpi.out)}
+          hint={kpi.out ? "Sin stock vigente" : "Ninguno agotado"}
+          valueClass={kpi.out ? "text-danger-fg" : undefined}
+          loading={isLoading}
+          active={groupBy === "producto" && status === "agotado"}
+          onClick={() => quickFilter("agotado")}
+        />
+        <Kpi
+          icon={CalendarClock}
+          label="Con vencidos"
+          value={fmtInt(kpi.count("vencido"))}
+          hint={`${fmtInt(kpi.expiredUnits)} unid. vencidas`}
+          valueClass={kpi.expiredUnits ? "text-danger-fg" : undefined}
+          loading={isLoading}
+          active={groupBy === "producto" && status === "vencido"}
+          onClick={() => quickFilter("vencido")}
         />
       </div>
 
-      <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white" aria-label="Inventario">
-        <div className="grid gap-3 border-b border-zinc-100 p-4 sm:px-5">
+      <Card as="section" padding="none" className="overflow-hidden" aria-labelledby="inv-title">
+        <div className="grid gap-3 border-b border-line-soft p-4 sm:px-5">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+            <h2 id="inv-title" className="font-semibold tracking-tight">
+              Productos
+            </h2>
+            <p className="text-caption tabular-nums text-muted" aria-live="polite" role="status">
+              {countText}
+              {!isLoading && ` · ${fmtInt(kpi.lots)} lotes con stock${multi ? ` en ${branchIds.length} locales` : ""}`}
+            </p>
+          </div>
           <div className="flex flex-wrap gap-2">
             <div className="relative min-w-0 flex-1 basis-64">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nombre, principio activo, laboratorio o código de barras" className="pl-9" aria-label="Buscar producto" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden />
+              <Input
+                ref={searchRef}
+                type="search"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Nombre, principio activo, laboratorio o código de barras"
+                className="pl-9 pr-12"
+                aria-label="Buscar producto"
+                aria-keyshortcuts="F2"
+              />
+              <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded-md border border-line bg-sunken px-1.5 text-micro font-semibold text-muted sm:pointer-fine:inline-block" aria-hidden>
+                F2
+              </kbd>
             </div>
-            <Select value={lab} onChange={(e) => setLab(e.target.value)} className="min-w-0 flex-1 sm:w-44 sm:flex-none" aria-label="Laboratorio o marca">
+            <Select value={lab} onChange={(e) => setLab(e.target.value)} className="min-w-0 flex-1 sm:w-56 sm:flex-none" aria-label="Laboratorio o marca">
               <option value="Todos">Todos los laboratorios</option>
               {options.labs.map((x) => <option key={x}>{x}</option>)}
             </Select>
-            <Select value={category} onChange={(e) => setCategory(e.target.value)} className="min-w-0 flex-1 sm:w-40 sm:flex-none" aria-label="Tipo de producto">
+            <Select value={category} onChange={(e) => setCategory(e.target.value)} className="min-w-0 flex-1 sm:w-48 sm:flex-none" aria-label="Tipo de producto">
               <option value="Todos">Todos los tipos</option>
               {options.categories.map((x) => <option key={x}>{x}</option>)}
             </Select>
-            <Select value={form} onChange={(e) => setForm(e.target.value)} className="min-w-0 flex-1 sm:w-36 sm:flex-none" aria-label="Forma farmacéutica">
+            <Select value={form} onChange={(e) => setForm(e.target.value)} className="min-w-0 flex-1 sm:w-48 sm:flex-none" aria-label="Forma farmacéutica">
               <option value="Todos">Todas las formas</option>
               {options.forms.map((x) => <option key={x}>{x}</option>)}
             </Select>
+            {hasFilters && (
+              <Button variant="ghost" onClick={clearFilters}>
+                <X className="h-4 w-4" aria-hidden /> Limpiar filtros
+              </Button>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Segmented<GroupBy>
@@ -171,42 +278,40 @@ export function InventoryScreen() {
                 { id: "category", label: "Por tipo" },
               ]}
             />
-            {isAdmin && <ScopeToggle scope={scope.scope} onChange={scope.setScope} operatingName={branchName(operating)} />}
-            <div className="flex flex-wrap gap-2 sm:ml-auto">
-              {isAdmin && (
-                <Button variant="primary" onClick={() => setEditing("new")}>
-                  <Plus className="h-4 w-4" /> Nuevo producto
-                </Button>
-              )}
-              <Button onClick={doExport} disabled={isLoading || base.length === 0}>
-                <FileSpreadsheet className="h-4 w-4 text-emerald-600" /> Inventario valorizado
-              </Button>
-            </div>
+            {groupBy === "producto" && (
+              <Segmented<StatusFilter>
+                label="Estado"
+                value={status}
+                onChange={setStatus}
+                options={(["todos", "bajo", "agotado", "vencido", "receta"] as const).map((id) => ({
+                  id,
+                  label: { todos: "Todos", bajo: "Bajo mínimo", agotado: "Agotados", vencido: "Con vencidos", receta: "Con receta" }[id],
+                  count: isLoading ? undefined : kpi.count(id),
+                }))}
+              />
+            )}
           </div>
-          {groupBy === "producto" && (
-            <Segmented<StatusFilter>
-              label="Estado"
-              value={status}
-              onChange={setStatus}
-              options={(["todos", "bajo", "agotado", "vencido", "receta"] as const).map((id) => ({
-                id,
-                label: { todos: "Todos", bajo: "Bajo mínimo", agotado: "Agotados", vencido: "Con vencidos", receta: "Con receta" }[id],
-                count: isLoading ? undefined : kpi.count(id),
-              }))}
-            />
-          )}
         </div>
 
         {isLoading ? (
           <div className="grid gap-2 p-4 sm:p-5" aria-busy="true">
-            {Array.from({ length: 8 }, (_, i) => <div key={i} className="h-12 animate-pulse rounded-xl bg-zinc-100" />)}
+            {Array.from({ length: 8 }, (_, i) => <div key={i} className="h-12 animate-pulse rounded-xl bg-sunken" />)}
           </div>
         ) : groupBy === "producto" ? (
           rows.length === 0 ? (
-            <Empty icon={Search} title="Sin productos para este filtro" />
-          ) : (
+            <Empty icon={Search} title={hasFilters ? "Sin productos con estos filtros" : "Aún no hay productos"}>
+              {hasFilters ? (
+                <button type="button" className="font-semibold underline" onClick={clearFilters}>
+                  Limpiar filtros
+                </button>
+              ) : (
+                isAdmin && "Crea el primero con “Nuevo producto”."
+              )}
+            </Empty>
+          ) : wide ? (
             <Table
-              minWidth={multi ? 1120 : 980}
+              maxHeight={640}
+              minWidth={multi ? 1180 : 1040}
               head={[
                 "Producto",
                 "Tipo",
@@ -214,76 +319,31 @@ export function InventoryScreen() {
                 "Próx. vencimiento",
                 { label: "Valor costo", align: "right" },
                 { label: "Precio u.", align: "right" },
-                "Estado",
+                { label: <span className="sr-only">Acciones</span> },
               ]}
             >
-              {rows.map((r) => {
-                const p = r.product;
-                return (
-                  <tr
-                    key={p.id}
-                    tabIndex={0}
-                    onClick={() => setDetailId(p.id)}
-                    onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setDetailId(p.id))}
-                    className={rowButtonClass}
-                    aria-label={`Ver ficha de ${p.name} ${p.conc}`}
-                  >
-                    <td className={td}>
-                      <p className="flex flex-wrap items-center gap-1.5 font-medium">
-                        {p.name} <span className="font-normal text-zinc-500">{p.conc}</span>
-                        <RxBadge rx={p.rx} />
-                        {p.coldChain && <Snowflake className="h-3.5 w-3.5 text-sky-600" aria-label="Cadena de frío" />}
-                      </p>
-                      <p className="text-xs text-zinc-500">
-                        {p.active} · <b className="font-medium text-zinc-600">{p.lab}</b> · {p.form}
-                        {r.expired > 0 && <span className="ml-1.5 font-semibold text-zinc-900">· {fmtInt(r.expired)} u vencidas</span>}
-                      </p>
-                    </td>
-                    <td className={cn(td, "text-xs text-zinc-600")}>{p.category}</td>
-                    {multi ? (
-                      <>
-                        {branchIds.map((b) => {
-                          const v = r.perBranch[b] ?? 0;
-                          return (
-                            <td key={b} className={cn(td, "whitespace-nowrap text-right tabular-nums", v === 0 ? "font-semibold text-zinc-400" : r.low.includes(b) && "font-semibold text-amber-700")}>
-                              {v === 0 ? "—" : stockLabel(p, v)}
-                            </td>
-                          );
-                        })}
-                        <td className={cn(td, "whitespace-nowrap text-right font-semibold tabular-nums")}>{stockLabel(p, r.stock)}</td>
-                      </>
-                    ) : (
-                      <>
-                        <td className={cn(td, "whitespace-nowrap text-right tabular-nums")}>{stockLabel(p, r.stock)}</td>
-                        <td className={cn(td, "text-right tabular-nums text-zinc-500")}>{fmtInt(minFor(p, operating))}</td>
-                      </>
-                    )}
-                    <td className={td}>
-                      {r.next ? (
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <ExpiryBadge days={daysUntil(r.next.expiresOn, now)} short thresholds={thresholds} />
-                        </div>
-                      ) : (
-                        <span className="text-xs text-zinc-400">—</span>
-                      )}
-                    </td>
-                    <td className={cn(td, "whitespace-nowrap text-right tabular-nums")}>{soles(r.valueCost)}</td>
-                    <td className={cn(td, "whitespace-nowrap text-right tabular-nums")}>{soles(p.priceUnit)}</td>
-                    <td className={td}>
-                      <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold", STATUS_CLASS[r.status])}>
-                        {STATUS_LABEL[r.status]}
-                        {multi && r.status === "bajo" ? ` · ${r.low.map(branchName).join(", ")}` : ""}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
+              {rows.map((r) => (
+                <ProductRow key={r.product.id} row={r} stag={stagFor(r.product.id)} {...shared} />
+              ))}
             </Table>
+          ) : (
+            <ul className="grid gap-2 p-3">
+              {rows.map((r) => (
+                <ProductCard key={r.product.id} row={r} stag={stagFor(r.product.id)} {...shared} />
+              ))}
+            </ul>
           )
         ) : groups.length === 0 ? (
-          <Empty icon={Search} title="Sin productos para este filtro" />
+          <Empty icon={Search} title={hasFilters ? "Sin productos con estos filtros" : "Aún no hay productos"}>
+            {hasFilters && (
+              <button type="button" className="font-semibold underline" onClick={clearFilters}>
+                Limpiar filtros
+              </button>
+            )}
+          </Empty>
         ) : (
           <Table
+            maxHeight={640}
             minWidth={820}
             head={[
               groupBy === "lab" ? "Laboratorio / marca" : "Tipo",
@@ -295,41 +355,22 @@ export function InventoryScreen() {
             ]}
           >
             {groups.map((g) => (
-              <tr
+              <GroupRow
                 key={g.key}
-                tabIndex={0}
-                className={rowButtonClass}
-                onClick={() => {
+                group={g}
+                ratio={g.valueCost / maxGroup}
+                multi={multi}
+                branchIds={branchIds}
+                onPick={() => {
                   if (groupBy === "lab") setLab(g.key);
                   else setCategory(g.key);
                   setGroupBy("producto");
                 }}
-                onKeyDown={(e) => {
-                  if (e.key !== "Enter") return;
-                  if (groupBy === "lab") setLab(g.key);
-                  else setCategory(g.key);
-                  setGroupBy("producto");
-                }}
-                aria-label={`Ver productos de ${g.key}`}
-              >
-                <td className={td}>
-                  <p className="font-medium">{g.key}</p>
-                  <div className="mt-1 h-1.5 w-40 max-w-full rounded-full bg-zinc-100">
-                    <div className="h-full rounded-full bg-brand" style={{ width: `${(g.valueCost / maxGroup) * 100}%` }} />
-                  </div>
-                </td>
-                <td className={cn(td, "text-right tabular-nums")}>
-                  {g.withStock}/{g.products}
-                </td>
-                {multi && branchIds.map((b) => <td key={b} className={cn(td, "whitespace-nowrap text-right tabular-nums text-zinc-600")}>{soles(g.costPerBranch[b] ?? 0)}</td>)}
-                <td className={cn(td, "whitespace-nowrap text-right font-semibold tabular-nums")}>{soles(g.valueCost)}</td>
-                <td className={cn(td, "whitespace-nowrap text-right tabular-nums")}>{soles(g.valueRetail)}</td>
-                <td className={cn(td, "text-right tabular-nums", g.alerts ? "font-semibold text-amber-700" : "text-zinc-400")}>{g.alerts || "—"}</td>
-              </tr>
+              />
             ))}
           </Table>
         )}
-      </section>
+      </Card>
 
       {detail && (
         <ProductDetailDialog
@@ -362,25 +403,33 @@ export function InventoryScreen() {
   );
 }
 
-function Kpi({ icon: Icon, label, value, hint, tone, loading, onClick }: { icon: LucideIcon; label: string; value: string; hint?: string; tone?: "amber"; loading?: boolean; onClick?: () => void }) {
-  const body = (
-    <>
-      <p className="flex items-center gap-2 text-xs font-semibold text-zinc-600">
-        <span className={cn("grid h-7 w-7 place-items-center rounded-lg", tone === "amber" ? "bg-amber-100 text-amber-700" : "bg-brand/10 text-brand")}>
-          <Icon className="h-4 w-4" />
-        </span>
-        {label}
-      </p>
-      {loading ? <div className="mt-2 h-7 w-24 animate-pulse rounded bg-zinc-100" /> : <p className="mt-2 truncate text-2xl font-semibold tracking-tight tabular-nums">{value}</p>}
-      {hint && <p className="mt-0.5 truncate text-xs text-zinc-500">{hint}</p>}
-    </>
-  );
-  const cls = "min-w-0 rounded-2xl border border-zinc-200 bg-white p-4 text-left";
-  return onClick ? (
-    <button type="button" onClick={onClick} className={cn(cls, "transition hover:border-zinc-300")}>
-      {body}
-    </button>
-  ) : (
-    <div className={cls}>{body}</div>
+function GroupRow({ group: g, ratio, multi, branchIds, onPick }: { group: ReturnType<typeof groupInventory>[number]; ratio: number; multi: boolean; branchIds: string[]; onPick: () => void }) {
+  return (
+    <tr
+      tabIndex={0}
+      className={cn(rowButtonClass, "h-12")}
+      onClick={onPick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onPick();
+        }
+      }}
+      aria-label={`Ver productos de ${g.key}`}
+    >
+      <td className={cn(td, "py-2")}>
+        <p className="font-semibold">{g.key}</p>
+        <div className="mt-1 h-1.5 w-40 max-w-full overflow-hidden rounded-full bg-sunken" aria-hidden>
+          <div className="h-full w-full origin-left rounded-full bg-brand" style={{ transform: `scaleX(${ratio})` }} />
+        </div>
+      </td>
+      <td className={cn(td, "py-2 text-right tabular-nums")}>
+        {g.withStock}/{g.products}
+      </td>
+      {multi && branchIds.map((b) => <td key={b} className={cn(td, "whitespace-nowrap py-2 text-right tabular-nums text-fg-2")}>{soles(g.costPerBranch[b] ?? 0)}</td>)}
+      <td className={cn(td, "whitespace-nowrap py-2 text-right font-semibold tabular-nums")}>{soles(g.valueCost)}</td>
+      <td className={cn(td, "whitespace-nowrap py-2 text-right tabular-nums")}>{soles(g.valueRetail)}</td>
+      <td className={cn(td, "py-2 text-right tabular-nums", g.alerts ? BRANCH_STOCK_CLASS[branchStockTone(1, true)] : "text-muted")}>{g.alerts || "—"}</td>
+    </tr>
   );
 }

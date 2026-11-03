@@ -10,7 +10,7 @@
   --focus-gap: #ffffff;
 
   /* Movimiento */
-  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1); /* expo-out: arranca rápido y se asienta suave */
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --dur-fast: 140ms;
   --dur-base: 200ms;
@@ -82,6 +82,9 @@
   --text-small: 0.8125rem; /* 13 px */
   --text-small--line-height: 1.25rem;
 
+  /* Todo `transition` de Tailwind sin curva propia usa la del token */
+  --default-transition-timing-function: var(--ease-out);
+
   /* Animaciones con los tokens de movimiento */
   --animate-fade: fade var(--dur-base) var(--ease-out);
   --animate-pop: pop var(--dur-base) var(--ease-out);
@@ -122,7 +125,7 @@ body {
   to { opacity: 1; }
 }
 @keyframes pop {
-  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  from { opacity: 0; transform: translate3d(0, 14px, 0) scale3d(0.985, 0.985, 1); }
   to { opacity: 1; transform: none; }
 }
 @keyframes fade-out {
@@ -130,41 +133,41 @@ body {
   to { opacity: 0; }
 }
 @keyframes line-in {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translate3d(0, 6px, 0); }
   to { opacity: 1; transform: none; }
 }
 @keyframes sheet-in {
-  from { transform: translateY(100%); }
+  from { transform: translate3d(0, 100%, 0); }
   to { transform: none; }
 }
 @keyframes sheet-out {
   from { transform: none; }
-  to { transform: translateY(100%); }
+  to { transform: translate3d(0, 100%, 0); }
 }
 @keyframes pop-out {
   from { opacity: 1; transform: none; }
-  to { opacity: 0; transform: translateY(4px) scale(0.97); }
+  to { opacity: 0; transform: translate3d(0, 4px, 0) scale3d(0.97, 0.97, 1); }
 }
 @keyframes toast-out {
   from { opacity: 1; transform: none; }
-  to { opacity: 0; transform: translateY(8px); }
+  to { opacity: 0; transform: translate3d(0, 8px, 0); }
 }
 @keyframes swap-in {
-  from { opacity: 0; transform: translateY(4px); }
+  from { opacity: 0; transform: translate3d(0, 4px, 0); }
   to { opacity: 1; transform: none; }
 }
 @keyframes stagger-in {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translate3d(0, 6px, 0); }
   to { opacity: 1; transform: none; }
 }
 @keyframes bar-grow {
-  from { opacity: 0; transform: scaleY(0.2); }
+  from { opacity: 0; transform: scale3d(1, 0.2, 1); }
   to { opacity: 1; transform: none; }
 }
 @keyframes shake {
   0%, 100% { transform: none; }
-  20%, 60% { transform: translateX(-6px); }
-  40%, 80% { transform: translateX(6px); }
+  20%, 60% { transform: translate3d(-6px, 0, 0); }
+  40%, 80% { transform: translate3d(6px, 0, 0); }
 }
 
 /* Reducir movimiento: se quita el desplazamiento y el zoom, se conserva el cambio de opacidad (así lo que sale sigue desmontándose al terminar). */
