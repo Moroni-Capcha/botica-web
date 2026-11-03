@@ -1,18 +1,23 @@
+import { Ban, CircleCheck, CircleX, Clock, type LucideIcon } from "lucide-react";
 import type { VoucherStatus } from "@/lib/api/types";
-import { cn } from "@/lib/cn";
 import { STATUS_LABEL } from "@/lib/domain/vouchers";
+import { Chip } from "@/components/ui/chip";
+import type { Tone } from "@/components/ui/tone";
 
-const CLASS: Record<VoucherStatus, string> = {
-  pendiente: "bg-amber-100 text-amber-800",
-  aceptado: "bg-emerald-100 text-emerald-700",
-  rechazado: "bg-rose-100 text-rose-700",
-  anulado: "bg-zinc-100 text-zinc-500",
+/** Estado ante SUNAT: tono + icono + texto, para que no dependa solo del color. */
+export const STATUS_UI: Record<VoucherStatus, { tone: Tone; solid?: boolean; icon: LucideIcon }> = {
+  pendiente: { tone: "warning", icon: Clock },
+  aceptado: { tone: "success", icon: CircleCheck },
+  rechazado: { tone: "danger", solid: true, icon: CircleX },
+  anulado: { tone: "neutral", icon: Ban },
 };
 
 export function StatusBadge({ status, title }: { status: VoucherStatus; title?: string }) {
+  const { tone, solid, icon: Icon } = STATUS_UI[status];
   return (
-    <span className={cn("inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold", CLASS[status])} title={title}>
+    <Chip tone={tone} solid={solid} title={title}>
+      <Icon className="h-3 w-3 shrink-0" aria-hidden />
       {STATUS_LABEL[status]}
-    </span>
+    </Chip>
   );
 }

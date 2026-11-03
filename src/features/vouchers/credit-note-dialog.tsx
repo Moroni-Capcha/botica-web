@@ -66,13 +66,13 @@ export function CreditNoteDialog({ voucher, products, onClose, onDone }: { vouch
       footer={
         <>
           {mutation.error ? (
-            <p className="mr-auto text-sm text-rose-600" role="alert">{errorMessage(mutation.error)}</p>
+            <p className="mr-auto text-sm text-danger-fg" role="alert">{errorMessage(mutation.error)}</p>
           ) : (
-            <p className="mr-auto text-sm text-zinc-600">{plan.ok ? <>Se acredita <b className="tabular-nums">{soles(plan.total)}</b></> : plan.error}</p>
+            <p className="mr-auto text-sm text-fg-2" role="status" aria-live="polite">{plan.ok ? <>Se acredita <b className="tabular-nums">{soles(plan.total)}</b></> : plan.error}</p>
           )}
           <Button onClick={onClose}>Volver</Button>
           <Button variant="primary" disabled={!plan.ok} loading={mutation.isPending} onClick={submit}>
-            <FilePlus2 className="h-4 w-4" /> Emitir nota
+            <FilePlus2 className="h-4 w-4" aria-hidden /> Emitir nota
           </Button>
         </>
       }
@@ -98,14 +98,14 @@ export function CreditNoteDialog({ voucher, products, onClose, onDone }: { vouch
         </div>
 
         {reason.kind === "items" && (
-          <ul className="divide-y divide-zinc-100 rounded-xl border border-zinc-200" aria-label="Productos a devolver">
+          <ul className="divide-y divide-line-soft rounded-xl border border-line" aria-label="Productos a devolver">
             {lines.map((c) => {
               const p = products.get(c.line.productId);
               return (
                 <li key={c.lineIndex} className="flex flex-wrap items-center gap-3 px-3 py-2.5 text-sm">
                   <span className="min-w-0 flex-1 basis-48">
                     <b className="font-medium">{p ? `${p.name} ${p.conc}` : `Producto ${c.line.productId}`}</b>
-                    <span className="block text-xs text-zinc-500">
+                    <span className="block text-caption text-muted">
                       {c.line.presentationLabel} · vendió {c.line.qty}
                       {c.creditedQty > 0 ? ` · ya se devolvió ${c.creditedQty}` : ""} · {soles(c.line.total)}
                     </span>
@@ -119,7 +119,7 @@ export function CreditNoteDialog({ voucher, products, onClose, onDone }: { vouch
                     placeholder="0"
                     onChange={(e) => setQty((prev) => ({ ...prev, [c.lineIndex]: Math.max(0, Math.floor(Number(e.target.value) || 0)) }))}
                   />
-                  <span className="w-12 text-xs text-zinc-500">de {c.remainingQty}</span>
+                  <span className="w-12 text-caption text-muted">de {c.remainingQty}</span>
                 </li>
               );
             })}
@@ -127,7 +127,7 @@ export function CreditNoteDialog({ voucher, products, onClose, onDone }: { vouch
         )}
 
         {reason.kind === "total" && (
-          <p className="rounded-xl bg-zinc-50 p-3 text-sm text-zinc-700">
+          <p className="rounded-xl border border-line bg-subtle p-3 text-sm text-fg-2">
             Se acredita todo el comprobante: {voucher.sale.items.length} {voucher.sale.items.length === 1 ? "producto" : "productos"} por {soles(voucher.total)}.
           </p>
         )}
@@ -140,14 +140,14 @@ export function CreditNoteDialog({ voucher, products, onClose, onDone }: { vouch
 
         {reason.stock && (
           <label className="flex items-start gap-2 text-sm">
-            <input type="checkbox" checked={returnStock} onChange={(e) => setReturnStock(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--brand)]" />
+            <input type="checkbox" checked={returnStock} onChange={(e) => setReturnStock(e.target.checked)} className="mt-0.5 h-4 w-4 accent-brand" />
             <span>
               La mercadería vuelve al stock
-              <span className="block text-xs text-zinc-500">Entra al kardex como devolución, en los lotes de la venta. Quita la marca si el producto no se puede volver a vender.</span>
+              <span className="block text-caption text-muted">Entra al kardex como devolución, en los lotes de la venta. Quita la marca si el producto no se puede volver a vender.</span>
             </span>
           </label>
         )}
-        {!reason.stock && <p className="text-xs text-zinc-500">Este motivo no mueve el stock. El reembolso del dinero se registra aparte, como egreso de caja.</p>}
+        {!reason.stock && <p className="text-caption text-muted">Este motivo no mueve el stock. El reembolso del dinero se registra aparte, como egreso de caja.</p>}
       </form>
     </Dialog>
   );

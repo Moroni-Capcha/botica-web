@@ -21,7 +21,7 @@ export function PrintRoot({ children }: { children: ReactNode }) {
 /** Abre el cuadro de impresión del navegador. En la ticketera térmica se elige su impresora; el papel ya viene en 80 mm. */
 export const printTicket = () => window.print();
 
-const Rule = () => <div className="my-1.5 border-t border-dashed border-zinc-400" />;
+const Rule = () => <div className="my-1.5 border-t border-dashed border-muted" />;
 const Row = ({ left, right, bold }: { left: ReactNode; right: ReactNode; bold?: boolean }) => (
   <p className={`flex justify-between gap-2 ${bold ? "font-bold" : ""}`}>
     <span>{left}</span>
@@ -32,7 +32,7 @@ const Row = ({ left, right, bold }: { left: ReactNode; right: ReactNode; bold?: 
 function Header({ pharmacy, branch, title, number }: { pharmacy: Pharmacy | undefined; branch: Branch | undefined; title: string; number: string }) {
   return (
     <div className="text-center">
-      <p className="text-[13px] font-bold">{(pharmacy?.name ?? "").toUpperCase()}</p>
+      <p className="ticket-title font-bold">{(pharmacy?.name ?? "").toUpperCase()}</p>
       {pharmacy?.ruc && <p>RUC {pharmacy.ruc}</p>}
       {branch && <p>{branch.name}{branch.address ? ` · ${branch.address}` : ""}</p>}
       {pharmacy?.phone && <p>Tel. {pharmacy.phone}</p>}
@@ -54,7 +54,7 @@ function Footer({ status, voided }: { status: VoucherStatus | undefined; voided?
   return (
     <>
       <SunatLine status={status} voided={voided} />
-      <p className="mt-2 text-center text-[10px]">Representación impresa del comprobante electrónico. Puede consultarlo en sunat.gob.pe con su número.</p>
+      <p className="ticket-fine mt-2 text-center">Representación impresa del comprobante electrónico. Puede consultarlo en sunat.gob.pe con su número.</p>
       <p className="mt-1 text-center">¡Gracias por su compra!</p>
     </>
   );
@@ -82,7 +82,7 @@ export function SaleTicket({ sale, electronic, pharmacy, branch, products, provi
         return (
           <div key={i} className="mb-1">
             <Row left={`${it.qty} × ${p ? `${p.name} ${p.conc}` : `Producto ${it.productId}`}`} right={money(it.total)} />
-            <p className="text-[10px]">
+            <p className="ticket-fine">
               {it.presentationLabel} · {it.lots.map((l) => `L:${l.code} V:${dateShort(l.expiresOn)}`).join(" · ")}
               {it.discount > 0 ? ` · Dcto ${Math.round(it.discount * 100)}%` : ""}
             </p>
@@ -102,7 +102,7 @@ export function SaleTicket({ sale, electronic, pharmacy, branch, products, provi
       <p className="mt-1">Atendido por: {sale.sellerName}</p>
       {provisional ? (
         <>
-          <p className="mt-2 text-center text-[10px]">Ticket provisional emitido sin conexión. Su {factura ? "factura" : "boleta"} electrónica oficial se emite al enviar la venta; consúltela en sunat.gob.pe.</p>
+          <p className="ticket-fine mt-2 text-center">Ticket provisional emitido sin conexión. Su {factura ? "factura" : "boleta"} electrónica oficial se emite al enviar la venta; consúltela en sunat.gob.pe.</p>
           <p className="mt-1 text-center">¡Gracias por su compra!</p>
         </>
       ) : (
