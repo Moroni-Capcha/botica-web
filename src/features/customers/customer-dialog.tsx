@@ -8,13 +8,17 @@ import { suggestedCycle, validateCustomer } from "@/lib/domain/customers";
 import { useCustomerPurchases, useSaveCustomer } from "@/lib/queries";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Chip } from "@/components/ui/chip";
 import { Empty } from "@/components/ui/empty";
 import { Field, Input } from "@/components/ui/field";
+import { IconButton } from "@/components/ui/icon-button";
+import { sectionLabelClass } from "@/components/ui/section-label";
 import { Segmented } from "@/components/ui/segmented";
 import { ProductPicker } from "@/components/product-picker";
 import { notify } from "@/components/ui/toast";
 import { dateShort, soles } from "@/lib/format";
 import { cn } from "@/lib/cn";
+import { ConsentChip } from "./customers-rows";
 
 const EMPTY: CustomerInput = { name: "", dni: "", ruc: "", phone: "", treatments: [], contactConsent: false, notes: "" };
 
@@ -73,10 +77,10 @@ export function CustomerDialog({ customer, customers, products, branches, onClos
       footer={
         tab === "datos" ? (
           <>
-            {(save.error || (tried && !ok)) && <p className="mr-auto text-sm text-rose-600" role="alert">{save.error ? errorMessage(save.error) : "Revisa los campos marcados."}</p>}
+            {(save.error || (tried && !ok)) && <p className="mr-auto text-sm text-danger-fg" role="alert">{save.error ? errorMessage(save.error) : "Revisa los campos marcados."}</p>}
             <Button onClick={onClose}>Cancelar</Button>
             <Button variant="primary" loading={save.isPending} onClick={submit}>
-              <Save className="h-4 w-4" /> Guardar
+              <Save className="h-4 w-4" aria-hidden /> Guardar
             </Button>
           </>
         ) : (
@@ -111,42 +115,45 @@ export function CustomerDialog({ customer, customers, products, branches, onClos
             <Field label="Celular" error={err("phone")} className="sm:col-span-2">
               <Input inputMode="tel" value={f.phone} onChange={(e) => set("phone", e.target.value)} placeholder="987 654 321" className="tabular-nums" aria-invalid={!!err("phone")} />
             </Field>
-            <label className="flex items-start gap-2.5 rounded-xl bg-zinc-50 p-3 text-sm sm:col-span-2">
-              <input type="checkbox" checked={f.contactConsent} onChange={(e) => set("contactConsent", e.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--brand)]" />
-              <span>
-                <span className="font-medium">El cliente acepta recibir recordatorios por WhatsApp o llamada</span>
-                <span className="block text-xs text-zinc-500">Pregúntale antes de marcarlo. Sin su permiso no se le envían avisos (Ley 29733 de protección de datos personales).</span>
-                {err("contactConsent") && <span className="mt-1 block text-xs text-rose-600">{err("contactConsent")}</span>}
+            <label className="flex items-start gap-2.5 rounded-xl border border-line bg-subtle p-3 text-sm sm:col-span-2">
+              <input type="checkbox" checked={f.contactConsent} onChange={(e) => set("contactConsent", e.target.checked)} className="mt-0.5 h-4 w-4 accent-brand" aria-invalid={!!err("contactConsent")} />
+              <span className="min-w-0 flex-1">
+                <span className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium">El cliente acepta recibir recordatorios por WhatsApp o llamada</span>
+                  <ConsentChip consent={f.contactConsent} />
+                </span>
+                <span className="mt-0.5 block text-caption text-muted">Pregúntale antes de marcarlo. Sin su permiso no se le envían avisos (Ley 29733 de protección de datos personales).</span>
+                {err("contactConsent") && <span className="mt-1 block text-caption text-danger-fg" role="alert">{err("contactConsent")}</span>}
               </span>
             </label>
           </div>
 
           <fieldset>
-            <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">Tratamientos continuos</legend>
-            <p className="mb-2 text-xs text-zinc-500">Medicamentos que compra todos los meses. Con su última compra y el ciclo se calcula cuándo avisarle.</p>
+            <legend className={cn(sectionLabelClass, "mb-1")}>Tratamientos continuos</legend>
+            <p className="mb-2 text-caption text-muted">Medicamentos que compra todos los meses. Con su última compra y el ciclo se calcula cuándo avisarle.</p>
             {f.treatments.length > 0 && (
               <ul className="mb-2 grid gap-2">
                 {f.treatments.map((t) => {
                   const p = productById.get(t.productId);
                   return (
-                    <li key={t.productId} className="flex flex-wrap items-center gap-2 rounded-xl border border-zinc-200 p-2.5">
+                    <li key={t.productId} className="flex flex-wrap items-center gap-2 rounded-xl border border-line p-2.5">
                       <span className="min-w-0 flex-1 text-sm">
-                        <b className="font-medium">{p?.name ?? `Producto ${t.productId}`}</b> <span className="text-zinc-500">{p?.conc}</span>
+                        <b className="font-medium">{p?.name ?? `Producto ${t.productId}`}</b> <span className="text-muted">{p?.conc}</span>
                       </span>
-                      <label className="flex items-center gap-1.5 text-xs text-zinc-600">
+                      <label className="flex items-center gap-1.5 text-caption text-fg-2">
                         Cada
-                        <input
+                        <Input
                           inputMode="numeric"
                           value={t.everyDays || ""}
                           onChange={(e) => setTreatment(t.productId, { everyDays: Number(e.target.value.replace(/\D/g, "").slice(0, 3)) || 0 })}
-                          className="h-8 w-14 rounded-lg border border-zinc-200 px-2 text-right text-sm tabular-nums outline-none focus:border-zinc-400"
+                          className="h-8 w-14 rounded-lg px-2 text-right tabular-nums"
                           aria-label={`Ciclo en días de ${p?.name ?? ""}`}
                         />
                         días
                       </label>
-                      <button type="button" onClick={() => set("treatments", f.treatments.filter((x) => x.productId !== t.productId))} className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-rose-600" aria-label={`Quitar ${p?.name ?? ""}`}>
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      <IconButton size="sm" tone="danger" onClick={() => set("treatments", f.treatments.filter((x) => x.productId !== t.productId))} aria-label={`Quitar ${p?.name ?? ""}`}>
+                        <Trash2 className="h-4 w-4" aria-hidden />
+                      </IconButton>
                     </li>
                   );
                 })}
@@ -155,7 +162,7 @@ export function CustomerDialog({ customer, customers, products, branches, onClos
             <div className="max-w-md">
               <ProductPicker products={treatable} value={adding} onChange={addTreatment} ariaLabel="Agregar tratamiento" />
             </div>
-            {err("treatments") && <p className="mt-1 text-xs text-rose-600">{err("treatments")}</p>}
+            {err("treatments") && <p className="mt-1 text-caption text-danger-fg" role="alert">{err("treatments")}</p>}
           </fieldset>
 
           <Field label="Notas">
@@ -164,21 +171,21 @@ export function CustomerDialog({ customer, customers, products, branches, onClos
           <button type="submit" className="hidden" aria-hidden tabIndex={-1} />
         </form>
       ) : purchases.isLoading ? (
-        <div className="grid gap-2">{Array.from({ length: 4 }, (_, i) => <div key={i} className="h-14 animate-pulse rounded-xl bg-zinc-100" />)}</div>
+        <div className="grid gap-2">{Array.from({ length: 4 }, (_, i) => <div key={i} className="h-14 animate-pulse rounded-xl bg-sunken" />)}</div>
       ) : !purchases.data?.length ? (
         <Empty icon={Receipt} title="Aún no tiene compras con su nombre">Asígnalo al cobrar en el punto de venta para sumar puntos e historial.</Empty>
       ) : (
-        <ul className="divide-y divide-zinc-100 rounded-xl border border-zinc-200">
+        <ul className="divide-y divide-line-soft rounded-xl border border-line">
           {purchases.data.map((s) => (
             <li key={s.saleId} className="px-4 py-2.5">
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <span className="font-medium tabular-nums">{dateShort(s.at)}</span>
-                <span className="text-xs tabular-nums text-zinc-500">{s.number}</span>
-                <span className="rounded bg-brand/10 px-1.5 py-px text-[10.5px] font-semibold text-brand">{branchName(s.branchId)}</span>
+                <span className="text-caption tabular-nums text-muted">{s.number}</span>
+                <Chip className="bg-brand/10 text-brand">{branchName(s.branchId)}</Chip>
                 <span className="ml-auto font-semibold tabular-nums">{soles(s.total)}</span>
               </div>
-              {s.returned ? <p className="mt-0.5 text-xs text-rose-600">Devolvió {soles(s.returned)} con nota de crédito; el total ya lo descuenta.</p> : null}
-              <p className={cn("mt-0.5 text-xs text-zinc-500")}>
+              {s.returned ? <p className="mt-0.5 text-caption text-danger-fg">Devolvió {soles(s.returned)} con nota de crédito; el total ya lo descuenta.</p> : null}
+              <p className="mt-0.5 text-caption text-muted">
                 {s.items.map((it) => `${it.qty} ${it.presentationLabel.toLowerCase()} ${productById.get(it.productId)?.name ?? ""}`).join(" · ")}
               </p>
             </li>

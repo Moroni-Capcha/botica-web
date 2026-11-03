@@ -195,6 +195,12 @@ body {
   color: var(--color-fg);
   background: #fff;
 }
+.ticket-title {
+  font-size: 13px;
+}
+.ticket-fine {
+  font-size: 10px;
+}
 .print-root {
   display: none;
 }
