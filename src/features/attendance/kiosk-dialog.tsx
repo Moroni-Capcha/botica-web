@@ -110,7 +110,7 @@ export function KioskDialog({ branches, fixedBranch, onClose }: { branches: Bran
     <Dialog title="Marcar asistencia" description={done ? undefined : sel ? `${sel.name} · horario ${sel.schedule.start} a ${sel.schedule.end}` : "Elige tu nombre e ingresa tu PIN personal."} onClose={onClose}>
       {done ? (
         <div className="grid place-items-center py-6 text-center" aria-live="polite">
-          <span className={cn("grid h-16 w-16 animate-[pop_.3s_cubic-bezier(.32,.72,0,1)] place-items-center rounded-full text-white", MARK_UI[done.type].tone)}>
+          <span className={cn("grid h-16 w-16 animate-pop place-items-center rounded-full text-white", MARK_UI[done.type].tone)}>
             {(() => {
               const Icon = MARK_UI[done.type].icon;
               return <Icon className="h-8 w-8" />;
@@ -189,7 +189,7 @@ export function KioskDialog({ branches, fixedBranch, onClose }: { branches: Bran
           </div>
           {!pinOk ? (
             <div>
-              <div className={cn("flex justify-center gap-3", error && "animate-[shake_.4s_ease-in-out]")} aria-label={`${pin.length} de 4 dígitos`}>
+              <div className={cn("flex justify-center gap-3", error && "animate-shake")} aria-label={`${pin.length} de 4 dígitos`}>
                 {[0, 1, 2, 3].map((i) => (
                   <span key={i} className={cn("h-3 w-3 rounded-full", i < pin.length ? (error ? "bg-rose-600" : "bg-brand") : "bg-zinc-200")} />
                 ))}

@@ -186,8 +186,8 @@ function ClosedResult({ closing: c }: { closing: CashClosing }) {
   const icon = useRef<HTMLSpanElement>(null);
   const body = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    animateIn(icon.current, [{ opacity: 0, transform: "scale(0.8)" }, { opacity: 1, transform: "none" }], { duration: 200 });
-    animateIn(body.current, [{ opacity: 0, transform: "translateY(6px)" }, { opacity: 1, transform: "none" }], { duration: 200, delay: 60, fill: "backwards" });
+    animateIn(icon.current, [{ opacity: 0, transform: "scale3d(0.8, 0.8, 1)" }, { opacity: 1, transform: "scale3d(1, 1, 1)" }], { duration: 200 });
+    animateIn(body.current, [{ opacity: 0, transform: "translate3d(0, 6px, 0)" }, { opacity: 1, transform: "translate3d(0, 0, 0)" }], { duration: 200, delay: 60, fill: "backwards" });
   }, []);
   return (
     <div className="grid justify-items-center gap-3 py-4 text-center">
