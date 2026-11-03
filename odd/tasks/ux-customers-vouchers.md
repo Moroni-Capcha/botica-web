@@ -11,14 +11,18 @@ Bring Clientes (`/clientes`) and Comprobantes (`/comprobantes`) to the standard 
 - Branch `feat/ux-customers-vouchers`. One work-unit commit per phase. No push or merge without the user.
 
 ## Tasks
-- [ ] C1 Clientes: customers-screen, customer-dialog (tokens, table/cards, search, states, consent/Ley 29733 clarity, a11y, mobile).
-- [ ] C2 Comprobantes: vouchers-screen, status-badge, voucher-dialog, void-dialog, credit-note-dialog, ticket (tokens, SUNAT status chips, filters, states, mobile, a11y).
+- [x] C1 Clientes (f646a3a): customers-screen, customer-dialog (tokens, table/cards, search, states, consent/Ley 29733 clarity, a11y, mobile).
+- [x] C2 Comprobantes (4a9747b): vouchers-screen, status-badge, voucher-dialog, void-dialog, credit-note-dialog, ticket (tokens, SUNAT status chips, filters, states, mobile, a11y).
 
 ## Route per task
 One delegated writer per phase; parent verifies with typecheck, tests and browser.
 
 ## Progress / evidence
 (branch from master @ 23e54d9)
+- C1 f646a3a `feat(ui): redesign customers screen`: new `customers-rows.tsx` (memo `RefillItem`, `CustomerRow`, `CustomerCard`, `ConsentChip`), Card list under 768 px, sticky table, aria-live counts, consent Chip (icon + text) in table, cards, refill list and dialog; refill status chips with icon + text; WhatsApp hex replaced by primary button. Consent and DNI/RUC validation untouched. Route: delegated writer.
+- C2 4a9747b `feat(ui): redesign vouchers screens`: new `vouchers-rows.tsx` (memo `VoucherTableRow`, `VoucherCard`), `StatusBadge` now Chip with icon + text (Clock/CircleCheck/CircleX/Ban), filters in a Card with aria-live count, "Estado" filter is now a Segmented with live counts (same values, was a Select), clear-filters action, dialogs on tokens, ticket `text-[13px]`/`text-[10px]` moved to `.ticket-title`/`.ticket-fine` in globals.css (same px sizes), dashed rule border zinc-400 -> `border-muted`.
+- Checks: `npm run typecheck` clean; `npm test` 43 files / 367 tests pass (after each commit); `npm run build` OK (.next deleted first). No new pure logic extracted, so no new tests.
+- NOT verified in a browser: layout at 360/768/1280 px, focus rings, stagger, reduced motion, real print preview of the 80 mm ticket, Segmented overflow with 5 estado options on narrow screens, refill list and WhatsApp/tel links.
 
 ## Next step
-Delegate C1.
+Parent: browser check of /clientes and /comprobantes (incl. print preview of the ticket), then decide on push/PR.
