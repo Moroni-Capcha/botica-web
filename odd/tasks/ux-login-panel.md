@@ -28,5 +28,7 @@ Browser check L1 (2026-11-02, dev server, no console errors): desktop layout wit
 
 - L2 b6aca4a: typecheck clean, 344 tests pass (338 + 6 new in panel.test.ts), build ok. Panel, setup checklist and column chart files have 0 raw zinc/emerald/rose/amber/sky/violet classes, 0 text-[Npx], 0 hex colors, 0 transition-all. Not browser-verified by the writer (focal card, stagger, bar grow, alert list scroll/sticky, 360 px / tablet, reduced motion, other botica colors). Quiet KPI figure is text-xl (20 px, as in cash) instead of 22 px to avoid an arbitrary size.
 
+Browser check L2 (2026-11-02, dev server, no console errors): admin login by physical keyboard lands on `/panel`; focal brand card "Venta de hoy S/ 52.10" with progress bar and wrapping comparison line, three quieter KPI cards, "vendido S/ 53.90 - devoluciones S/ 1.80 = venta neta S/ 52.10" line (numbers match the cash screen figures), chart cards with the current hour highlighted, alert list with tone icons, count chip and internal scroll; scope switch to "Ambos locales" shows S/ 110.20 / 14 comprobantes with stacked series and legend. NOT checked: 360 px / tablet, reduced motion, keyboard-only navigation, setup checklist as a fresh admin, error state, non-admin view, other botica colors, reports chart regression.
+
 ## Next step
-Browser check of L2, then open the PR.
+Open the PR (user decision).
