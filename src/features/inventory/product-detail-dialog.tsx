@@ -14,6 +14,9 @@ import { Empty } from "@/components/ui/empty";
 import { Pagination } from "@/components/ui/pagination";
 import { Segmented } from "@/components/ui/segmented";
 import { Table, td } from "@/components/ui/table";
+import { Chip } from "@/components/ui/chip";
+import { SectionLabel } from "@/components/ui/section-label";
+import { TONE_CLASS } from "@/components/ui/tone";
 import { ExpiryBadge, RxBadge } from "@/components/ui/badges";
 import { notify } from "@/components/ui/toast";
 import { dateShort, soles, timeShort } from "@/lib/format";
@@ -83,7 +86,7 @@ export function ProductDetailDialog({ product: p, lots, branchIds, branches, sco
       footer={
         <>
           <Button onClick={() => void doExport()} loading={exporting} disabled={!kardex.data || total === 0}>
-            <FileSpreadsheet className="h-4 w-4 text-emerald-600" /> Exportar kardex
+            <FileSpreadsheet className="h-4 w-4 text-success-fg" /> Exportar kardex
           </Button>
           {canEdit && (
             <Button variant="primary" onClick={onEdit}>
@@ -96,13 +99,13 @@ export function ProductDetailDialog({ product: p, lots, branchIds, branches, sco
       <div className="grid gap-6">
         <div className="flex flex-wrap items-center gap-2">
           <RxBadge rx={p.rx} />
-          <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-zinc-600">{p.category}</span>
+          <Chip>{p.category}</Chip>
           {p.coldChain && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700">
-              <Snowflake className="h-3 w-3" /> 2–8 °C
-            </span>
+            <Chip tone="info">
+              <Snowflake className="h-3 w-3" aria-hidden /> 2–8 °C
+            </Chip>
           )}
-          <span className="text-xs text-zinc-500">Ubicación {p.location || "—"} · Código {p.barcode || "—"}</span>
+          <span className="text-caption text-muted">Ubicación {p.location || "—"} · Código {p.barcode || "—"}</span>
         </div>
 
         <div className={cn("grid gap-3", multi ? "sm:grid-cols-4" : "sm:grid-cols-3")}>
@@ -110,7 +113,7 @@ export function ProductDetailDialog({ product: p, lots, branchIds, branches, sco
             const st = vigente(b);
             const low = st <= minFor(p, b);
             return (
-              <Stat key={b} label={`Stock ${name(b)}`} value={stockLabel(p, st)} hint={`Mínimo ${fmtInt(minFor(p, b))} unid.`} tone={st === 0 ? "dark" : low ? "amber" : undefined} />
+              <Stat key={b} label={`Stock ${name(b)}`} value={stockLabel(p, st)} hint={`Mínimo ${fmtInt(minFor(p, b))} unid.${st === 0 ? " · Agotado" : low ? " · Bajo mínimo" : ""}`} tone={st === 0 ? "danger" : low ? "warning" : undefined} />
             );
           })}
           <Stat label={`Vendido · ${days} días`} value={kardex.data ? `${fmtInt(totals.sold)} unid.` : "…"} hint={kardex.data ? `${(totals.sold / days).toLocaleString("es-PE", { maximumFractionDigits: 1 })} por día` : undefined} />
@@ -118,16 +121,16 @@ export function ProductDetailDialog({ product: p, lots, branchIds, branches, sco
         </div>
 
         <section>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Precios y margen</h3>
+          <SectionLabel as="h3" className="mb-2">Precios y margen</SectionLabel>
           <div className="grid gap-2 sm:grid-cols-3">
             {presentationsOf(p).map((ps) => {
               const m = marginPct(ps.price, ps.units, p.cost);
               return (
-                <div key={ps.id} className="rounded-xl border border-zinc-200 p-3">
-                  <p className="text-xs text-zinc-500">{ps.label}</p>
+                <div key={ps.id} className="rounded-xl border border-line p-3">
+                  <p className="text-caption text-muted">{ps.label}</p>
                   <p className="text-lg font-semibold tabular-nums">{soles(ps.price)}</p>
-                  <p className="text-[11px] text-zinc-500">
-                    Costo {soles(p.cost * ps.units)} sin IGV · margen <b className={m < 15 ? "text-rose-600" : "text-emerald-700"}>{m.toFixed(0)} %</b>
+                  <p className="text-micro text-muted">
+                    Costo {soles(p.cost * ps.units)} sin IGV · margen <b className={m < 15 ? "text-danger-fg" : "text-success-fg"}>{m.toFixed(0)} %</b>
                   </p>
                 </div>
               );
@@ -136,16 +139,16 @@ export function ProductDetailDialog({ product: p, lots, branchIds, branches, sco
         </section>
 
         <section>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Lotes en orden de salida (FEFO)</h3>
-          <div className="overflow-hidden rounded-xl border border-zinc-200">
+          <SectionLabel as="h3" className="mb-2">Lotes en orden de salida (FEFO)</SectionLabel>
+          <div className="overflow-hidden rounded-xl border border-line">
             {productLots.length === 0 ? (
               <Empty icon={Boxes} title="Sin lotes con stock" />
             ) : (
               <Table minWidth={620} head={["#", ...(multi ? ["Local"] : []), "Lote", "Vencimiento", { label: "Cantidad", align: "right" }, { label: "Costo u.", align: "right" }, "Descuento", "Proveedor"]}>
                 {productLots.map((l, i) => (
                   <tr key={l.id}>
-                    <td className={cn(td, "text-xs text-zinc-400")}>{i + 1}</td>
-                    {multi && <td className={cn(td, "text-xs font-semibold")}>{name(l.branchId)}</td>}
+                    <td className={cn(td, "text-caption text-muted")}>{i + 1}</td>
+                    {multi && <td className={cn(td, "text-caption font-semibold")}>{name(l.branchId)}</td>}
                     <td className={cn(td, "tabular-nums")}>{l.code}</td>
                     <td className={td}>
                       <div className="flex items-center gap-2">
@@ -155,8 +158,8 @@ export function ProductDetailDialog({ product: p, lots, branchIds, branches, sco
                     </td>
                     <td className={cn(td, "text-right tabular-nums")}>{fmtInt(l.qty)}</td>
                     <td className={cn(td, "text-right tabular-nums")}>{soles(l.cost)}</td>
-                    <td className={cn(td, "text-xs")}>{l.discount ? `-${Math.round(l.discount * 100)} %` : "—"}</td>
-                    <td className={cn(td, "max-w-[180px] truncate text-xs text-zinc-500")}>{l.supplier ?? "—"}</td>
+                    <td className={cn(td, "text-caption")}>{l.discount ? `-${Math.round(l.discount * 100)} %` : "—"}</td>
+                    <td className={cn(td, "max-w-44 truncate text-caption text-muted")}>{l.supplier ?? "—"}</td>
                   </tr>
                 ))}
               </Table>
@@ -166,20 +169,20 @@ export function ProductDetailDialog({ product: p, lots, branchIds, branches, sco
 
         <section>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Kardex (unidades)</h3>
+            <SectionLabel as="h3">Kardex (unidades)</SectionLabel>
             <Segmented label="Periodo del kardex" value={String(days)} onChange={(v) => { setDays(Number(v) as (typeof KARDEX_DAYS)[number]); setKPage(1); }} options={KARDEX_DAYS.map((d) => ({ id: String(d), label: `${d} días` }))} />
           </div>
           {kardex.data && (
-            <p className="mb-2 text-xs text-zinc-500">
-              Entradas <b className="tabular-nums text-emerald-700">{fmtInt(totals.inUnits)}</b> · Salidas <b className="tabular-nums text-zinc-800">{fmtInt(totals.outUnits)}</b> · Saldo inicial{" "}
-              <b className="tabular-nums text-zinc-800">{fmtInt(opening)}</b> · Saldo actual <b className="tabular-nums text-zinc-800">{fmtInt(kardex.data.closing)}</b>
+            <p className="mb-2 text-caption text-muted">
+              Entradas <b className="tabular-nums text-success-fg">{fmtInt(totals.inUnits)}</b> · Salidas <b className="tabular-nums text-fg">{fmtInt(totals.outUnits)}</b> · Saldo inicial{" "}
+              <b className="tabular-nums text-fg">{fmtInt(opening)}</b> · Saldo actual <b className="tabular-nums text-fg">{fmtInt(kardex.data.closing)}</b>
             </p>
           )}
-          <div className="max-h-80 overflow-y-auto rounded-xl border border-zinc-200">
+          <div className="max-h-80 overflow-y-auto rounded-xl border border-line">
             {kardex.isLoading ? (
               <div className="grid gap-2 p-3">
                 {Array.from({ length: 5 }, (_, i) => (
-                  <div key={i} className="h-9 animate-pulse rounded-lg bg-zinc-100" />
+                  <div key={i} className="h-9 animate-pulse rounded-lg bg-sunken" />
                 ))}
               </div>
             ) : kardex.error ? (
@@ -192,28 +195,26 @@ export function ProductDetailDialog({ product: p, lots, branchIds, branches, sco
               <Table minWidth={760} head={["Fecha", "Movimiento", "Documento / motivo", "Lote", { label: "Entrada", align: "right" }, { label: "Salida", align: "right" }, { label: "Saldo", align: "right" }]}>
                 {lines.map((r) => (
                   <tr key={r.id}>
-                    <td className={cn(td, "whitespace-nowrap text-xs tabular-nums text-zinc-500")}>
+                    <td className={cn(td, "whitespace-nowrap text-caption tabular-nums text-muted")}>
                       {dateShort(r.at)} {timeShort(r.at)}
                     </td>
                     <td className={td}>
-                      <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold", r.delta > 0 ? "bg-emerald-50 text-emerald-700" : r.type === "venta" ? "bg-zinc-100 text-zinc-600" : "bg-rose-50 text-rose-700")}>
-                        {MOVE_LABEL[r.type]}
-                      </span>
+                      <Chip tone={r.delta > 0 ? "success" : r.type === "venta" ? "neutral" : "danger"}>{MOVE_LABEL[r.type]}</Chip>
                     </td>
-                    <td className={cn(td, "text-xs")}>
-                      {multi && <span className="mr-1.5 rounded bg-brand/10 px-1.5 py-px text-[10.5px] font-semibold text-brand">{name(r.branchId)}</span>}
+                    <td className={cn(td, "text-caption")}>
+                      {multi && <span className="mr-1.5 rounded bg-brand/10 px-1.5 py-px text-micro font-semibold text-brand">{name(r.branchId)}</span>}
                       {r.reference}
-                      <span className="block text-[11px] text-zinc-400">{r.userName}</span>
+                      <span className="block text-micro text-muted">{r.userName}</span>
                     </td>
-                    <td className={cn(td, "text-xs tabular-nums text-zinc-500")}>{r.lotCode ?? "—"}</td>
-                    <td className={cn(td, "text-right tabular-nums text-emerald-700")}>{r.delta > 0 ? fmtInt(r.delta) : ""}</td>
+                    <td className={cn(td, "text-caption tabular-nums text-muted")}>{r.lotCode ?? "—"}</td>
+                    <td className={cn(td, "text-right tabular-nums text-success-fg")}>{r.delta > 0 ? fmtInt(r.delta) : ""}</td>
                     <td className={cn(td, "text-right tabular-nums")}>{r.delta < 0 ? fmtInt(-r.delta) : ""}</td>
                     <td className={cn(td, "text-right font-semibold tabular-nums")}>{fmtInt(r.balance)}</td>
                   </tr>
                 ))}
                 {lastPage && (
-                  <tr className="bg-zinc-50">
-                    <td className={cn(td, "text-xs text-zinc-500")} colSpan={6}>
+                  <tr className="bg-subtle">
+                    <td className={cn(td, "text-caption text-muted")} colSpan={6}>
                       Saldo inicial del periodo
                     </td>
                     <td className={cn(td, "text-right font-semibold tabular-nums")}>{fmtInt(opening)}</td>
@@ -229,12 +230,12 @@ export function ProductDetailDialog({ product: p, lots, branchIds, branches, sco
   );
 }
 
-function Stat({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: "amber" | "dark" }) {
+function Stat({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: "warning" | "danger" }) {
   return (
-    <div className={cn("rounded-xl p-3", tone === "amber" ? "bg-amber-50" : tone === "dark" ? "bg-zinc-900 text-white" : "bg-zinc-50")}>
-      <p className={cn("text-[11px] font-medium", tone === "dark" ? "text-white/60" : "text-zinc-500")}>{label}</p>
-      <p className="mt-0.5 truncate text-sm font-semibold tabular-nums">{value}</p>
-      {hint && <p className={cn("text-[11px]", tone === "dark" ? "text-white/60" : tone === "amber" ? "text-amber-800" : "text-zinc-500")}>{hint}</p>}
+    <div className={cn("rounded-xl p-3", tone ? TONE_CLASS[tone].soft : "bg-subtle")}>
+      <p className={cn("text-micro font-medium", !tone && "text-muted")}>{label}</p>
+      <p className="mt-0.5 truncate text-small font-semibold tabular-nums">{value}</p>
+      {hint && <p className={cn("text-micro", !tone && "text-muted")}>{hint}</p>}
     </div>
   );
 }
