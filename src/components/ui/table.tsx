@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 import { cn } from "@/lib/cn";
 
 export interface HeadCell {
@@ -8,7 +8,7 @@ export interface HeadCell {
 }
 
 /** Tabla con desplazamiento horizontal en pantallas chicas. Con `maxHeight` se desplaza por dentro y el encabezado queda fijo arriba. */
-export function Table({ head, children, minWidth = 720, maxHeight, className }: { head: (HeadCell | string)[]; children: ReactNode; minWidth?: number; maxHeight?: number; className?: string }) {
+export function Table({ head, children, minWidth = 720, maxHeight, className, bodyRef }: { head: (HeadCell | string)[]; children: ReactNode; minWidth?: number; maxHeight?: number; className?: string; bodyRef?: Ref<HTMLTableSectionElement> }) {
   return (
     <div className={cn(maxHeight ? "overflow-auto" : "overflow-x-auto", className)} style={maxHeight ? { maxHeight } : undefined}>
       <table className="w-full border-collapse text-sm" style={{ minWidth }}>
@@ -24,7 +24,7 @@ export function Table({ head, children, minWidth = 720, maxHeight, className }: 
             })}
           </tr>
         </thead>
-        <tbody className="divide-y divide-line-soft">{children}</tbody>
+        <tbody ref={bodyRef} className="divide-y divide-line-soft">{children}</tbody>
       </table>
     </div>
   );

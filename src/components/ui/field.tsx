@@ -9,7 +9,7 @@ export function Field({ label, hint, error, children, className }: { label: stri
     <label className={cn("block min-w-0", className)}>
       <span className="mb-1 block text-xs font-medium text-fg-2">{label}</span>
       {children}
-      {error ? <span className="mt-1 block text-micro text-danger-fg">{error}</span> : hint ? <span className="mt-1 block text-micro text-muted">{hint}</span> : null}
+      {error ? <span role="alert" className="mt-1 block text-micro text-danger-fg">{error}</span> : hint ? <span className="mt-1 block text-micro text-muted">{hint}</span> : null}
     </label>
   );
 }

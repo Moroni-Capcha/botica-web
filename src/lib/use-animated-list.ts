@@ -43,3 +43,14 @@ export function useAnimatedList<T extends { key: string }>(items: T[], exitMs = 
 
   return rows;
 }
+
+/**
+ * Para listas ordenadas por algo que cambia (p. ej. la pérdida): las filas que siguen en la lista se vuelven a ordenar
+ * como en `items`, y las que están saliendo conservan su lugar mientras corre la animación.
+ */
+export function orderAnimatedRows<T extends { key: string }>(rows: AnimatedRow<T>[], items: T[]): AnimatedRow<T>[] {
+  const order = new Map(items.map((it, i) => [it.key, i]));
+  const live = rows.filter((r) => !r.exiting).sort((a, b) => (order.get(a.key) ?? 0) - (order.get(b.key) ?? 0));
+  let i = 0;
+  return rows.map((r) => (r.exiting ? r : live[i++]!));
+}
