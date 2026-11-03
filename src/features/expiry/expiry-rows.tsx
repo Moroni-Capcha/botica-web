@@ -99,7 +99,7 @@ function PriorityActions({ row: r, shared: s }: { row: LotRisk; shared: ExpShare
   const main = primaryAction(r.tone, { hasMove: !!move, canSell: s.canSell });
   const target = move ? (s.names[move.branchId] ?? move.branchId) : "";
   return (
-    <div className="flex flex-wrap items-center justify-end gap-1.5">
+    <div className="flex flex-col items-end gap-1.5">
       {move && (
         <Link
           href={`/traslados?${new URLSearchParams({ from: r.branchId, to: move.branchId, productId: String(r.product.id), lotId: String(r.lot.id), units: String(Math.min(r.atRisk, r.lot.qty)) })}`}

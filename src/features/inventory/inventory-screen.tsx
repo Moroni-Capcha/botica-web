@@ -249,15 +249,15 @@ export function InventoryScreen() {
                 F2
               </kbd>
             </div>
-            <Select value={lab} onChange={(e) => setLab(e.target.value)} className="min-w-0 flex-1 sm:w-44 sm:flex-none" aria-label="Laboratorio o marca">
+            <Select value={lab} onChange={(e) => setLab(e.target.value)} className="min-w-0 flex-1 sm:w-56 sm:flex-none" aria-label="Laboratorio o marca">
               <option value="Todos">Todos los laboratorios</option>
               {options.labs.map((x) => <option key={x}>{x}</option>)}
             </Select>
-            <Select value={category} onChange={(e) => setCategory(e.target.value)} className="min-w-0 flex-1 sm:w-40 sm:flex-none" aria-label="Tipo de producto">
+            <Select value={category} onChange={(e) => setCategory(e.target.value)} className="min-w-0 flex-1 sm:w-48 sm:flex-none" aria-label="Tipo de producto">
               <option value="Todos">Todos los tipos</option>
               {options.categories.map((x) => <option key={x}>{x}</option>)}
             </Select>
-            <Select value={form} onChange={(e) => setForm(e.target.value)} className="min-w-0 flex-1 sm:w-36 sm:flex-none" aria-label="Forma farmacéutica">
+            <Select value={form} onChange={(e) => setForm(e.target.value)} className="min-w-0 flex-1 sm:w-48 sm:flex-none" aria-label="Forma farmacéutica">
               <option value="Todos">Todas las formas</option>
               {options.forms.map((x) => <option key={x}>{x}</option>)}
             </Select>
