@@ -26,3 +26,5 @@ One delegated writer per phase; parent verifies with typecheck, tests and browse
 
 ## Next step
 Parent: browser check of /clientes and /comprobantes (incl. print preview of the ticket), then decide on push/PR.
+
+Browser check (2026-11-02, dev server, no console errors): `/clientes` shows the Recompras tab (status chips with icon + text, WhatsApp and call buttons) and the Clientes table with the "Avisos" consent chips and search; `/comprobantes` shows the date range, search, type select, Segmented status filter with counts, table with SUNAT chips and the credit note in red; the detail dialog shows the status, data and the 80 mm ticket preview with Imprimir / Nota de crédito / Anular. NOT checked: 360/768 px, reduced motion, real print preview, void and credit-note dialogs, customer dialog, WhatsApp/tel links.
