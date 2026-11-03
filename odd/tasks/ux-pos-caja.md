@@ -21,7 +21,7 @@ Improve look, order and motion of the POS and cash screens (the most used by the
 ## Tasks
 - [x] F1 Base (commit 08a7749): semantic tokens (success, danger, warning, muted text, radius, shadow, type scale), `Card`, `Chip`, `IconButton`, visible `focus-visible` everywhere, contrast fixes, 44 px hit areas, shared motion tokens (durations, easing).
 - [x] F2 POS (commit 60bb806): product card hierarchy, cart line enter/exit and total transition, change (vuelto) emphasis, keyboard flow (F2 focus search, Esc, refocus after add/close), accessible mobile cart sheet (Escape, focus trap, animation), payment dialog polish.
-- [ ] F3 Cash: single primary button style, KPI hierarchy, table density and order, number transitions, close dialog flow.
+- [x] F3 Cash (commit 7a2a6c5): single primary button style, KPI hierarchy, table density and order, number transitions, close dialog flow.
 - [ ] F4 Motion system: exit animations for Dialog and Toast, reduced-motion in JS animations, list stagger, shared helpers.
 
 ## Route per task
@@ -35,5 +35,7 @@ Each phase: one delegated writer (2+ non-trivial files; reading that prepares th
 
 Browser check F1+F2 (2026-11-02, dev server, no console errors): focus ring visible on search; product cards show the unit as the primary price; F2 focuses the search; Ctrl+Enter opens "Cobrar" with the total as focal point, focus on "Monto recibido", segmented payment methods; typing 10 on a S/ 1.40 sale shows "Vuelto S/ 8.60" large in the success tone; Esc closes the dialog and focus returns to the search. NOT checked: mobile cart sheet, reduced motion, the feel of the cart line animations (only the end state), narrow phones.
 
+- F3 (delegated writer, commit 7a2a6c5): primary Button in cash/close dialog; focal KPI 'Debe haber en caja' (text-4xl, first, brand) with quiet KPIs (text-xl, muted); sales table sticky header + h-11 rows + payment Chip with icon; movements form on one row with Field labels and Empty compact; history diff column with sign and label via new describeDifference (4 new tests); useValuePulse on KPIs, sales total and close dialog totals; close dialog in 2 numbered steps, 44 px inputs with select-all, first denomination autofocus, success moment (animateIn) with 'Caja cerrada'; opening card with autofocus input and inline error; Table gained optional maxHeight (sticky head), Empty gained compact. Checks: `rm -rf .next && npm run build` OK, typecheck OK, `npm test` 324/324 (320 + 4 new). Leftovers in src/features/cash: raw colors 0, text-[Npx] 0, bg-zinc-900|bg-black 0, transition-all 0, variant="dark" 0. Nothing verified in a browser (parent pending).
+
 ## Next step
-F3 (Cash).
+F4 (Motion system).
