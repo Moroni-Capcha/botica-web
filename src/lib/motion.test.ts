@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { EASE_OUT, animateIn, prefersReducedMotion } from "./motion";
+import { EASE_OUT, animateIn, prefersReducedMotion, stagger } from "./motion";
 
 const stubMedia = (reduce: boolean) => vi.stubGlobal("window", { matchMedia: (q: string) => ({ matches: reduce && q.includes("prefers-reduced-motion"), media: q }) });
 const fakeEl = () => {
@@ -39,5 +39,26 @@ describe("animateIn", () => {
     stubMedia(false);
     expect(animateIn(null, [], { duration: 1 })).toBeNull();
     expect(animateIn({} as Element, [], { duration: 1 })).toBeNull();
+  });
+});
+
+describe("stagger", () => {
+  it("espera 30 ms más por elemento", () => {
+    stubMedia(false);
+    expect(stagger(0)).toEqual({ animationDelay: "0ms" });
+    expect(stagger(3)).toEqual({ animationDelay: "90ms" });
+  });
+  it("no pasa del máximo", () => {
+    stubMedia(false);
+    expect(stagger(50)).toEqual({ animationDelay: "180ms" });
+    expect(stagger(10, 50, 100)).toEqual({ animationDelay: "100ms" });
+  });
+  it("tolera índices negativos", () => {
+    stubMedia(false);
+    expect(stagger(-2)).toEqual({ animationDelay: "0ms" });
+  });
+  it("no devuelve nada con reducir movimiento", () => {
+    stubMedia(true);
+    expect(stagger(3)).toEqual({});
   });
 });

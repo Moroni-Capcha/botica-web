@@ -56,6 +56,8 @@ export function PosScreen() {
   const [payError, setPayError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<Sale | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
+  /* Entrada escalonada de las primeras tarjetas, una sola vez al cargar el catálogo (no al filtrar ni al buscar). */
+  const [intro, setIntro] = useState<Map<Product["id"], number> | "done" | null>(null);
   const [opening, setOpening] = useState("150");
   const searchRef = useRef<HTMLInputElement>(null);
   const fabRef = useRef<HTMLButtonElement>(null);
@@ -111,6 +113,12 @@ export function PosScreen() {
       return [p.name, p.active, p.lab, p.barcode, p.conc].some((f) => f.toLowerCase().includes(s));
     });
   }, [productList, q, category, lab]);
+  if (intro === null && !products.isLoading && !lots.isLoading && results.length > 0) setIntro(new Map(results.slice(0, 8).map((p, i) => [p.id, i])));
+  useEffect(() => {
+    if (!(intro instanceof Map)) return;
+    const id = setTimeout(() => setIntro("done"), 600);
+    return () => clearTimeout(id);
+  }, [intro]);
 
   const lines = useMemo(() => buildCartLines(cart.items, productMap, lotList, now), [cart.items, productMap, lotList, now]);
   const totals = useMemo(() => cartTotals(lines), [lines]);
@@ -273,6 +281,7 @@ export function PosScreen() {
       onAddEquivalent={(p) => add(p, "unidad")}
       onClose={closeCart}
       titleId={titleId}
+      staggerLines={!!titleId}
     />
   );
 
@@ -359,6 +368,7 @@ export function PosScreen() {
                 sellFirst={!!next && (next.discount > 0 || (days !== null && days <= DEFAULT_THRESHOLDS.red))}
                 now={now}
                 onAdd={(prod, pres, el) => add(prod, pres, el)}
+                introIndex={intro instanceof Map ? intro.get(p.id) : undefined}
               />
             );
           })}

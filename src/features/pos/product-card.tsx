@@ -12,6 +12,7 @@ import { hitArea } from "@/components/ui/icon-button";
 import { pickPrimaryPresentation } from "./primary-presentation";
 import { soles } from "@/lib/format";
 import { cn } from "@/lib/cn";
+import { stagger } from "@/lib/motion";
 
 export interface ProductCardProps {
   product: Product;
@@ -24,15 +25,17 @@ export interface ProductCardProps {
   sellFirst: boolean;
   now: number;
   onAdd: (product: Product, presentation: PresentationId, el: HTMLButtonElement) => void;
+  /** Posición en la primera carga del catálogo: solo esas tarjetas entran escalonadas. */
+  introIndex?: number;
 }
 
-export const ProductCard = memo(function ProductCard({ product: p, stock, minStock, nextLot, hasExpiredOnly, otherBranch, sellFirst, now, onAdd }: ProductCardProps) {
+export const ProductCard = memo(function ProductCard({ product: p, stock, minStock, nextLot, hasExpiredOnly, otherBranch, sellFirst, now, onAdd, introIndex }: ProductCardProps) {
   const days = nextLot ? daysUntil(nextLot.expiresOn, now) : null;
   const low = stock > 0 && stock <= minStock;
   const presentations = presentationsOf(p);
   const main = pickPrimaryPresentation(presentations);
   return (
-    <Card as="article" padding="sm" className={cn(sellFirst && "border-danger-border")}>
+    <Card as="article" padding="sm" className={cn(sellFirst && "border-danger-border", introIndex !== undefined && "animate-stagger-in")} style={introIndex !== undefined ? stagger(introIndex) : undefined}>
       <div className="flex items-start gap-3">
         <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-sunken text-muted">
           {p.coldChain ? <Snowflake className="h-5 w-5 text-info-fg" role="img" aria-label="Cadena de frío" /> : <Pill className="h-5 w-5" aria-hidden />}

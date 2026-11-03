@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, Banknote, ChevronRight, CreditCard, FileSpreadsheet, History, Lock, Plus, Receipt, Smartphone, Stethoscope, TriangleAlert, Wallet, type LucideIcon } from "lucide-react";
 import type { CashClosing, CashMovementType, PaymentMethod } from "@/lib/api/types";
 import { netPayments, sumPayments } from "@/lib/domain/returns";
@@ -22,7 +22,9 @@ import { notify } from "@/components/ui/toast";
 import { dateShort, soles, timeShort } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { ScopeToggle, useBranchScope } from "@/features/shared/branch-scope";
-import { useValuePulse } from "@/features/pos/use-pulse";
+import { useValuePulse } from "@/lib/use-value-pulse";
+import { stagger } from "@/lib/motion";
+import { Pulse } from "@/components/ui/pulse";
 import { CloseDialog, TONE_LABEL, TONE_TEXT } from "./close-dialog";
 import { exportClosings } from "./export";
 
@@ -292,7 +294,7 @@ export function CashScreen() {
           <Empty icon={History} title={`Sin cierres en ${days} días`} />
         ) : (
           <Table maxHeight={480} minWidth={multi ? 1060 : 980} head={["Fecha", ...(multi ? ["Local"] : []), "Cerró", { label: "Tickets", align: "right" }, { label: "Efectivo", align: "right" }, { label: "Yape / Plin", align: "right" }, { label: "Tarjeta", align: "right" }, { label: "Devuelto", align: "right" }, { label: "Debe haber", align: "right" }, { label: "Contado", align: "right" }, { label: "Diferencia", align: "right" }, { label: <span className="sr-only">Ver</span> }]}>
-            {closings.data.map((c) => {
+            {closings.data.map((c, i) => {
               const diff = describeDifference(c.counted, c.expected);
               return (
                 <tr
@@ -305,7 +307,8 @@ export function CashScreen() {
                       setDetail(c);
                     }
                   }}
-                  className={cn(rowButtonClass, "h-11")}
+                  className={cn(rowButtonClass, "h-11", i < 8 && "animate-stagger-in")}
+                  style={i < 8 ? stagger(i) : undefined}
                   aria-label={`Ver cierre del ${dateShort(c.closedAt)}`}
                 >
                   <td className={cn(td, "whitespace-nowrap py-1.5 tabular-nums")}>
@@ -435,16 +438,6 @@ function ClosingDetail({ closing: c, branchName, onClose }: { closing: CashClosi
         </div>
       </div>
     </Dialog>
-  );
-}
-
-/** Cambia el monto con un pulso corto (120 ms), sin contar números. */
-function Pulse({ value, className, children }: { value: unknown; className?: string; children: ReactNode }) {
-  const ref = useValuePulse<HTMLSpanElement>(value);
-  return (
-    <span ref={ref} className={cn("inline-block origin-left", className)}>
-      {children}
-    </span>
   );
 }
 

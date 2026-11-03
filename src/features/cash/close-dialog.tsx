@@ -14,7 +14,7 @@ import { soles } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { animateIn } from "@/lib/motion";
 import { TONE_CLASS } from "@/components/ui/tone";
-import { useValuePulse } from "@/features/pos/use-pulse";
+import { useValuePulse } from "@/lib/use-value-pulse";
 
 /** Color del texto de la diferencia de caja, sacado de los tonos semánticos. */
 export const TONE_TEXT = { cuadra: TONE_CLASS.success.text, faltante: TONE_CLASS.danger.text, sobrante: TONE_CLASS.warning.text } as const;
@@ -91,16 +91,20 @@ export function CloseDialog({ summary, branchName, onClose, onClosed }: { summar
 
   if (done) {
     return (
+      /* Mismo <Dialog> que el conteo (no se desmonta): solo cambia el contenido, con un fundido corto. */
       <Dialog
         title={`Caja cerrada · ${branchName}`}
         onClose={() => onClosed(done)}
+        size="lg"
         footer={
           <Button ref={doneBtn} variant="primary" onClick={() => onClosed(done)}>
             Ver detalle del cierre
           </Button>
         }
       >
-        <ClosedResult closing={done} />
+        <div className="animate-swap-in">
+          <ClosedResult closing={done} />
+        </div>
       </Dialog>
     );
   }

@@ -15,3 +15,13 @@ export function animateIn(el: Element | null | undefined, keyframes: Keyframe[] 
   if (!el || typeof el.animate !== "function" || prefersReducedMotion()) return null;
   return el.animate(keyframes, { easing: EASE_OUT, ...options });
 }
+
+/**
+ * Retraso de entrada escalonado para listas que aparecen de golpe tras cargar datos (pocas filas).
+ * Úsalo con la clase `animate-stagger-in`. Cada elemento espera `stepMs` más que el anterior, hasta `maxMs`.
+ * Con "reducir movimiento" no devuelve nada (y la clase no anima).
+ */
+export function stagger(index: number, stepMs = 30, maxMs = 180): { animationDelay?: string } {
+  if (prefersReducedMotion()) return {};
+  return { animationDelay: `${Math.min(Math.max(0, index) * stepMs, maxMs)}ms` };
+}

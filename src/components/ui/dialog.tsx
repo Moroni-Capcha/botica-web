@@ -1,10 +1,14 @@
 "use client";
 
-import { useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { IconButton } from "./icon-button";
+import { playExitGhost } from "./presence";
 import { useFocusTrap } from "./use-focus-trap";
+
+/** Duración de la salida (--dur-fast). */
+const EXIT_MS = 140;
 
 interface DialogProps {
   title: string;
@@ -18,14 +22,31 @@ interface DialogProps {
 /** Diálogo modal accesible: foco inicial (o el campo marcado con `data-autofocus`), Escape para cerrar y foco atrapado en el contenido. */
 export function Dialog({ title, description, onClose, children, footer, size = "md" }: DialogProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   useFocusTrap(ref, onClose);
 
+  /* Los diálogos los desmonta quien los usa. Al desmontarse, un "fantasma" hace la salida (el foco y el scroll
+     se liberan al instante, el fantasma no atrapa nada). El microtask distingue el desmontaje real del simulado de StrictMode. */
+  const alive = useRef(false);
+  useEffect(() => {
+    alive.current = true;
+    const root = rootRef.current;
+    return () => {
+      alive.current = false;
+      queueMicrotask(() => {
+        if (!alive.current && root) playExitGhost(root, EXIT_MS);
+      });
+    };
+  }, []);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
-      <div className="absolute inset-0 animate-fade bg-scrim" onClick={onClose} aria-hidden />
+    <div ref={rootRef} className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
+      <div data-enter="animate-fade" data-exit="animate-fade-out" className="absolute inset-0 animate-fade bg-scrim" onClick={onClose} aria-hidden />
       <div
         ref={ref}
+        data-enter="animate-pop"
+        data-exit="animate-pop-out"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

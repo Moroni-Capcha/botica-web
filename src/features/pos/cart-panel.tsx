@@ -11,8 +11,9 @@ import { hitArea, IconButton } from "@/components/ui/icon-button";
 import { CustomerPicker } from "./customer-picker";
 import { dateShort, soles } from "@/lib/format";
 import { cn } from "@/lib/cn";
-import { useAnimatedList } from "./use-animated-list";
-import { useValuePulse } from "./use-pulse";
+import { useAnimatedList } from "@/lib/use-animated-list";
+import { useValuePulse } from "@/lib/use-value-pulse";
+import { stagger } from "@/lib/motion";
 
 interface CartPanelProps {
   lines: CartLine[];
@@ -30,9 +31,11 @@ interface CartPanelProps {
   onClose?: () => void;
   /** Id para el título cuando el panel va dentro de la hoja (la nombra como diálogo). */
   titleId?: string;
+  /** Las líneas que ya estaban entran escalonadas (para la hoja del móvil, que se arma al abrirla). */
+  staggerLines?: boolean;
 }
 
-export function CartPanel({ lines, totals, customer, onCustomer, onQty, onClear, onCharge, canCharge, writable = true, cashOpen, equivalents, onAddEquivalent, onClose, titleId }: CartPanelProps) {
+export function CartPanel({ lines, totals, customer, onCustomer, onQty, onClear, onCharge, canCharge, writable = true, cashOpen, equivalents, onAddEquivalent, onClose, titleId, staggerLines }: CartPanelProps) {
   const rows = useAnimatedList(lines);
   const totalRef = useValuePulse<HTMLSpanElement>(totals.total);
   const chargeRef = useValuePulse<HTMLSpanElement>(totals.total);
@@ -67,7 +70,7 @@ export function CartPanel({ lines, totals, customer, onCustomer, onQty, onClear,
           </>
         ) : (
           <ul className="divide-y divide-line-soft">
-            {rows.map(({ key, item: l, exiting, isNew }) => (
+            {rows.map(({ key, item: l, exiting, isNew }, idx) => (
               <li
                 key={key}
                 inert={exiting}
@@ -76,7 +79,9 @@ export function CartPanel({ lines, totals, customer, onCustomer, onQty, onClear,
                   "grid transition-[grid-template-rows,opacity,transform] duration-[var(--dur-fast)] ease-[var(--ease-out)]",
                   exiting ? "-translate-x-3 grid-rows-[0fr] opacity-0" : "grid-rows-[1fr]",
                   isNew && "animate-line-in",
+                  staggerLines && !isNew && !exiting && idx < 6 && "animate-stagger-in",
                 )}
+                style={staggerLines && !isNew && idx < 6 ? stagger(idx) : undefined}
               >
                 <div className="min-h-0 overflow-hidden">
                   <div className="px-4 py-3">
