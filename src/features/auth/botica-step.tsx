@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { api, errorMessage, isApiError, type BoticaPublic } from "@/lib/api";
 import { isValidBoticaCode, normalizeBoticaCode } from "@/lib/domain/auth";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
+import { TestHint } from "./test-hint";
 
 /** Resuelve el código de una botica. Devuelve sus datos públicos o un mensaje de error listo para mostrar. */
 export async function lookupBotica(raw: string): Promise<{ botica: BoticaPublic } | { error: string }> {
@@ -23,6 +24,13 @@ export function BoticaStep({ initialCode, onFound, mockHint }: { initialCode: st
   const [code, setCode] = useState(initialCode);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const errorId = useId();
+
+  // El foco inicial solo con mouse o lápiz: en una tablet o un celular abriría el teclado de pantalla sin que lo pidan.
+  useEffect(() => {
+    if (window.matchMedia("(pointer: fine)").matches) inputRef.current?.focus();
+  }, []);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -35,13 +43,31 @@ export function BoticaStep({ initialCode, onFound, mockHint }: { initialCode: st
   };
 
   return (
-    <form onSubmit={submit} noValidate>
-      <h2 className="text-xl font-semibold tracking-tight">Ingresa a tu botica</h2>
-      <p className="mt-1 text-sm text-zinc-500">Escribe el código de tu botica para continuar.</p>
-      {mockHint && <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{mockHint}</p>}
-      <Field label="Código de la botica" error={error ?? undefined} className="mt-6">
-        <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="botica-huanuco" autoCapitalize="none" autoCorrect="off" spellCheck={false} autoFocus aria-invalid={!!error} />
+    <form onSubmit={submit} noValidate aria-busy={busy}>
+      <h2 className="text-2xl font-semibold tracking-tight text-fg">Ingresa a tu botica</h2>
+      <p className="mt-1 text-small text-fg-2">Escribe el código de tu botica para continuar.</p>
+      {mockHint && <TestHint>{mockHint}</TestHint>}
+      <Field label="Código de la botica" hint="Si no lo recuerdas, pídelo a quien administra tu botica." className="mt-6">
+        <Input
+          ref={inputRef}
+          name="botica"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          placeholder="botica-huanuco"
+          autoCapitalize="none"
+          autoCorrect="off"
+          autoComplete="off"
+          spellCheck={false}
+          className="h-12 text-base"
+          aria-invalid={!!error}
+          aria-describedby={error ? errorId : undefined}
+        />
       </Field>
+      {error && (
+        <p id={errorId} role="alert" className="mt-2 text-small text-danger-fg">
+          {error}
+        </p>
+      )}
       <Button type="submit" variant="primary" size="lg" className="mt-4 w-full" loading={busy} disabled={!code.trim()}>
         Continuar
       </Button>
