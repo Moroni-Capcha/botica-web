@@ -22,7 +22,7 @@ Improve look, order and motion of the POS and cash screens (the most used by the
 - [x] F1 Base (commit 08a7749): semantic tokens (success, danger, warning, muted text, radius, shadow, type scale), `Card`, `Chip`, `IconButton`, visible `focus-visible` everywhere, contrast fixes, 44 px hit areas, shared motion tokens (durations, easing).
 - [x] F2 POS (commit 60bb806): product card hierarchy, cart line enter/exit and total transition, change (vuelto) emphasis, keyboard flow (F2 focus search, Esc, refocus after add/close), accessible mobile cart sheet (Escape, focus trap, animation), payment dialog polish.
 - [x] F3 Cash (commit 7a2a6c5): single primary button style, KPI hierarchy, table density and order, number transitions, close dialog flow.
-- [ ] F4 Motion system: exit animations for Dialog and Toast, reduced-motion in JS animations, list stagger, shared helpers.
+- [x] F4 Motion system (commit 4b97cdd): exit animations for Dialog and Toast, reduced-motion in JS animations, list stagger, shared helpers.
 
 ## Route per task
 Each phase: one delegated writer (2+ non-trivial files; reading that prepares the write goes with the write). Parent verifies with typecheck, tests and a browser check before the next phase.
@@ -39,5 +39,7 @@ Browser check F1+F2 (2026-11-02, dev server, no console errors): focus ring visi
 
 Browser check F3 (2026-11-02, dev server, no console errors): "Debe haber en caja" is the wide brand-filled first KPI (S/ 167.60, breakdown wraps), the other four KPIs are quieter, payment methods are chips with icons, sticky table header, "Hacer arqueo y cerrar" is brand green. Close dialog: first denomination focused, running total with per-row subtotals, counting S/ 167.60 shows "Cuadra" in success tone with Contado/Debe haber; counting 0 shows "Falta S/ 167.60" in danger tone and a required reason field. Closed with Esc without closing the register. NOT checked: the closing success moment, history table, mobile layout, inline opening error, Space on history rows.
 
+- F4 (delegated writer, commit 4b97cdd): ui/presence.ts (nextPresence state machine, usePresence, playExitGhost); Dialog exit via ghost clone left on unmount (covers parent-initiated closes, skipped under reduced motion; focus and scroll lock released immediately); Toaster with persistent role=status aria-live=polite region and 140 ms exit; CartSheet now uses usePresence; Pulse (ui/pulse.tsx), useValuePulse and useAnimatedList moved to src/lib; close dialog keeps one Dialog instance (size lg in both steps) with animate-swap-in; stagger() helper + animate-stagger-in on cash history rows (first 8), POS first-paint cards (first 8, once, cleared after 600 ms) and mobile sheet lines (first 6); globals.css reduced-motion now keeps opacity-only keyframes and drops the 0.01ms animation override; README "Movimiento" section. Checks: `rm -rf .next && npm run build` OK, typecheck OK, `npm test` 333/333 (324 + 9 new). Leftovers: transition-all 1 (pre-existing setup-checklist progress bar), --dur-slow in UI 0 (only shake token), direct .animate( outside motion.ts 0. Nothing verified in a browser (parent pending): dialog exit, toast exit, no stuck ghost/overlay, no scroll lock, focus restore, cash close swap, stagger.
+
 ## Next step
-F4 (Motion system).
+Parent browser check of F4, then final review of the branch.
