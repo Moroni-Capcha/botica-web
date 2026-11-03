@@ -29,5 +29,7 @@ Each phase: one delegated writer; parent verifies with typecheck, tests and a br
 (branch created from master @ 14edda3)
 - M0 done in 38fd187: --ease-out = cubic-bezier(0.16, 1, 0.3, 1) (also default Tailwind transition curve); cart line exit now opacity + translate3d with FLIP (`playFlip`/`useFlipList`), no grid-template-rows; CSS keyframes and WAAPI use translate3d/scale3d; will-change only during animateIn; memo rows (CartPanel, CartLineRow, ProductCard stable props, SaleRow, ClosingRow) with `useStableCallback`; add-to-cart POP_KEYFRAMES. Checks: typecheck clean, 352 tests pass (was 344), build OK. Not verified in a browser yet (parent: cart add/remove, bars, dialogs).
 
+Browser check M0 (2026-11-02, dev server, no console errors): with 2 cart lines, removing the first one (Panadol Forte) fades it with a transform (opacity 1 -> 0) and removes it from the DOM at about 230 ms; the remaining line ends with no inline transform and no `will-change`; total updates. NOT checked: FLIP slide of lines below with 3+ lines, two quick removals, add-to-cart pop feel, mobile sheet, dialogs/toast with the new curve, kiosk shake, reduced motion, React Profiler.
+
 ## Next step
-I1 Inventario (after the parent's browser check of M0).
+I1 Inventario.
