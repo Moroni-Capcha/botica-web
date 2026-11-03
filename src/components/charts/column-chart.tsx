@@ -3,6 +3,8 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Table2, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { Empty } from "@/components/ui/empty";
+import { hitArea } from "@/components/ui/icon-button";
 
 export interface ChartSeries {
   key: string;
@@ -33,6 +35,8 @@ interface Props {
   labelEvery?: number;
   ariaLabel: string;
   emptyText?: string;
+  /** Las columnas crecen desde la base al aparecer (solo la primera vez que se dibujan; no con "reducir movimiento"). */
+  grow?: boolean;
 }
 
 const PAD = { top: 12, right: 8, bottom: 24, left: 44 };
@@ -73,7 +77,7 @@ function useWidth<T extends HTMLElement>() {
  * Columnas (apiladas si hay varias series) con tooltip al pasar el mouse o enfocar con el teclado,
  * leyenda cuando hay 2 o más series y una vista de tabla con los mismos números.
  */
-export function ColumnChart({ data, series, height = 220, format, formatTick = format, highlightKey, labelEvery = 1, ariaLabel, emptyText = "Sin datos" }: Props) {
+export function ColumnChart({ data, series, height = 220, format, formatTick = format, highlightKey, labelEvery = 1, ariaLabel, emptyText = "Sin datos", grow }: Props) {
   const [wrapRef, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
   const [asTable, setAsTable] = useState(false);
@@ -96,33 +100,33 @@ export function ColumnChart({ data, series, height = 220, format, formatTick = f
       <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1">
         {series.length > 1 &&
           series.map((s) => (
-            <span key={s.key} className="inline-flex items-center gap-1.5 text-xs text-zinc-600">
+            <span key={s.key} className="inline-flex items-center gap-1.5 text-caption text-fg-2">
               <span className="h-2.5 w-2.5 rounded-sm" style={{ background: s.color }} aria-hidden />
               {s.label}
             </span>
           ))}
-        <button type="button" onClick={() => setAsTable((v) => !v)} className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800" aria-pressed={asTable}>
-          {asTable ? <BarChart3 className="h-3.5 w-3.5" /> : <Table2 className="h-3.5 w-3.5" />} {asTable ? "Ver gráfico" : "Ver tabla"}
+        <button type="button" onClick={() => setAsTable((v) => !v)} className={cn("ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 text-caption font-medium text-muted transition-colors duration-[var(--dur-fast)] hover:bg-sunken hover:text-fg", hitArea)} aria-pressed={asTable}>
+          {asTable ? <BarChart3 className="h-3.5 w-3.5" aria-hidden /> : <Table2 className="h-3.5 w-3.5" aria-hidden />} {asTable ? "Ver gráfico" : "Ver tabla"}
         </button>
       </div>
 
       {asTable ? (
-        <div className="max-h-[260px] overflow-auto rounded-xl border border-zinc-200">
+        <div className="max-h-[260px] overflow-auto rounded-xl border border-line">
           <table className="w-full text-sm">
             <caption className="sr-only">{ariaLabel}</caption>
             <thead>
-              <tr className="border-b border-zinc-200 text-left text-[11px] uppercase tracking-wide text-zinc-500">
-                <th scope="col" className="px-3 py-2 font-semibold"> </th>
+              <tr className="border-b border-line text-left text-micro uppercase tracking-wide text-muted">
+                <th scope="col" className="px-3 py-2"><span className="sr-only">Periodo</span></th>
                 {series.map((s) => (
                   <th key={s.key} scope="col" className="px-3 py-2 text-right font-semibold">{s.label}</th>
                 ))}
                 {series.length > 1 && <th scope="col" className="px-3 py-2 text-right font-semibold">Total</th>}
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-100">
+            <tbody className="divide-y divide-line-soft">
               {data.map((d, i) => (
                 <tr key={d.key}>
-                  <th scope="row" className="px-3 py-1.5 text-left font-normal text-zinc-600">{d.title}</th>
+                  <th scope="row" className="px-3 py-1.5 text-left font-normal text-fg-2">{d.title}</th>
                   {series.map((s) => (
                     <td key={s.key} className="px-3 py-1.5 text-right tabular-nums">{format(d.values[s.key] ?? 0)}</td>
                   ))}
@@ -134,13 +138,18 @@ export function ColumnChart({ data, series, height = 220, format, formatTick = f
         </div>
       ) : (
         <div ref={wrapRef} className="relative w-full" style={{ height }} onMouseLeave={() => setHover(null)}>
-          {width > 0 && (
+          {empty ? (
+            <div className="grid h-full place-items-center">
+              <Empty compact icon={BarChart3} title={emptyText} />
+            </div>
+          ) : (
+            width > 0 && (
             <svg width={width} height={height} role="img" aria-labelledby={`${id}-t`} className="block overflow-visible">
               <title id={`${id}-t`}>{ariaLabel}</title>
               {ticks.map((t) => (
                 <g key={t}>
-                  <line x1={PAD.left} x2={width - PAD.right} y1={y(t)} y2={y(t)} stroke={t === 0 ? "#d4d4d8" : "#f1f1f3"} />
-                  <text x={PAD.left - 6} y={y(t)} dy="0.32em" textAnchor="end" className="fill-zinc-400 text-[10px] tabular-nums">
+                  <line x1={PAD.left} x2={width - PAD.right} y1={y(t)} y2={y(t)} style={{ stroke: t === 0 ? "var(--color-line-strong)" : "var(--color-line-soft)" }} />
+                  <text x={PAD.left - 6} y={y(t)} dy="0.32em" textAnchor="end" className="fill-muted text-micro tabular-nums">
                     {formatTick(t)}
                   </text>
                 </g>
@@ -151,8 +160,12 @@ export function ColumnChart({ data, series, height = 220, format, formatTick = f
                 let acc = 0;
                 const visible = series.filter((s) => (d.values[s.key] ?? 0) > 0);
                 const isHi = hover === i || (hover === null && d.key === highlightKey);
+                /* Con una sola serie y una columna destacada: la destacada va en el color de la marca y el resto en un tono quieto */
+                const accent = series.length === 1 && highlightKey !== undefined;
+                const fillFor = (color: string) => (accent ? (d.key === highlightKey ? "var(--brand)" : "var(--color-line-strong)") : color);
                 return (
                   <g key={d.key} opacity={hover !== null && hover !== i ? 0.45 : 1}>
+                    <g className={cn(grow && "origin-bottom animate-bar-grow [transform-box:fill-box]")}>
                     {visible.map((s, si) => {
                       const v = d.values[s.key] ?? 0;
                       const y0 = y(acc);
@@ -161,10 +174,11 @@ export function ColumnChart({ data, series, height = 220, format, formatTick = f
                       const isTop = si === visible.length - 1;
                       const h = Math.max(1, y0 - y1 - (si > 0 ? GAP : 0));
                       const yy = y1;
-                      return isTop ? <path key={s.key} d={topRounded(x, yy, barW, h, RADIUS)} fill={s.color} /> : <rect key={s.key} x={x} y={yy} width={barW} height={h} fill={s.color} />;
+                      return isTop ? <path key={s.key} d={topRounded(x, yy, barW, h, RADIUS)} fill={fillFor(s.color)} /> : <rect key={s.key} x={x} y={yy} width={barW} height={h} fill={fillFor(s.color)} />;
                     })}
+                    </g>
                     {(i % labelEvery === 0 || d.key === highlightKey) && (
-                      <text x={cx} y={height - 8} textAnchor="middle" className={cn("text-[10px]", isHi ? "fill-zinc-900 font-semibold" : "fill-zinc-500")}>
+                      <text x={cx} y={height - 8} textAnchor="middle" className={cn("text-micro", isHi ? "fill-fg font-semibold" : "fill-muted")}>
                         {d.label}
                       </text>
                     )}
@@ -187,11 +201,11 @@ export function ColumnChart({ data, series, height = 220, format, formatTick = f
                 );
               })}
             </svg>
+            )
           )}
-          {empty && <p className="absolute inset-0 grid place-items-center text-sm text-zinc-400">{emptyText}</p>}
-          {hover !== null && data[hover] && width > 0 && (
+          {!empty && hover !== null && data[hover] && width > 0 && (
             <div
-              className={cn("pointer-events-none absolute z-10 min-w-[150px] whitespace-nowrap rounded-xl bg-zinc-900 px-3 py-2 text-xs text-white shadow-lg", flipTooltip(hover) && "-translate-x-full")}
+              className={cn("pointer-events-none absolute z-10 min-w-[150px] whitespace-nowrap rounded-xl bg-fg px-3 py-2 text-caption text-white shadow-overlay", flipTooltip(hover) && "-translate-x-full")}
               /* Al costado de la columna (no encima) para no tapar el dato; cerca del borde derecho se pasa al otro lado */
               style={{ left: PAD.left + band * hover + band / 2 + (flipTooltip(hover) ? -(barW / 2 + 8) : barW / 2 + 8), top: Math.min(Math.max(0, y(totals[hover] ?? 0) - 8), height - 110) }}
               role="status"
