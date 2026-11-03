@@ -41,7 +41,7 @@ export function DigiHmeName({ light, className }: { light?: boolean; className?:
 /** Sello "Desarrollado por Digi!HME" del pie de la barra lateral y del ingreso. */
 export function DigiSeal({ light }: { light?: boolean }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 text-[11px] ${light ? "text-white/55" : "text-zinc-400"}`}>
+    <span className={`inline-flex items-center gap-1.5 text-micro ${light ? "text-white/80" : "text-muted"}`}>
       Desarrollado por
       <DigiHmeIcon size={18} />
       <DigiHmeName light={light} className="text-xs" />

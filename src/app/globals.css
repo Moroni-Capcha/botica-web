@@ -94,6 +94,7 @@
   --animate-toast-out: toast-out var(--dur-fast) var(--ease-out) forwards;
   --animate-swap-in: swap-in var(--dur-fast) var(--ease-out);
   --animate-stagger-in: stagger-in var(--dur-base) var(--ease-out) backwards;
+  --animate-bar-grow: bar-grow var(--dur-base) var(--ease-out) backwards;
 }
 
 html,
@@ -156,6 +157,10 @@ body {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
 }
+@keyframes bar-grow {
+  from { opacity: 0; transform: scaleY(0.2); }
+  to { opacity: 1; transform: none; }
+}
 @keyframes shake {
   0%, 100% { transform: none; }
   20%, 60% { transform: translateX(-6px); }
@@ -174,6 +179,7 @@ body {
   @keyframes sheet-out { from { opacity: 1; } to { opacity: 0; } }
   @keyframes shake { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
   .animate-stagger-in { animation: none; }
+  .animate-bar-grow { animation: none; }
 }
 
 /* Ticket de 80 mm (impresora térmica). Se imprime solo el contenido de .print-root; el resto de la pantalla se oculta. */

@@ -20,18 +20,22 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean;
 }
 
+/** Las clases del botón, para darle su aspecto a un enlace (por ejemplo "Vender" que lleva a otra pantalla). */
+export function buttonClass(variant: Variant = "secondary", size: Size = "md") {
+  return cn(
+    "inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition duration-[var(--dur-fast)] ease-[var(--ease-out)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40",
+    variants[variant],
+    sizes[size],
+  );
+}
+
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button({ variant = "secondary", size = "md", loading, className, disabled, children, type = "button", ...rest }, ref) {
   return (
     <button
       ref={ref}
       type={type}
       disabled={disabled || loading}
-      className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition duration-[var(--dur-fast)] ease-[var(--ease-out)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40",
-        variants[variant],
-        sizes[size],
-        className,
-      )}
+      className={cn(buttonClass(variant, size), className)}
       {...rest}
     >
       {loading && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent" aria-hidden />}
