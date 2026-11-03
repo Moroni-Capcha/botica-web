@@ -33,5 +33,7 @@ Each phase: one delegated writer (2+ non-trivial files; reading that prepares th
 
 - F2 (delegated writer, commit 60bb806): product card hierarchy (primary presentation via pickPrimaryPresentation), F2 hint chip, animated cart lines and total pulse, payment dialog focal amount + big change, use-pos-shortcuts (F2, Esc, Ctrl+Enter, refocus), accessible CartSheet via shared useFocusTrap (stacked modals, scroll lock counter), src/lib/motion.ts (prefersReducedMotion, animateIn). Checks: `rm -rf .next && npm run build` OK, typecheck OK, `npm test` 320/320 (301 + 19 new). Leftovers in src/features/pos: raw colors 0, text-[Npx] 0; only arbitrary px is the pre-existing aside `w-[380px]`. Nothing verified in a browser (parent pending).
 
+Browser check F1+F2 (2026-11-02, dev server, no console errors): focus ring visible on search; product cards show the unit as the primary price; F2 focuses the search; Ctrl+Enter opens "Cobrar" with the total as focal point, focus on "Monto recibido", segmented payment methods; typing 10 on a S/ 1.40 sale shows "Vuelto S/ 8.60" large in the success tone; Esc closes the dialog and focus returns to the search. NOT checked: mobile cart sheet, reduced motion, the feel of the cart line animations (only the end state), narrow phones.
+
 ## Next step
-Browser check of F1 and F2 (keyboard flow, mobile sheet, reduced motion), then F3 (Cash).
+F3 (Cash).
