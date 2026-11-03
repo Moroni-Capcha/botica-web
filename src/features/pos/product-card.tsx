@@ -6,8 +6,13 @@ import { ArrowLeftRight, Pill, Snowflake, TrendingUp } from "lucide-react";
 import type { Lot, PresentationId, Product } from "@/lib/api/types";
 import { daysUntil, presentationsOf, stockLabel, DEFAULT_THRESHOLDS } from "@/lib/domain/pharmacy";
 import { ExpiryBadge, RxBadge } from "@/components/ui/badges";
+import { Card } from "@/components/ui/card";
+import { Chip, chipClass } from "@/components/ui/chip";
+import { hitArea } from "@/components/ui/icon-button";
+import { pickPrimaryPresentation } from "./primary-presentation";
 import { soles } from "@/lib/format";
 import { cn } from "@/lib/cn";
+import { stagger } from "@/lib/motion";
 
 export interface ProductCardProps {
   product: Product;
@@ -20,63 +25,79 @@ export interface ProductCardProps {
   sellFirst: boolean;
   now: number;
   onAdd: (product: Product, presentation: PresentationId, el: HTMLButtonElement) => void;
+  /** Posición en la primera carga del catálogo: solo esas tarjetas entran escalonadas. */
+  introIndex?: number;
 }
 
-export const ProductCard = memo(function ProductCard({ product: p, stock, minStock, nextLot, hasExpiredOnly, otherBranch, sellFirst, now, onAdd }: ProductCardProps) {
+export const ProductCard = memo(function ProductCard({ product: p, stock, minStock, nextLot, hasExpiredOnly, otherBranch, sellFirst, now, onAdd, introIndex }: ProductCardProps) {
   const days = nextLot ? daysUntil(nextLot.expiresOn, now) : null;
   const low = stock > 0 && stock <= minStock;
+  const presentations = presentationsOf(p);
+  const main = pickPrimaryPresentation(presentations);
   return (
-    <article className={cn("rounded-2xl border bg-white p-3.5", sellFirst ? "border-rose-200" : "border-zinc-200")}>
+    <Card as="article" padding="sm" className={cn(sellFirst && "border-danger-border", introIndex !== undefined && "animate-stagger-in")} style={introIndex !== undefined ? stagger(introIndex) : undefined}>
       <div className="flex items-start gap-3">
-        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-zinc-100 text-zinc-500">
-          {p.coldChain ? <Snowflake className="h-5 w-5 text-sky-600" aria-label="Cadena de frío" /> : <Pill className="h-5 w-5" aria-hidden />}
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-sunken text-muted">
+          {p.coldChain ? <Snowflake className="h-5 w-5 text-info-fg" role="img" aria-label="Cadena de frío" /> : <Pill className="h-5 w-5" aria-hidden />}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            <h3 className="text-sm font-semibold leading-tight">{p.name}</h3>
-            <span className="text-sm text-zinc-500">{p.conc}</span>
+            <h3 className="text-base font-semibold leading-tight">{p.name}</h3>
+            <span className="text-sm font-medium text-fg-2">{p.conc}</span>
             <RxBadge rx={p.rx} />
           </div>
-          <p className="mt-0.5 truncate text-xs text-zinc-500">
+          <p className="mt-0.5 truncate text-caption text-muted">
             {p.active !== "—" ? `${p.active} · ` : ""}
             {p.form} · {p.lab} · Ubic. {p.location}
           </p>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", stock === 0 ? "bg-zinc-900 text-white" : low ? "bg-amber-100 text-amber-800" : "bg-zinc-100 text-zinc-600")}>
+            <Chip tone={stock === 0 ? "neutral" : low ? "warning" : "neutral"} solid={stock === 0}>
               {stock === 0 ? (hasExpiredOnly ? "Solo stock vencido" : "Agotado") : `Stock ${stockLabel(p, stock)}`}
-            </span>
+            </Chip>
             {days !== null && <ExpiryBadge days={days} short />}
-            {nextLot && nextLot.discount > 0 && <span className="rounded-full bg-rose-600 px-2 py-0.5 text-[11px] font-bold text-white">-{Math.round(nextLot.discount * 100)} %</span>}
+            {nextLot && nextLot.discount > 0 && <Chip tone="danger" solid className="font-bold">-{Math.round(nextLot.discount * 100)} %</Chip>}
             {sellFirst && days !== null && days <= DEFAULT_THRESHOLDS.yellow && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700 ring-1 ring-rose-200">
-                <TrendingUp className="h-3 w-3" />
+              <Chip tone="danger" ring>
+                <TrendingUp className="h-3 w-3" aria-hidden />
                 Vender primero
-              </span>
+              </Chip>
             )}
             {stock === 0 && otherBranch && otherBranch.units > 0 && (
-              <Link href={`/traslados?from=${otherBranch.id}&to=${otherBranch.toId}&productId=${p.id}`} className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-700 ring-1 ring-violet-200 hover:bg-violet-100">
-                <ArrowLeftRight className="h-3 w-3" />
+              <Link href={`/traslados?from=${otherBranch.id}&to=${otherBranch.toId}&productId=${p.id}`} className={cn(chipClass("special", { ring: true }), hitArea, "transition-colors duration-[var(--dur-fast)] hover:bg-special-border")}>
+                <ArrowLeftRight className="h-3 w-3" aria-hidden />
                 {stockLabel(p, otherBranch.units)} en {otherBranch.name} · pedir traslado
               </Link>
             )}
           </div>
         </div>
       </div>
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {presentationsOf(p).map((ps) => (
-          <button
-            key={ps.id}
-            type="button"
-            disabled={stock < ps.units}
-            onClick={(e) => onAdd(p, ps.id, e.currentTarget)}
-            className="flex min-w-[96px] flex-1 flex-col items-start rounded-xl border border-zinc-200 px-3 py-1.5 text-left transition hover:border-zinc-400 hover:bg-zinc-50 active:scale-[0.98] disabled:opacity-40"
-            aria-label={`Agregar ${ps.label} de ${p.name} a ${soles(ps.price)}`}
-          >
-            <span className="text-[11px] font-medium text-zinc-500">{ps.label}</span>
-            <span className="text-sm font-semibold tabular-nums">{soles(ps.price)}</span>
-          </button>
-        ))}
+      <div className="mt-3 flex flex-wrap items-stretch gap-1.5">
+        {presentations.map((ps) => {
+          const primary = ps.id === main?.id;
+          const blocked = stock < ps.units;
+          const why = stock === 0 ? "Sin stock vigente en este local" : `Solo quedan ${stockLabel(p, stock)}: no alcanza para ${ps.label}`;
+          return (
+            <button
+              key={ps.id}
+              type="button"
+              disabled={blocked}
+              onClick={(e) => onAdd(p, ps.id, e.currentTarget)}
+              title={blocked ? why : undefined}
+              className={cn(
+                "flex flex-col items-start justify-center rounded-xl border text-left transition-[transform,opacity,border-color,background-color] duration-[var(--dur-fast)] ease-[var(--ease-out)] active:scale-[0.97]",
+                "disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100",
+                primary
+                  ? "min-h-14 min-w-[9rem] flex-[2_1_9rem] border-brand/25 bg-brand/5 px-3.5 py-2 enabled:hover:border-brand/60 enabled:hover:bg-brand/10"
+                  : "min-h-12 min-w-24 flex-1 self-end border-line px-3 py-1.5 enabled:hover:border-brand/40 enabled:hover:bg-subtle",
+              )}
+              aria-label={blocked ? `${ps.label} de ${p.name}: ${why}` : `Agregar ${ps.label} de ${p.name} a ${soles(ps.price)}`}
+            >
+              <span className={cn("text-micro font-medium", primary ? "text-fg-2" : "text-muted")}>{ps.label}</span>
+              <span className={cn("tabular-nums", primary ? "text-lg font-semibold leading-tight text-fg" : "text-sm font-medium text-fg-2")}>{soles(ps.price)}</span>
+            </button>
+          );
+        })}
       </div>
-    </article>
+    </Card>
   );
 });

@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { notify } from "@/components/ui/toast";
 import { initials } from "@/lib/format";
+import { cn } from "@/lib/cn";
+import { hitArea } from "@/components/ui/icon-button";
 
 const useDebounced = (value: string, ms = 250) => {
   const [v, setV] = useState(value);
@@ -41,9 +43,9 @@ export function CustomerPicker({ customer, onChange }: { customer: Customer | nu
   if (customer) {
     return (
       <div className="flex items-center gap-2">
-        <span className="grid h-7 w-7 place-items-center rounded-full bg-zinc-100 text-[11px] font-bold text-zinc-600">{initials(customer.name)}</span>
+        <span className="grid h-7 w-7 place-items-center rounded-full bg-sunken text-micro font-bold text-fg-2">{initials(customer.name)}</span>
         <span className="min-w-0 flex-1 truncate text-sm font-medium">{customer.name}</span>
-        <button type="button" onClick={() => onChange(null)} className="text-xs font-medium text-zinc-500 hover:text-zinc-800">
+        <button type="button" onClick={() => onChange(null)} className={cn(hitArea, "rounded text-xs font-medium text-muted transition-colors duration-[var(--dur-fast)] hover:text-fg")}>
           Quitar
         </button>
       </div>
@@ -65,11 +67,11 @@ export function CustomerPicker({ customer, onChange }: { customer: Customer | nu
 
   return (
     <div className="relative" ref={boxRef}>
-      <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-2 text-left text-sm text-zinc-500 hover:text-zinc-800" aria-expanded={open}>
-        <UserPlus className="h-4 w-4" /> Asignar cliente (puntos e historial)
+      <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-2 text-left text-sm text-muted hover:text-fg" aria-expanded={open}>
+        <UserPlus className="h-4 w-4" aria-hidden /> Asignar cliente (puntos e historial)
       </button>
       {open && (
-        <div className="absolute left-0 right-0 top-8 z-20 rounded-2xl border border-zinc-200 bg-white p-2 shadow-xl">
+        <div className="absolute left-0 right-0 top-8 z-20 rounded-2xl border border-line bg-surface p-2 shadow-overlay">
           {!creating ? (
             <>
               <Input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nombre, DNI o RUC" aria-label="Buscar cliente" />
@@ -83,17 +85,17 @@ export function CustomerPicker({ customer, onChange }: { customer: Customer | nu
                         setOpen(false);
                         setQ("");
                       }}
-                      className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm hover:bg-zinc-50"
+                      className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm hover:bg-subtle"
                     >
                       <span className="min-w-0 flex-1 truncate">{c.name}</span>
-                      <span className="text-xs tabular-nums text-zinc-400">{c.dni || c.ruc}</span>
+                      <span className="text-xs tabular-nums text-muted">{c.dni || c.ruc}</span>
                     </button>
                   </li>
                 ))}
-                {!isFetching && results.length === 0 && <li className="px-2 py-3 text-xs text-zinc-500">Sin coincidencias.</li>}
+                {!isFetching && results.length === 0 && <li className="px-2 py-3 text-xs text-muted">Sin coincidencias.</li>}
               </ul>
-              <button type="button" onClick={() => setCreating(true)} className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50">
-                <Plus className="h-4 w-4" /> Nuevo cliente
+              <button type="button" onClick={() => setCreating(true)} className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm font-semibold text-fg-2 hover:bg-subtle">
+                <Plus className="h-4 w-4" aria-hidden /> Nuevo cliente
               </button>
             </>
           ) : (

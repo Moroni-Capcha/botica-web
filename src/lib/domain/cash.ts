@@ -62,6 +62,20 @@ export function closeDifference(counted: number, expected: number): { difference
   return { difference, tone: abs < 0.05 ? "cuadra" : difference < 0 ? "faltante" : "sobrante", needsNote: abs >= 1 };
 }
 
+export type DifferenceTone = "success" | "warning" | "danger";
+
+/**
+ * La diferencia del arqueo dicha en palabras: tono (verde si cuadra, ámbar si es menos de S/ 1, rojo si es S/ 1 o más),
+ * signo y texto en castellano claro. El número sale de `closeDifference`; aquí no se calcula nada nuevo.
+ */
+export function describeDifference(counted: number, expected: number): { difference: number; kind: CloseTone; tone: DifferenceTone; sign: "" | "+" | "−"; label: "Cuadra" | "Sobra" | "Falta"; text: string } {
+  const { difference, tone: kind, needsNote } = closeDifference(counted, expected);
+  if (kind === "cuadra") return { difference, kind, tone: "success", sign: "", label: "Cuadra", text: "Cuadra" };
+  const amount = Math.abs(difference).toFixed(2);
+  const label = kind === "sobrante" ? "Sobra" : "Falta";
+  return { difference, kind, tone: needsNote ? "danger" : "warning", sign: kind === "sobrante" ? "+" : "−", label, text: `${label} S/ ${amount}` };
+}
+
 /** Un egreso o retiro no puede dejar la caja en negativo. */
 export function movementError(type: CashMovement["type"], amount: number, note: string, available: number): string | null {
   if (!(amount > 0)) return "Escribe el monto";

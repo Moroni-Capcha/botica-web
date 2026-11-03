@@ -2,14 +2,14 @@ import { forwardRef, type InputHTMLAttributes, type ReactNode, type SelectHTMLAt
 import { cn } from "@/lib/cn";
 
 export const inputClass =
-  "h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none transition placeholder:text-zinc-400 focus:border-zinc-400 focus:ring-2 focus:ring-zinc-900/5 aria-[invalid=true]:border-rose-300";
+  "h-10 rounded-xl border border-line-strong bg-surface px-3 text-sm transition-colors duration-[var(--dur-fast)] placeholder:text-muted focus:border-brand aria-[invalid=true]:border-danger aria-[invalid=true]:focus:border-danger";
 
 export function Field({ label, hint, error, children, className }: { label: string; hint?: string; error?: string; children: ReactNode; className?: string }) {
   return (
     <label className={cn("block min-w-0", className)}>
-      <span className="mb-1 block text-xs font-medium text-zinc-600">{label}</span>
+      <span className="mb-1 block text-xs font-medium text-fg-2">{label}</span>
       {children}
-      {error ? <span className="mt-1 block text-[11px] text-rose-600">{error}</span> : hint ? <span className="mt-1 block text-[11px] text-zinc-500">{hint}</span> : null}
+      {error ? <span className="mt-1 block text-micro text-danger-fg">{error}</span> : hint ? <span className="mt-1 block text-micro text-muted">{hint}</span> : null}
     </label>
   );
 }

@@ -11,7 +11,7 @@ import { Empty } from "@/components/ui/empty";
 import { Input } from "@/components/ui/field";
 import { Pagination } from "@/components/ui/pagination";
 import { Segmented } from "@/components/ui/segmented";
-import { Table, td } from "@/components/ui/table";
+import { Table, rowButtonClass, td } from "@/components/ui/table";
 import { notify } from "@/components/ui/toast";
 import { dateShort, initials, soles } from "@/lib/format";
 import { cn } from "@/lib/cn";
@@ -208,7 +208,7 @@ export function CustomersScreen() {
           ) : (
             <Table minWidth={820} head={["Cliente", "Documento", "Celular", { label: "Compras", align: "right" }, { label: "Total (neto)", align: "right" }, "Última compra", { label: "Puntos", align: "right" }]}>
               {filtered.map((c) => (
-                <tr key={c.id} tabIndex={0} onClick={() => setEditing(c)} onKeyDown={(e) => e.key === "Enter" && setEditing(c)} className="cursor-pointer outline-none transition-colors hover:bg-zinc-50 focus-visible:bg-zinc-50" aria-label={`Abrir ficha de ${c.name}`}>
+                <tr key={c.id} tabIndex={0} onClick={() => setEditing(c)} onKeyDown={(e) => e.key === "Enter" && setEditing(c)} className={rowButtonClass} aria-label={`Abrir ficha de ${c.name}`}>
                   <td className={td}>
                     <p className="flex items-center gap-1.5 font-medium">
                       {c.name}

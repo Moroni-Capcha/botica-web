@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Empty } from "@/components/ui/empty";
 import { Input, Select } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
-import { Table, td } from "@/components/ui/table";
+import { Table, rowButtonClass, td } from "@/components/ui/table";
 import { ExpiryBadge, RxBadge } from "@/components/ui/badges";
 import { notify } from "@/components/ui/toast";
 import { soles } from "@/lib/format";
@@ -225,7 +225,7 @@ export function InventoryScreen() {
                     tabIndex={0}
                     onClick={() => setDetailId(p.id)}
                     onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setDetailId(p.id))}
-                    className="cursor-pointer outline-none transition-colors hover:bg-zinc-50 focus-visible:bg-zinc-50"
+                    className={rowButtonClass}
                     aria-label={`Ver ficha de ${p.name} ${p.conc}`}
                   >
                     <td className={td}>
@@ -298,7 +298,7 @@ export function InventoryScreen() {
               <tr
                 key={g.key}
                 tabIndex={0}
-                className="cursor-pointer outline-none transition-colors hover:bg-zinc-50 focus-visible:bg-zinc-50"
+                className={rowButtonClass}
                 onClick={() => {
                   if (groupBy === "lab") setLab(g.key);
                   else setCategory(g.key);

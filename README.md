@@ -77,6 +77,26 @@ setMonitoringReporter(Sentry); // el SDK ya cumple la interfaz MonitoringReporte
 
 Para probarlo, definir el DSN y provocar un error en una pantalla (por ejemplo lanzar una excepción desde un componente en desarrollo): debe aparecer en Sentry con las etiquetas `tenant` y `role`, sin datos personales.
 
+## Movimiento
+
+El movimiento se siente, no se mira: rápido, con un propósito y sin estorbar a quien atiende con apuro. Las acciones que se repiten todo el día (agregar al carrito, atajos) no llevan animación extra. Todo vive en `src/app/globals.css` (tokens y animaciones), `src/lib/motion.ts` (para JavaScript) y `src/components/ui/presence.ts` (salidas).
+
+| Token | Valor | Dónde se usa |
+| --- | --- | --- |
+| `--dur-fast` | 140 ms | Salidas (diálogo, aviso, hoja), cambios de color, cambio de contenido (`animate-swap-in`) |
+| `--dur-base` | 200 ms | Entradas (`animate-pop`, `animate-fade`, `animate-line-in`, `animate-stagger-in`) |
+| `--dur-slow` | 320 ms | Solo el temblor de error (`animate-shake`). Nunca en la interfaz normal |
+| `--ease-out` | `cubic-bezier(0.23, 1, 0.32, 1)` | Todo. En JavaScript, `EASE_OUT` |
+
+Reglas:
+
+- Menos de 300 ms. Las salidas son más rápidas y suaves que las entradas.
+- Solo `transform` y `opacity`; nunca `transition: all`. Nada nace de `scale(0)`: se parte de 0,95 o más y con opacidad 0.
+- "Reducir movimiento" se respeta en CSS (queda solo el cambio de opacidad) y en JavaScript: usa `animateIn`, `stagger` y `usePresence` de `src/lib/motion.ts` y `ui/presence.ts`, nunca `.animate()` directo.
+- El `Dialog` hace su salida solo, aunque quien lo usa lo desmonte. Un aviso o una hoja propios usan `usePresence(open, ms)`.
+- El escalonado (`stagger`) es solo para listas cortas que aparecen tras cargar datos, una vez; nunca en lo que cambia seguido.
+- Los montos que cambian usan `Pulse` / `useValuePulse` (120 ms, sin contar números).
+
 ## Scripts
 
 | Comando | Qué hace |

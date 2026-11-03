@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Banknote, Check, CreditCard, Smartphone, Stethoscope } from "lucide-react";
 import type { Customer, DocType, PaymentMethod, Prescription, SaleRequest } from "@/lib/api/types";
 import { documentIsValid, isValidCmp, quickCashAmounts, round2, type Totals } from "@/lib/domain/pharmacy";
@@ -8,8 +8,11 @@ import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
+import { SectionLabel } from "@/components/ui/section-label";
+import { hitArea } from "@/components/ui/icon-button";
 import { soles } from "@/lib/format";
 import { cn } from "@/lib/cn";
+import { animateIn } from "@/lib/motion";
 
 type Draft = Omit<SaleRequest, "branchId" | "items">;
 
@@ -48,6 +51,16 @@ export function PaymentDialog({ totals, itemsCount, customer, yapeNumber, submit
   const rxOk = !totals.needsRx || (rx.number.trim() !== "" && rx.doctor.trim() !== "" && isValidCmp(rx.cmp));
   const payOk = method !== "efectivo" || rec >= total;
   const ok = docOk && rxOk && payOk && !submitting;
+  const enough = rec > 0 && rec >= total;
+  const missing = round2(total - rec);
+
+  /* El vuelto aparece con un golpe suave la primera vez que alcanza. */
+  const changeRef = useRef<HTMLDivElement>(null);
+  const wasEnough = useRef(false);
+  useEffect(() => {
+    if (enough && !wasEnough.current) animateIn(changeRef.current, [{ opacity: 0.4, transform: "scale(0.97)" }, { opacity: 1, transform: "none" }], { duration: 200 });
+    wasEnough.current = enough;
+  }, [enough]);
 
   const switchDoc = (v: DocType) => {
     setDoc(v);
@@ -67,16 +80,17 @@ export function PaymentDialog({ totals, itemsCount, customer, yapeNumber, submit
 
   return (
     <Dialog
-      title={`Cobrar ${soles(total)}`}
+      title="Cobrar"
       description={`${itemsCount} ${itemsCount === 1 ? "producto" : "productos"} · ${customer ? customer.name : "Cliente varios"}`}
       onClose={onClose}
       size="lg"
       footer={
         <>
-          {error && <p className="mr-auto text-sm text-rose-600" role="alert">{error}</p>}
+          {error && <p className="mr-auto text-sm text-danger-fg" role="alert">{error}</p>}
           <Button onClick={onClose}>Cancelar</Button>
-          <Button variant="primary" disabled={!ok} loading={submitting} onClick={confirm}>
-            <Check className="h-4 w-4" /> {offline ? "Cobrar sin conexión" : `Confirmar y emitir ${doc}`}
+          <Button variant="primary" size="lg" disabled={!ok} loading={submitting} onClick={confirm} className="tabular-nums">
+            {!submitting && <Check className="h-4 w-4" aria-hidden />}
+            {submitting ? "Cobrando…" : offline ? `Cobrar ${soles(total)} sin conexión` : `Cobrar ${soles(total)} y emitir ${doc}`}
           </Button>
         </>
       }
@@ -88,14 +102,21 @@ export function PaymentDialog({ totals, itemsCount, customer, yapeNumber, submit
           confirm();
         }}
       >
+        <div className="flex items-end justify-between gap-3 rounded-2xl bg-subtle px-4 py-3 md:col-span-2">
+          <div>
+            <SectionLabel>Total a cobrar</SectionLabel>
+            <p className="mt-0.5 text-4xl font-semibold leading-none tracking-tight tabular-nums">{soles(total)}</p>
+          </div>
+          <p className="pb-0.5 text-right text-caption text-muted">IGV incluido</p>
+        </div>
         <div className="grid content-start gap-4">
           {offline && (
-            <p className="rounded-2xl bg-amber-50 p-3 text-xs text-amber-900" role="status">
+            <p className="rounded-2xl bg-warning-bg p-3 text-xs text-warning-fg" role="status">
               Sin conexión: la venta se guarda en este equipo y se envía sola al volver el internet. Entrega el ticket provisional; la {doc} oficial se emite al enviarla.
             </p>
           )}
           <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Comprobante</p>
+            <SectionLabel className="mb-2">Comprobante</SectionLabel>
             <Segmented full label="Tipo de comprobante" value={doc} onChange={switchDoc} options={[{ id: "boleta", label: "Boleta" }, { id: "factura", label: "Factura" }]} />
             <div className="mt-3 grid grid-cols-[1fr_1.4fr] gap-2">
               <Field label={doc === "factura" ? "RUC (11 dígitos)" : `DNI ${total > 700 ? "(obligatorio > S/ 700)" : "(opcional)"}`}>
@@ -108,9 +129,9 @@ export function PaymentDialog({ totals, itemsCount, customer, yapeNumber, submit
           </div>
 
           {totals.needsRx && (
-            <fieldset className="rounded-2xl border border-sky-200 bg-sky-50/60 p-3">
-              <legend className="flex items-center gap-1.5 px-1 text-xs font-semibold text-sky-800">
-                <Stethoscope className="h-4 w-4" /> Receta médica {totals.needsControlled ? "especial (controlados)" : ""}
+            <fieldset className="rounded-2xl border border-info-border bg-info-bg/60 p-3">
+              <legend className="flex items-center gap-1.5 px-1 text-xs font-semibold text-info-fg">
+                <Stethoscope className="h-4 w-4" aria-hidden /> Receta médica {totals.needsControlled ? "especial (controlados)" : ""}
               </legend>
               <div className="grid grid-cols-2 gap-2">
                 <Field label="N.º de receta">
@@ -128,8 +149,8 @@ export function PaymentDialog({ totals, itemsCount, customer, yapeNumber, submit
         </div>
 
         <div className="grid content-start gap-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Método de pago</p>
-          <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Método de pago">
+          <SectionLabel>Método de pago</SectionLabel>
+          <div className="grid grid-cols-3 gap-1 rounded-xl bg-sunken p-1" role="radiogroup" aria-label="Método de pago">
             {METHODS.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
@@ -137,35 +158,45 @@ export function PaymentDialog({ totals, itemsCount, customer, yapeNumber, submit
                 role="radio"
                 aria-checked={method === id}
                 onClick={() => setMethod(id)}
-                className={cn("flex flex-col items-center gap-1.5 rounded-2xl border p-3 text-xs font-semibold transition", method === id ? "border-transparent bg-brand text-white" : "border-zinc-200 text-zinc-600 hover:bg-zinc-50")}
+                className={cn(
+                  "flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-xs font-semibold transition-[background-color,color,transform] duration-[var(--dur-fast)] ease-[var(--ease-out)] active:scale-[0.97]",
+                  method === id ? "bg-brand text-white shadow-subtle" : "text-fg-2 hover:bg-surface",
+                )}
               >
-                <Icon className="h-5 w-5" /> {label}
+                <Icon className="h-5 w-5" aria-hidden /> {label}
               </button>
             ))}
           </div>
           {method === "efectivo" && (
-            <div className="rounded-2xl bg-zinc-50 p-3">
+            <div className="rounded-2xl bg-subtle p-3">
               <Field label="Monto recibido">
-                <Input inputMode="decimal" value={received} onChange={(e) => setReceived(e.target.value.replace(/[^\d.]/g, ""))} className="text-lg font-semibold tabular-nums" placeholder={total.toFixed(2)} />
+                <Input data-autofocus inputMode="decimal" value={received} onChange={(e) => setReceived(e.target.value.replace(/[^\d.]/g, ""))} className="h-12 text-xl font-semibold tabular-nums" placeholder={total.toFixed(2)} />
               </Field>
-              <div className="mt-2 flex flex-wrap gap-1.5">
+              <div className="mt-2 flex flex-wrap gap-2">
                 {quickCashAmounts(total).map((v) => (
-                  <button key={v} type="button" onClick={() => setReceived(String(v))} className="rounded-lg bg-white px-3 py-1.5 text-sm font-semibold tabular-nums ring-1 ring-zinc-200 hover:bg-zinc-100">
+                  <button key={v} type="button" onClick={() => setReceived(String(v))} className={cn(hitArea, "h-11 rounded-lg bg-surface px-3 text-sm font-semibold tabular-nums ring-1 ring-line transition-[background-color,transform] duration-[var(--dur-fast)] ease-[var(--ease-out)] hover:bg-sunken active:scale-[0.97]")}>
                     {v - total < 1 && v === Math.ceil(total) ? `Exacto ${soles(total)}` : `S/ ${v}`}
                   </button>
                 ))}
               </div>
-              <div className="mt-3 flex items-center justify-between">
-                <span className="text-sm text-zinc-600">Vuelto</span>
-                <span className={cn("text-2xl font-semibold tabular-nums", change < 0 ? "text-zinc-300" : "text-emerald-700")} aria-live="polite">
-                  {soles(Math.max(0, change))}
+              <div
+                ref={changeRef}
+                aria-live="polite"
+                className={cn(
+                  "mt-3 flex items-center justify-between gap-3 rounded-xl border px-4 py-3 transition-[background-color,border-color] duration-[var(--dur-base)] ease-[var(--ease-out)]",
+                  enough ? "border-success-border bg-success-bg" : rec > 0 ? "border-warning-border bg-warning-bg" : "border-line bg-surface",
+                )}
+              >
+                <span className={cn("text-sm font-semibold", enough ? "text-success-fg" : rec > 0 ? "text-warning-fg" : "text-fg-2")}>{enough ? "Vuelto" : rec > 0 ? "Falta" : "Vuelto"}</span>
+                <span className={cn("text-4xl font-semibold leading-none tracking-tight tabular-nums", enough ? "text-success-fg" : rec > 0 ? "text-warning-fg" : "text-muted")}>
+                  {enough ? soles(change) : rec > 0 ? soles(missing) : soles(0)}
                 </span>
               </div>
             </div>
           )}
           {method === "yape" && (
-            <div className="rounded-2xl bg-zinc-50 p-3 text-sm">
-              <p className="text-zinc-600">El cliente yapea o plinea al número de la botica:</p>
+            <div className="rounded-2xl bg-subtle p-3 text-sm">
+              <p className="text-fg-2">El cliente yapea o plinea al número de la botica:</p>
               <p className="mt-1 text-xl font-semibold tabular-nums">{yapeNumber}</p>
               <Field label="Código de operación (opcional)" className="mt-3">
                 <Input value={reference} onChange={(e) => setReference(e.target.value)} />
@@ -173,14 +204,14 @@ export function PaymentDialog({ totals, itemsCount, customer, yapeNumber, submit
             </div>
           )}
           {method === "tarjeta" && (
-            <div className="rounded-2xl bg-zinc-50 p-3 text-sm text-zinc-600">
+            <div className="rounded-2xl bg-subtle p-3 text-sm text-fg-2">
               Pasa la tarjeta por el POS del banco y confirma cuando el voucher salga aprobado.
               <Field label="N.º de voucher (opcional)" className="mt-3">
                 <Input value={reference} onChange={(e) => setReference(e.target.value)} />
               </Field>
             </div>
           )}
-          <dl className="rounded-2xl border border-zinc-200 p-3 text-xs text-zinc-500">
+          <dl className="rounded-2xl border border-line p-3 text-xs text-muted">
             <div className="flex justify-between">
               <dt>Op. gravada</dt>
               <dd className="tabular-nums">{soles(totals.taxBase)}</dd>
@@ -188,10 +219,6 @@ export function PaymentDialog({ totals, itemsCount, customer, yapeNumber, submit
             <div className="flex justify-between">
               <dt>IGV (18 %)</dt>
               <dd className="tabular-nums">{soles(totals.igv)}</dd>
-            </div>
-            <div className="mt-1 flex justify-between text-sm font-semibold text-zinc-900">
-              <dt>Total</dt>
-              <dd className="tabular-nums">{soles(total)}</dd>
             </div>
           </dl>
         </div>

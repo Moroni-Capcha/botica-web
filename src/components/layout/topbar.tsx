@@ -42,7 +42,7 @@ export function Topbar({ title, user, onLogout }: { title: string; user: User; o
         <label className="flex items-center gap-1.5 rounded-xl bg-zinc-100 py-1 pl-2.5 pr-1">
           <Building2 className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
           <span className="sr-only">Local donde operas</span>
-          <select value={adminBranch} onChange={(e) => setAdminBranch(e.target.value)} className="h-7 max-w-40 rounded-lg bg-white px-2 text-xs font-semibold text-zinc-800 outline-none">
+          <select value={adminBranch} onChange={(e) => setAdminBranch(e.target.value)} className="h-7 max-w-40 rounded-lg bg-white px-2 text-xs font-semibold text-zinc-800">
             {branches.map((b) => (
               <option key={b.id} value={b.id}>{b.name}</option>
             ))}

@@ -5,6 +5,16 @@
   --brand: #0b4f45;
   --accent: #3ddc97;
   --canvas: #f6f7f7;
+
+  /* Anillo de foco: 2 px de --brand con un espacio blanco. Sobre fondo oscuro se ve el espacio, sobre claro el aro. */
+  --focus-gap: #ffffff;
+
+  /* Movimiento */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --dur-fast: 140ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
 }
 
 @theme inline {
@@ -14,15 +24,96 @@
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
 
+@theme {
+  /* Texto: fg (principal) > fg-2 (secundario) > muted (terciario, 5:1 sobre blanco) */
+  --color-fg: #18181b;
+  --color-fg-2: #52525b;
+  --color-muted: #6b6b74;
+
+  /* Superficies y bordes (bordes con opacidad baja para que funcionen sobre cualquier fondo) */
+  --color-surface: #ffffff;
+  --color-subtle: #fafafa;
+  --color-sunken: #f4f4f5;
+  --color-sunken-strong: #e4e4e7;
+  --color-line: rgb(24 24 27 / 0.12);
+  --color-line-soft: rgb(24 24 27 / 0.07);
+  --color-line-strong: rgb(24 24 27 / 0.24);
+  --color-scrim: rgb(24 24 27 / 0.4);
+
+  /* Semánticos: color sólido, texto (-fg), fondo (-bg) y borde (-border) */
+  --color-success: #059669;
+  --color-success-fg: #047857;
+  --color-success-bg: #ecfdf5;
+  --color-success-border: #a7f3d0;
+  --color-danger: #e11d48;
+  --color-danger-fg: #be123c;
+  --color-danger-bg: #fff1f2;
+  --color-danger-border: #fecdd3;
+  --color-warning: #d97706;
+  --color-warning-fg: #92400e;
+  --color-warning-bg: #fffbeb;
+  --color-warning-border: #fde68a;
+  --color-info: #0284c7;
+  --color-info-fg: #075985;
+  --color-info-bg: #f0f9ff;
+  --color-info-border: #bae6fd;
+  /* Controlados y traslados */
+  --color-special: #7c3aed;
+  --color-special-fg: #6d28d9;
+  --color-special-bg: #f5f3ff;
+  --color-special-border: #ddd6fe;
+
+  /* Radios (mismos valores que Tailwind: nada cambia de golpe, ahora tienen nombre propio) */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+
+  /* Sombras: una sutil para lo que se despega, una para lo que flota */
+  --shadow-subtle: 0 1px 2px rgb(24 24 27 / 0.06);
+  --shadow-overlay: 0 10px 28px -6px rgb(24 24 27 / 0.2), 0 2px 6px rgb(24 24 27 / 0.08);
+
+  /* Escala tipográfica del texto chico */
+  --text-micro: 0.6875rem; /* 11 px */
+  --text-micro--line-height: 1rem;
+  --text-caption: 0.75rem; /* 12 px */
+  --text-caption--line-height: 1rem;
+  --text-small: 0.8125rem; /* 13 px */
+  --text-small--line-height: 1.25rem;
+
+  /* Animaciones con los tokens de movimiento */
+  --animate-fade: fade var(--dur-base) var(--ease-out);
+  --animate-pop: pop var(--dur-base) var(--ease-out);
+  --animate-shake: shake var(--dur-slow) var(--ease-in-out);
+  --animate-fade-out: fade-out var(--dur-fast) var(--ease-out) forwards;
+  --animate-line-in: line-in var(--dur-base) var(--ease-out);
+  --animate-sheet-in: sheet-in var(--dur-base) var(--ease-out);
+  --animate-sheet-out: sheet-out var(--dur-fast) var(--ease-out) forwards;
+  --animate-pop-out: pop-out var(--dur-fast) var(--ease-out) forwards;
+  --animate-toast-out: toast-out var(--dur-fast) var(--ease-out) forwards;
+  --animate-swap-in: swap-in var(--dur-fast) var(--ease-out);
+  --animate-stagger-in: stagger-in var(--dur-base) var(--ease-out) backwards;
+}
+
 html,
 body {
   height: 100%;
   background: var(--canvas);
-  color: #18181b;
+  color: var(--color-fg);
 }
 
 body {
   -webkit-font-smoothing: antialiased;
+}
+
+/* Foco visible en todo lo que se puede usar con teclado. Va en la capa base: cualquier clase de Tailwind lo puede afinar. */
+@layer base {
+  :where(button, a, input, select, textarea, summary, [role="radio"], [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 2px var(--focus-gap);
+  }
 }
 
 @keyframes fade {
@@ -33,14 +124,56 @@ body {
   from { opacity: 0; transform: translateY(14px) scale(0.985); }
   to { opacity: 1; transform: none; }
 }
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes line-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes sheet-in {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+@keyframes sheet-out {
+  from { transform: none; }
+  to { transform: translateY(100%); }
+}
+@keyframes pop-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(4px) scale(0.97); }
+}
+@keyframes toast-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(8px); }
+}
+@keyframes swap-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes stagger-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
 @keyframes shake {
   0%, 100% { transform: none; }
   20%, 60% { transform: translateX(-6px); }
   40%, 80% { transform: translateX(6px); }
 }
 
+/* Reducir movimiento: se quita el desplazamiento y el zoom, se conserva el cambio de opacidad (así lo que sale sigue desmontándose al terminar). */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  *, *::before, *::after { transition-duration: 0.01ms !important; }
+  @keyframes pop { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes pop-out { from { opacity: 1; } to { opacity: 0; } }
+  @keyframes toast-out { from { opacity: 1; } to { opacity: 0; } }
+  @keyframes line-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes swap-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes sheet-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes sheet-out { from { opacity: 1; } to { opacity: 0; } }
+  @keyframes shake { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+  .animate-stagger-in { animation: none; }
 }
 
 /* Ticket de 80 mm (impresora térmica). Se imprime solo el contenido de .print-root; el resto de la pantalla se oculta. */
@@ -50,7 +183,7 @@ body {
   font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   font-size: 11px;
   line-height: 1.35;
-  color: #18181b;
+  color: var(--color-fg);
   background: #fff;
 }
 .print-root {
