@@ -20,7 +20,7 @@ Known violation found in the audit: `src/features/pos/cart-panel.tsx` animates `
 ## Tasks
 - [x] M0 Motion rules: change `--ease-out` to `cubic-bezier(0.16, 1, 0.3, 1)`, remove the `grid-template-rows` animation in the cart (replace with transform/opacity plus a FLIP-style translate for the lines below), audit every animation for layout properties and for re-render cost, update README "Movimiento" and `src/lib/motion.ts` docs/tests.
 - [x] I1 Inventario: tokens and components, table hierarchy and density, filters/search, stock and expiry chips, row actions, dialogs, states, mobile, accessibility, motion.
-- [ ] I2 Vencimientos: expiry semaphore hierarchy, risk-in-money figure as focal, lists and actions (discount, move, write-off), states, mobile, accessibility, motion.
+- [x] I2 Vencimientos: expiry semaphore hierarchy, risk-in-money figure as focal, lists and actions (discount, move, write-off), states, mobile, accessibility, motion.
 
 ## Route per task
 Each phase: one delegated writer; parent verifies with typecheck, tests and a browser check before the next phase.
@@ -35,5 +35,9 @@ Browser check M0 (2026-11-02, dev server, no console errors): with 2 cart lines,
 
 Browser check I1 (2026-11-02, dev server, no console errors): `/inventario` shows the focal brand KPI "Inventario a costo S/ 3,911.09", "A precio de venta", and the quick-filter KPIs (Bajo mínimo 6, Agotados 1, Con vencidos 3); table with bold stock, tone chips (Agotado, Bajo mínimo), expiry chips with days, sticky header; clicking "Bajo mínimo" gives 6 of 36 products, `aria-pressed` on the card, "Limpiar filtros" appears, the result count is in an `aria-live` region; clicking a row opens the detail dialog (prices and margin, FEFO lots, kardex). NOT checked: `F2` and `/` shortcuts, mobile card list (<768 px), single vs all locals, product create/edit dialogs, reduced motion, encargado view. Visual nits: the three filter selects truncate their text ("Todos los labora...", "Todas las fc..."). Behavior note: the old "Productos" KPI and the old combined "Agotados o bajo mínimo" KPI (which counted both but filtered only "bajo") were replaced by separate quick filters; products and lots counts moved to the section header.
 
+- I2 done in 8e38745 (pending parent browser check): expiry files have 0 zinc/raw colors/text-[Npx]/hex/transition-all/style width. Focal brand KPI "Pérdida estimada si no se actúa" (same figure) + 4 semaphore KPI cards as quick filters (aria-pressed, Pulse via shared `Kpi`, now in `features/shared/kpi.tsx`); header with ScopeToggle and secondary Excel; sections with h2 and aria-live count; "Todos los lotes" has a group header per semaphore tone (same order, groups are consecutive); rows are memo + stable callbacks, days-left Chip with icon + text, lot code/location muted, tabular right-aligned numbers, sticky table header (maxHeight 640) and Card list under 768 px; primary action per row via `primaryAction` (vencido -> baja; else traslado if suggested, else vender, else baja); exit fade (opacity + translate3d) and FLIP on write-off via useAnimatedList/useFlipList (list remounts on filter change so filtering does not animate; `orderAnimatedRows` keeps loss order); stagger of the first 8 rows once; write-off dialog with inline errors (Field error now role=alert), exact button labels ("Dar de baja N unidades" in danger tone / "Devolver N unidades"), effect preview. Table got optional `bodyRef`. Checks: typecheck clean, 367 tests pass (was 359; +8), build OK. NOT verified in a browser. Notes: no per-lot discount or transfer dialog exists (bulk discount bar and /traslados link stay); no read-only/offline banner added (none on this screen before).
+
+Browser check I2: pending (parent).
+
 ## Next step
-I2 Vencimientos.
+Browser check of I2; then final review and delivery decision (push/PR are the user's).
