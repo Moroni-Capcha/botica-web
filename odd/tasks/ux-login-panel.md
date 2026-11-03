@@ -24,5 +24,7 @@ Each phase: one delegated writer; parent verifies with typecheck, tests and a br
 (branch created from master @ 332d15f)
 - L1 048deb8: typecheck clean, 338 tests pass (333 + 5 new in pin.test.ts), build ok. Login files have 0 zinc/rose/amber classes, 0 text-[Npx], 0 transition-all. Not browser-verified by the writer. Kiosk dialog (features/attendance) not touched.
 
+Browser check L1 (2026-11-02, dev server, no console errors): desktop layout with the compact brand column and benefit list, Mostrador/Dueño switch, user cards with selected ring and check, "PIN de 4 dígitos" dots; a wrong PIN (9999) shows red dots and "PIN incorrecto. Intenta de nuevo."; typing 1111 on the physical keyboard logs in the Principal account and lands on `/pos`. NOT checked: 360 px / tablet widths, Dueño form, kiosk dialog, offline card, reduced motion, keyboard-only navigation, other botica colors.
+
 ## Next step
-L2 (Panel), after the parent browser-checks L1.
+L2 (Panel).
