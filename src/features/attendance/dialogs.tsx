@@ -47,10 +47,10 @@ export function ManualMarkDialog({ workers, branchName, initialWorkerId, onClose
       onClose={onClose}
       footer={
         <>
-          {save.error && <p className="mr-auto text-sm text-rose-600" role="alert">{errorMessage(save.error)}</p>}
+          {save.error && <p className="mr-auto text-sm text-danger-fg" role="alert">{errorMessage(save.error)}</p>}
           <Button onClick={onClose}>Cancelar</Button>
           <Button variant="primary" disabled={!ok} loading={save.isPending} onClick={submit}>
-            <Save className="h-4 w-4" /> Registrar
+            <Save className="h-4 w-4" aria-hidden /> Registrar
           </Button>
         </>
       }
@@ -131,10 +131,10 @@ export function WorkerDialog({ worker, branches, onClose }: { worker: Worker | n
       onClose={onClose}
       footer={
         <>
-          {save.error && <p className="mr-auto text-sm text-rose-600" role="alert">{errorMessage(save.error)}</p>}
+          {save.error && <p className="mr-auto text-sm text-danger-fg" role="alert">{errorMessage(save.error)}</p>}
           <Button onClick={onClose}>Cancelar</Button>
           <Button variant="primary" loading={save.isPending} onClick={submit}>
-            <Save className="h-4 w-4" /> Guardar
+            <Save className="h-4 w-4" aria-hidden /> Guardar
           </Button>
         </>
       }
@@ -171,7 +171,7 @@ export function WorkerDialog({ worker, branches, onClose }: { worker: Worker | n
           <Input type="time" value={f.schedule.end} onChange={(e) => setSchedule({ end: e.target.value })} />
         </Field>
         <fieldset className="sm:col-span-2">
-          <legend className="mb-1 text-xs font-medium text-zinc-600">Días que trabaja</legend>
+          <legend className="mb-1 text-xs font-medium text-fg-2">Días que trabaja</legend>
           <div className="flex flex-wrap gap-1.5">
             {[1, 2, 3, 4, 5, 6, 0].map((d) => {
               const on = f.schedule.days.includes(d);
@@ -181,7 +181,7 @@ export function WorkerDialog({ worker, branches, onClose }: { worker: Worker | n
                   type="button"
                   aria-pressed={on}
                   onClick={() => setSchedule({ days: on ? f.schedule.days.filter((x) => x !== d) : [...f.schedule.days, d] })}
-                  className={cn("h-9 w-12 rounded-lg text-xs font-semibold transition", on ? "bg-brand text-white" : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200")}
+                  className={cn("h-10 w-12 rounded-lg text-xs font-semibold transition-colors duration-[var(--dur-fast)]", on ? "bg-brand text-white" : "bg-sunken text-fg-2 hover:bg-sunken-strong")}
                 >
                   {DOW[d]}
                 </button>
