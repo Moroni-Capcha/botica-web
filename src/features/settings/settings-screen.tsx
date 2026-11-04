@@ -69,7 +69,9 @@ export function SettingsScreen() {
       />
       {!c ? (
         <div className={cn(card, "h-72 animate-pulse bg-zinc-50")} />
-      ) : tab === "botica" ? (
+      ) : (
+      <div key={tab} className="animate-swap-in">
+      {tab === "botica" ? (
         <PharmacyForm key={JSON.stringify(c.pharmacy)} initial={c.pharmacy} />
       ) : tab === "locales" ? (
         <Branches config={c} />
@@ -79,6 +81,8 @@ export function SettingsScreen() {
         <PlanBilling config={c} />
       ) : (
         <RulesForm key={JSON.stringify([c.expiry, c.purchasing, c.attendance])} config={c} />
+      )}
+      </div>
       )}
     </div>
   );

@@ -96,6 +96,7 @@
   --animate-pop-out: pop-out var(--dur-fast) var(--ease-out) forwards;
   --animate-toast-out: toast-out var(--dur-fast) var(--ease-out) forwards;
   --animate-swap-in: swap-in var(--dur-fast) var(--ease-out);
+  --animate-page-in: page-in var(--dur-slow) var(--ease-out);
   --animate-stagger-in: stagger-in var(--dur-base) var(--ease-out) backwards;
   --animate-bar-grow: bar-grow var(--dur-base) var(--ease-out) backwards;
 }
@@ -117,6 +118,12 @@ body {
     outline: 2px solid var(--brand);
     outline-offset: 2px;
     box-shadow: 0 0 0 2px var(--focus-gap);
+  }
+
+  /* Un grid sin columnas explícitas crece hasta el contenido más ancho y se sale de la pantalla en móvil.
+     Con minmax(0, 1fr) la columna se queda en el ancho disponible; las clases grid-cols-* siguen mandando. */
+  :where(.grid) {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -156,6 +163,10 @@ body {
   from { opacity: 0; transform: translate3d(0, 4px, 0); }
   to { opacity: 1; transform: none; }
 }
+@keyframes page-in {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to { opacity: 1; transform: none; }
+}
 @keyframes stagger-in {
   from { opacity: 0; transform: translate3d(0, 6px, 0); }
   to { opacity: 1; transform: none; }
@@ -178,6 +189,7 @@ body {
   @keyframes toast-out { from { opacity: 1; } to { opacity: 0; } }
   @keyframes line-in { from { opacity: 0; } to { opacity: 1; } }
   @keyframes swap-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes page-in { from { opacity: 0; } to { opacity: 1; } }
   @keyframes sheet-in { from { opacity: 0; } to { opacity: 1; } }
   @keyframes sheet-out { from { opacity: 1; } to { opacity: 0; } }
   @keyframes shake { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }

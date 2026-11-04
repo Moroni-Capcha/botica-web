@@ -163,8 +163,9 @@ export function TransfersScreen() {
         ))}
       </ol>
 
-      {tab === "curso" &&
-        (transfers.isLoading ? (
+      {tab === "curso" && (
+        <div className="animate-swap-in">
+        {transfers.isLoading ? (
           <Skeleton />
         ) : active.length === 0 ? (
           <section className="rounded-2xl border border-zinc-200 bg-white">
@@ -238,10 +239,12 @@ export function TransfersScreen() {
               );
             })}
           </div>
-        ))}
+        )}
+        </div>
+      )}
 
       {tab === "sugeridos" && (
-        <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white" aria-labelledby="sug-tr">
+        <section className="animate-swap-in overflow-hidden rounded-2xl border border-zinc-200 bg-white" aria-labelledby="sug-tr">
           <div className="border-b border-zinc-100 p-4 sm:p-5">
             <h2 id="sug-tr" className="text-base font-semibold tracking-tight">Traslados sugeridos</h2>
             <p className="mt-1 text-xs text-zinc-500">Antes de comprar o de perder un lote por vencimiento, revisa si el otro local lo tiene de sobra o lo vende más rápido.</p>
@@ -282,7 +285,7 @@ export function TransfersScreen() {
       )}
 
       {tab === "historial" && (
-        <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white" aria-label="Historial de traslados">
+        <section className="animate-swap-in overflow-hidden rounded-2xl border border-zinc-200 bg-white" aria-label="Historial de traslados">
           <div className="flex justify-end border-b border-zinc-100 p-3 sm:px-5">
             <Segmented label="Periodo" value={String(days)} onChange={(v) => setDays(Number(v) as (typeof PERIODS)[number])} options={PERIODS.map((d) => ({ id: String(d), label: `${d} días` }))} />
           </div>

@@ -363,7 +363,7 @@ export function PosScreen() {
           </div>
         </div>
 
-        <div className="grid gap-2.5 p-4 sm:p-6 xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2.5 p-4 sm:p-6 xl:grid-cols-2">
           {(products.isLoading || lots.isLoading) && Array.from({ length: 6 }, (_, i) => <div key={i} className="h-40 animate-pulse rounded-2xl bg-surface" />)}
           {results.map((p) => {
             const info = stockInfo.get(p.id);

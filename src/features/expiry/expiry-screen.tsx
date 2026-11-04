@@ -276,24 +276,27 @@ export function ExpiryScreen() {
 
         {isLoading ? (
           <RowsSkeleton wide={wide} />
-        ) : tab === "prioridad" ? (
-          priority.length === 0 ? (
-            <Empty icon={CircleCheck} title="Ningún lote en riesgo">
-              Con la venta actual, todo se venderá antes de vencer.
+        ) : (
+          <div key={tab} className="animate-swap-in">
+  tab === "prioridad" ? (
+            priority.length === 0 ? (
+              <Empty icon={CircleCheck} title="Ningún lote en riesgo">
+                Con la venta actual, todo se venderá antes de vencer.
+              </Empty>
+            ) : (
+              <PriorityList key={listKey} rows={priority} wide={wide} shared={shared} stagIds={stagIds} selected={selectedSet} allSelected={allSelected} onToggleAll={toggleAll} />
+            )
+          ) : lotRows.length === 0 ? (
+            <Empty icon={Search} title="Sin lotes para este filtro">
+              {(q.trim() !== "" || tone !== "todos") && (
+                <button type="button" className="font-semibold underline" onClick={clearLotFilters}>
+                  Limpiar filtros
+                </button>
+              )}
             </Empty>
           ) : (
-            <PriorityList key={listKey} rows={priority} wide={wide} shared={shared} stagIds={stagIds} selected={selectedSet} allSelected={allSelected} onToggleAll={toggleAll} />
-          )
-        ) : lotRows.length === 0 ? (
-          <Empty icon={Search} title="Sin lotes para este filtro">
-            {(q.trim() !== "" || tone !== "todos") && (
-              <button type="button" className="font-semibold underline" onClick={clearLotFilters}>
-                Limpiar filtros
-              </button>
-            )}
-          </Empty>
-        ) : (
-          <LotList key={listKey} rows={lotRows} wide={wide} shared={shared} stagIds={stagIds} />
+            <LotList key={listKey} rows={lotRows} wide={wide} shared={shared} stagIds={stagIds} />
+          </div>
         )}
       </Card>
 

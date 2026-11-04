@@ -130,7 +130,7 @@ export function CustomersScreen() {
       </div>
 
       {tab === "recompras" && (
-        <Card as="section" padding="none" className="overflow-hidden" aria-labelledby="refills-title">
+        <Card as="section" padding="none" className="animate-swap-in overflow-hidden" aria-labelledby="refills-title">
           <div className="flex flex-wrap items-start gap-3 border-b border-line-soft p-4 sm:p-5">
             <div className="min-w-0 flex-1 basis-72">
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
@@ -173,7 +173,7 @@ export function CustomersScreen() {
       )}
 
       {tab === "clientes" && (
-        <Card as="section" padding="none" className="overflow-hidden" aria-labelledby="customers-title">
+        <Card as="section" padding="none" className="animate-swap-in overflow-hidden" aria-labelledby="customers-title">
           <div className="grid gap-3 border-b border-line-soft p-4 sm:px-5">
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
               <h2 id="customers-title" className="font-semibold tracking-tight">

@@ -187,14 +187,18 @@ export function ReportsScreen() {
         </div>
         {loading ? (
           <div className="grid gap-2 p-4">{Array.from({ length: 6 }, (_, i) => <div key={i} className="h-11 animate-pulse rounded-xl bg-zinc-100" />)}</div>
-        ) : view === "sin_movimiento" ? (
-          <DeadStockTable rows={dead} multi={multi} branchName={branchName} />
-        ) : view === "recetas" ? (
-          <PrescriptionTable entries={book} pm={pm} multi={multi} branchName={branchName} />
-        ) : groups.length === 0 ? (
-          <Empty icon={Receipt} title="Sin ventas en el periodo" />
         ) : (
-          <GroupTable rows={groups} first={{ producto: "Producto", laboratorio: "Laboratorio o marca", tipo: "Tipo", local: "Local", vendedor: "Atendió", pago: "Método de pago" }[view]} />
+          <div key={view} className="animate-swap-in">
+            {view === "sin_movimiento" ? (
+              <DeadStockTable rows={dead} multi={multi} branchName={branchName} />
+            ) : view === "recetas" ? (
+              <PrescriptionTable entries={book} pm={pm} multi={multi} branchName={branchName} />
+            ) : groups.length === 0 ? (
+              <Empty icon={Receipt} title="Sin ventas en el periodo" />
+            ) : (
+              <GroupTable rows={groups} first={{ producto: "Producto", laboratorio: "Laboratorio o marca", tipo: "Tipo", local: "Local", vendedor: "Atendió", pago: "Método de pago" }[view]} />
+            )}
+          </div>
         )}
       </section>
     </div>

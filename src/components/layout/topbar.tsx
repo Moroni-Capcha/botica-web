@@ -31,7 +31,7 @@ export function Topbar({ title, user, onLogout }: { title: string; user: User; o
 
   return (
     <header className="flex h-16 shrink-0 items-center gap-2 border-b border-zinc-200 bg-white px-4 sm:gap-3 sm:px-6">
-      <div className="md:hidden">
+      <div className="hidden sm:block md:hidden">
         <BrandMark size={30} />
       </div>
       <div className="min-w-0 flex-1">
@@ -49,8 +49,17 @@ export function Topbar({ title, user, onLogout }: { title: string; user: User; o
           </select>
         </label>
       ) : user.role === "admin" ? (
-        <div className="flex items-center gap-1 rounded-xl bg-zinc-100 p-1" role="radiogroup" aria-label="Local donde operas">
-          <Building2 className="ml-1.5 hidden h-4 w-4 text-zinc-500 sm:block" />
+        <>
+        <label className="flex items-center rounded-xl bg-zinc-100 p-1 sm:hidden">
+          <span className="sr-only">Local donde operas</span>
+          <select value={adminBranch} onChange={(e) => setAdminBranch(e.target.value)} className="h-7 max-w-24 rounded-lg bg-brand px-2 text-xs font-semibold text-white">
+            {branches.map((b) => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
+        </label>
+        <div className="hidden items-center gap-1 rounded-xl bg-zinc-100 p-1 sm:flex" role="radiogroup" aria-label="Local donde operas">
+          <Building2 className="ml-1.5 h-4 w-4 text-zinc-500" />
           {branches.map((b) => (
             <button
               key={b.id}
@@ -64,6 +73,7 @@ export function Topbar({ title, user, onLogout }: { title: string; user: User; o
             </button>
           ))}
         </div>
+        </>
       ) : (
         <span className="flex items-center gap-1.5 rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-700">
           <MapPin className="h-3.5 w-3.5" />
@@ -75,7 +85,9 @@ export function Topbar({ title, user, onLogout }: { title: string; user: User; o
         <span className="hidden 2xl:inline">Asistencia</span>
       </button>
       <ConnectionStatus />
-      <Clock />
+      <div className="hidden sm:block">
+        <Clock />
+      </div>
       <button type="button" onClick={onLogout} className="rounded-lg p-2 text-zinc-500 transition hover:bg-zinc-100 md:hidden" aria-label="Cerrar turno">
         <LogOut className="h-4 w-4" />
       </button>
