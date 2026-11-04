@@ -31,7 +31,7 @@ export function Topbar({ title, user, onLogout }: { title: string; user: User; o
 
   return (
     <header className="flex h-16 shrink-0 items-center gap-2 border-b border-zinc-200 bg-white px-4 sm:gap-3 sm:px-6">
-      <div className="md:hidden">
+      <div className="hidden sm:block md:hidden">
         <BrandMark size={30} />
       </div>
       <div className="min-w-0 flex-1">
@@ -75,7 +75,9 @@ export function Topbar({ title, user, onLogout }: { title: string; user: User; o
         <span className="hidden 2xl:inline">Asistencia</span>
       </button>
       <ConnectionStatus />
-      <Clock />
+      <div className="hidden sm:block">
+        <Clock />
+      </div>
       <button type="button" onClick={onLogout} className="rounded-lg p-2 text-zinc-500 transition hover:bg-zinc-100 md:hidden" aria-label="Cerrar turno">
         <LogOut className="h-4 w-4" />
       </button>
