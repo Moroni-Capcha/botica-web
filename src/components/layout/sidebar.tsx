@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { NavLink } from "./nav-link";
 import { usePathname } from "next/navigation";
 import { LogOut } from "lucide-react";
 import type { User } from "@/lib/api/types";
@@ -29,7 +29,7 @@ export function Sidebar({ user, onLogout }: { user: User; onLogout: () => void }
           const active = pathname.startsWith(n.href);
           const Icon = n.icon;
           return (
-            <Link
+            <NavLink
               key={n.id}
               href={n.href}
               aria-current={active ? "page" : undefined}
@@ -42,7 +42,7 @@ export function Sidebar({ user, onLogout }: { user: User; onLogout: () => void }
               <Icon className={cn("h-[18px] w-[18px]", active && "text-accent")} />
               {n.label}
               {!n.ready && <span className="ml-auto rounded-full bg-white/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white/50">Pronto</span>}
-            </Link>
+            </NavLink>
           );
         })}
       </nav>
