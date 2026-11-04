@@ -527,3 +527,7 @@ Cosas que no se pudieron confirmar con el código ni con `API.md`. Cada una trae
 | Proveedor de facturación electrónica | _______________ |
 | Proveedor de pagos del plan | _______________ |
 | Entornos (URL de pruebas / producción) | _______________ |
+
+## Ticket: QR y hash
+
+El ticket de 80 mm ya imprime razón social, RUC, dirección fiscal y el monto en letras. Falta lo que solo puede dar el backend: cada `Voucher` debe devolver el **hash** (valor resumen) y el **contenido del QR** que SUNAT exige en la representación impresa. Cuando lleguen, el front los imprimirá debajo de los totales. Hoy no se imprime nada de esto ni se inventa ningún valor.
