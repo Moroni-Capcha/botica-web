@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { Branch, CreditNote, Pharmacy, Product, Sale, VoidInfo, VoucherStatus } from "@/lib/api/types";
+import { amountInWords } from "@/lib/domain/amount-words";
 import { dateShort, timeShort } from "@/lib/format";
 
 const PAY: Record<Sale["payment"]["method"], string> = { efectivo: "Efectivo", yape: "Yape / Plin", tarjeta: "Tarjeta" };
@@ -30,11 +31,20 @@ const Row = ({ left, right, bold }: { left: ReactNode; right: ReactNode; bold?: 
 );
 
 function Header({ pharmacy, branch, title, number }: { pharmacy: Pharmacy | undefined; branch: Branch | undefined; title: string; number: string }) {
+  // Datos fiscales de Ajustes; si faltan (datos antiguos), cae al nombre comercial y a la dirección del local.
+  const name = (pharmacy?.name ?? "").trim();
+  const legal = (pharmacy?.legalName ?? "").trim() || name;
+  const fiscal = (pharmacy?.fiscalAddress ?? "").trim();
+  const address = fiscal || branch?.address || "";
+  // Con dirección fiscal propia, la del local se muestra aparte para que se sepa dónde se atendió.
+  const branchLine = branch ? `${branch.name}${fiscal && branch.address ? ` · ${branch.address}` : ""}` : "";
   return (
     <div className="text-center">
-      <p className="ticket-title font-bold">{(pharmacy?.name ?? "").toUpperCase()}</p>
+      <p className="ticket-title font-bold">{legal.toUpperCase()}</p>
+      {name && name !== legal && <p>{name}</p>}
       {pharmacy?.ruc && <p>RUC {pharmacy.ruc}</p>}
-      {branch && <p>{branch.name}{branch.address ? ` · ${branch.address}` : ""}</p>}
+      {address && <p>{address}</p>}
+      {branchLine && <p>{branchLine}</p>}
       {pharmacy?.phone && <p>Tel. {pharmacy.phone}</p>}
       <p className="mt-2 font-bold">{title}</p>
       <p className="font-bold">{number}</p>
@@ -93,6 +103,7 @@ export function SaleTicket({ sale, electronic, pharmacy, branch, products, provi
       <Row left="OP. GRAVADA" right={money(sale.taxBase)} />
       <Row left="IGV 18%" right={money(sale.igv)} />
       <Row left="TOTAL S/" right={money(sale.total)} bold />
+      <p className="ticket-fine">{amountInWords(sale.total)}</p>
       <p className="mt-1">
         Pago: {PAY[sale.payment.method]}
         {sale.payment.method === "efectivo" ? ` · Recibido ${money(sale.payment.received)} · Vuelto ${money(sale.payment.change)}` : ""}
@@ -137,6 +148,7 @@ export function CreditNoteTicket({ note, pharmacy, branch, products }: TicketBas
       <Row left="OP. GRAVADA" right={money(note.taxBase)} />
       <Row left="IGV 18%" right={money(note.igv)} />
       <Row left="TOTAL ACREDITADO S/" right={money(note.total)} bold />
+      <p className="ticket-fine">{amountInWords(note.total)}</p>
       <p className="mt-1">Emitida por: {note.userName}</p>
       <Footer status={note.status} />
     </div>
