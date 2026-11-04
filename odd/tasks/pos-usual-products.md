@@ -13,13 +13,16 @@ In the POS, when a customer is attached to the sale, suggest what they usually b
 - Checks: `npm run typecheck`, `npm test`. TDD: not configured; the pure helper gets tests. Runner: Vitest.
 
 ## Tasks
-- [ ] U1 Pure rule `usualProducts` (+ tests).
-- [ ] U2 Hook/data wiring and the "Suele llevar" row in the POS cart panel.
+- [x] U1 Pure rule `usualProducts` (+ tests).
+- [x] U2 Hook/data wiring and the "Suele llevar" row in the POS cart panel.
 
 ## Route per task
 Delegated writer (reads several POS files first); parent verifies with typecheck, tests and browser.
 
 ## Progress / evidence
+Delegated writer. Data source: existing `useCustomerPurchases(id)` (no contract, API.md or mock change). `npm run typecheck` clean; `npm test` 46 files / 421 tests pass (10 new cases for `usualProducts`).
+Browser check (parent, dev server, mock): attached Rosa Huaman in the POS: row "Suele llevar" shows Losartan, Metformina and Azitromicina; tapping Azitromicina added it to the cart with the Receta tag and the prescription notice, and its chip disappeared; removing the customer hid the row. Also checked inside the 390 px cart sheet: chips wrap correctly. Test data cleared afterwards.
+NOT checked: reduced motion, offline mode, `npm run build`, real phone.
 
 ## Next step
-Delegate writer.
+User decides push/PR (stacked on feat/copy-min-stock-new-branch and chore/remove-pending-module-route).
