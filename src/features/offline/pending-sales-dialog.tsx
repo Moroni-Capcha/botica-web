@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CloudUpload, RotateCw, Trash2 } from "lucide-react";
+import { CircleAlert, CircleCheck, CloudUpload, Loader2, RotateCw, Trash2 } from "lucide-react";
 import { useConfig, useWritable } from "@/lib/queries";
 import { useSessionStore } from "@/lib/auth/session-store";
 import { useQueueStore } from "@/lib/offline/queue-store";
@@ -10,16 +10,18 @@ import { queueSummary, type QueuedSale } from "@/lib/domain/offline-sales";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Empty } from "@/components/ui/empty";
+import { Chip } from "@/components/ui/chip";
+import type { Tone } from "@/components/ui/tone";
 import { dateShort, soles, timeShort } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { useSyncNow } from "./use-sync-now";
 
 const STATUS = {
-  pending: { label: "Por enviar", className: "bg-sky-100 text-sky-800" },
-  syncing: { label: "Enviando…", className: "bg-sky-100 text-sky-800" },
-  failed: { label: "Con problema", className: "bg-rose-100 text-rose-800" },
-  synced: { label: "Enviada", className: "bg-emerald-100 text-emerald-800" },
-} as const;
+  pending: { label: "Por enviar", tone: "info", Icon: CloudUpload },
+  syncing: { label: "Enviando…", tone: "info", Icon: Loader2 },
+  failed: { label: "Con problema", tone: "danger", Icon: CircleAlert },
+  synced: { label: "Enviada", tone: "success", Icon: CircleCheck },
+} as const satisfies Record<string, { label: string; tone: Tone; Icon: typeof CloudUpload }>;
 
 /** Lista de las ventas cobradas sin conexión: qué falta enviar, cuáles tuvieron problema y por qué. */
 export function PendingSalesDialog({ onClose }: { onClose: () => void }) {
@@ -67,12 +69,12 @@ export function PendingSalesDialog({ onClose }: { onClose: () => void }) {
       }
     >
       {!online && (
-        <p className="mb-3 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status">
+        <p className="mb-3 rounded-xl bg-warning-bg px-3 py-2 text-sm text-warning-fg" role="status">
           Sin conexión. Puedes seguir cobrando: las ventas se guardan en este equipo y se envían solas cuando vuelva el internet.
         </p>
       )}
       {!writable && (
-        <p className="mb-3 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-900" role="status">
+        <p className="mb-3 rounded-xl bg-danger-bg px-3 py-2 text-sm text-danger-fg" role="status">
           Tu cuenta está en solo lectura. Las ventas siguen guardadas y se enviarán cuando se reactive.
         </p>
       )}
@@ -94,19 +96,19 @@ export function PendingSalesDialog({ onClose }: { onClose: () => void }) {
 function Row({ item, branch, isAdmin, confirming, onAskDiscard, onCancel, onRetry, onDiscard }: { item: QueuedSale; branch: string; isAdmin: boolean; confirming: boolean; onAskDiscard: () => void; onCancel: () => void; onRetry: () => void; onDiscard: () => void }) {
   const st = STATUS[item.status];
   return (
-    <li className={cn("rounded-2xl border p-3", item.status === "failed" ? "border-rose-200 bg-rose-50/50" : "border-zinc-200")}>
+    <li className={cn("rounded-2xl border p-3", item.status === "failed" ? "border-danger-border bg-danger-bg/50" : "border-line")}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="font-mono text-sm font-semibold">{item.ticket}</span>
-        <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", st.className)}>{st.label}</span>
-        {item.status === "synced" && item.saleNumber && <span className="text-xs text-zinc-600">Comprobante {item.saleNumber}</span>}
+        <Chip tone={st.tone}><st.Icon className={cn("h-3 w-3", item.status === "syncing" && "animate-spin motion-reduce:animate-none")} aria-hidden />{st.label}</Chip>
+        {item.status === "synced" && item.saleNumber && <span className="text-xs text-fg-2">Comprobante {item.saleNumber}</span>}
         <span className="ml-auto text-sm font-semibold tabular-nums">{soles(item.total)}</span>
       </div>
-      <p className="mt-0.5 text-xs text-zinc-500">
+      <p className="mt-0.5 text-xs text-muted">
         {dateShort(item.createdAt)} {timeShort(item.createdAt)} · {branch} · {item.itemCount} {item.itemCount === 1 ? "producto" : "productos"}
         {item.attempts > 0 && item.status !== "synced" ? ` · ${item.attempts} ${item.attempts === 1 ? "intento" : "intentos"}` : ""}
       </p>
       {item.lastError && item.status !== "synced" && (
-        <p className={cn("mt-1.5 text-xs", item.status === "failed" ? "font-medium text-rose-700" : "text-zinc-600")}>
+        <p className={cn("mt-1.5 text-xs", item.status === "failed" ? "font-medium text-danger-fg" : "text-fg-2")}>
           {item.status === "failed" ? "No se pudo registrar: " : "Último intento: "}
           {item.lastError.message}
         </p>
@@ -119,7 +121,7 @@ function Row({ item, branch, isAdmin, confirming, onAskDiscard, onCancel, onRetr
           {isAdmin &&
             (confirming ? (
               <>
-                <span className="text-xs text-rose-700">La venta ya se entregó al cliente. ¿Descartarla de verdad?</span>
+                <span className="text-xs text-danger-fg">La venta ya se entregó al cliente. ¿Descartarla de verdad?</span>
                 <Button size="sm" variant="danger" onClick={onDiscard}>
                   Sí, descartar
                 </Button>
@@ -132,7 +134,7 @@ function Row({ item, branch, isAdmin, confirming, onAskDiscard, onCancel, onRetr
                 <Trash2 className="h-3.5 w-3.5" /> Descartar
               </Button>
             ))}
-          {!isAdmin && <span className="text-xs text-zinc-500">Solo el administrador puede descartarla.</span>}
+          {!isAdmin && <span className="text-xs text-muted">Solo el administrador puede descartarla.</span>}
         </div>
       )}
     </li>

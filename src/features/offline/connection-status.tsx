@@ -6,6 +6,7 @@ import { useQueueStore } from "@/lib/offline/queue-store";
 import { useOnline } from "@/lib/offline/use-online";
 import { queueSummary } from "@/lib/domain/offline-sales";
 import { cn } from "@/lib/cn";
+import { TONE_CLASS } from "@/components/ui/tone";
 import { PendingSalesDialog } from "./pending-sales-dialog";
 
 /** Estado de la conexión y de las ventas por enviar, en la barra superior. Al tocarlo se abre la lista. */
@@ -19,15 +20,10 @@ export function ConnectionStatus() {
   const Icon = failed > 0 ? CircleAlert : !online ? WifiOff : unsent > 0 ? CloudUpload : Wifi;
   const label =
     failed > 0 ? `${failed} con problema` : !online ? (unsent > 0 ? `Sin conexión · ${unsent} por enviar` : "Sin conexión") : unsent > 0 ? `${unsent} por enviar` : "En línea";
-  const style = {
-    ok: "bg-emerald-50 text-emerald-800",
-    info: "bg-sky-100 text-sky-800",
-    warn: "bg-amber-100 text-amber-900",
-    error: "bg-rose-100 text-rose-800",
-  }[tone];
+  const style = TONE_CLASS[{ ok: "success", info: "info", warn: "warning", error: "danger" }[tone] as "success" | "info" | "warning" | "danger"].soft;
 
   const showText = tone !== "ok";
-  const className = cn("flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-semibold", style);
+  const className = cn("flex min-h-10 shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-semibold", style);
   const content = (
     <>
       <Icon className="h-3.5 w-3.5" aria-hidden />
