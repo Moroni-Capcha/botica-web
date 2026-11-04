@@ -125,7 +125,7 @@ export function PurchasesScreen() {
       </div>
 
       {tab === "sugerido" && (
-        <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white" aria-labelledby="sug-title">
+        <section className="animate-swap-in overflow-hidden rounded-2xl border border-zinc-200 bg-white" aria-labelledby="sug-title">
           <div className="flex flex-wrap items-start gap-3 border-b border-zinc-100 p-4 sm:p-5">
             <div className="min-w-0 flex-1">
               <h2 id="sug-title" className="text-base font-semibold tracking-tight">
@@ -216,7 +216,7 @@ export function PurchasesScreen() {
       )}
 
       {tab === "ingresos" && (
-        <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white" aria-labelledby="ing-title">
+        <section className="animate-swap-in overflow-hidden rounded-2xl border border-zinc-200 bg-white" aria-labelledby="ing-title">
           <div className="flex flex-wrap items-center gap-3 border-b border-zinc-100 p-4 sm:p-5">
             <div className="min-w-0 flex-1">
               <h2 id="ing-title" className="text-base font-semibold tracking-tight">
@@ -273,7 +273,7 @@ export function PurchasesScreen() {
       )}
 
       {tab === "proveedores" && (
-        <div className="grid gap-3">
+        <div className="grid animate-swap-in gap-3">
           {isAdmin && (
             <Button className="w-fit" onClick={() => setEditingSupplier("new")}>
               <Plus className="h-4 w-4" /> Nuevo proveedor

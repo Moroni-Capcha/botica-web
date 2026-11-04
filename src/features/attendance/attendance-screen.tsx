@@ -125,7 +125,7 @@ export function AttendanceScreen() {
       </div>
 
       {tab === "hoy" && (
-        <>
+        <div className="grid animate-swap-in gap-4">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Kpi icon={UserCheck} label="En el local ahora" value={`${count(["en_turno", "refrigerio"])} de ${today.filter((r) => r.scheduled).length}`} hint={`${count(["refrigerio"])} en refrigerio`} loading={isLoading} />
             <Kpi icon={Clock3} label="Tardanzas hoy" value={String(lateToday.length)} hint={lateToday.map((r) => `${firstName(r.worker.name)} ${r.late} min`).join(" · ") || "Todos a tiempo"} tone={lateToday.length ? "rose" : undefined} loading={isLoading} />
@@ -186,7 +186,7 @@ export function AttendanceScreen() {
               </Table>
             )}
           </section>
-        </>
+        </div>
       )}
 
       {(tab === "historial" || tab === "resumen") && (
@@ -202,7 +202,7 @@ export function AttendanceScreen() {
       )}
 
       {tab === "historial" && (
-        <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white" aria-label="Historial de asistencia">
+        <section className="animate-swap-in overflow-hidden rounded-2xl border border-zinc-200 bg-white" aria-label="Historial de asistencia">
           {isLoading ? (
             <Skeleton />
           ) : !rows.length ? (
@@ -251,7 +251,7 @@ export function AttendanceScreen() {
       )}
 
       {tab === "resumen" && (
-        <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white" aria-labelledby="att-sum">
+        <section className="animate-swap-in overflow-hidden rounded-2xl border border-zinc-200 bg-white" aria-labelledby="att-sum">
           <div className="border-b border-zinc-100 p-4 sm:px-5">
             <h2 id="att-sum" className="font-semibold tracking-tight">Últimos {range} días</h2>
             <p className="mt-0.5 text-xs text-zinc-500">
@@ -296,7 +296,7 @@ export function AttendanceScreen() {
       )}
 
       {tab === "personal" && (
-        <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white" aria-label="Personal">
+        <section className="animate-swap-in overflow-hidden rounded-2xl border border-zinc-200 bg-white" aria-label="Personal">
           <div className="flex items-center justify-between gap-2 border-b border-zinc-100 p-4 sm:px-5">
             <p className="text-xs text-zinc-500">Cada trabajador marca con su propio PIN. Los inactivos no aparecen en el equipo de marcación.</p>
             <Button size="sm" variant="primary" onClick={() => setEditing("new")}>
