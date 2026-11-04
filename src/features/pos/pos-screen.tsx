@@ -4,7 +4,8 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type Keyboard
 import { Search, TriangleAlert, Wallet, WifiOff, X } from "lucide-react";
 import type { Customer, Lot, Product, Sale, SaleRequest } from "@/lib/api/types";
 import { errorMessage } from "@/lib/api";
-import { useBranchStock, useCash, useConfig, useCreateSale, useLots, useOpenCash, useProducts, useWritable } from "@/lib/queries";
+import { useBranchStock, useCash, useConfig, useCreateSale, useCustomerPurchases, useLots, useOpenCash, useProducts, useWritable } from "@/lib/queries";
+import { usualProducts } from "@/lib/domain/usual-products";
 import { useOperatingBranch, useSessionStore } from "@/lib/auth/session-store";
 import { applyReserved, buildProvisionalSale, isConnectionError, isProvisionalSale, newClientSaleId, reservedUnits } from "@/lib/domain/offline-sales";
 import { useQueueStore } from "@/lib/offline/queue-store";
@@ -192,6 +193,17 @@ export function PosScreen() {
     return { base, options };
   }, [lastAdded, productMap, productList, stockInfo]);
 
+  /** Lo que el cliente suele llevar, sin lo que ya está en el carrito ni lo que no tiene stock vigente. Sin historial (o sin conexión), no hay sugerencias. */
+  const purchases = useCustomerPurchases(cart.customer?.id ?? null);
+  const usual = useMemo(() => {
+    if (!cart.customer || !purchases.data) return [];
+    const inCart = new Set(lines.map((l) => l.productId));
+    return usualProducts(purchases.data, { limit: 12 })
+      .map((u) => productMap.get(u.productId))
+      .filter((p): p is Product => !!p && !inCart.has(p.id) && (stockInfo.get(p.id)?.stock ?? 0) > 0)
+      .slice(0, 4);
+  }, [cart.customer, purchases.data, lines, productMap, stockInfo]);
+
   type Draft = Parameters<Parameters<typeof PaymentDialog>[0]["onConfirm"]>[0];
 
   const openPayment = () => {
@@ -221,6 +233,7 @@ export function PosScreen() {
   const onCustomerStable = useStableCallback((c: Customer | null) => setCustomer(branchId, c));
   const onClearStable = useStableCallback(() => clear(branchId));
   const onAddEquivalent = useStableCallback((p: Product) => add(p, "unidad"));
+  const onAddUsual = useStableCallback((p: Product, el: HTMLElement) => add(p, "unidad", el));
 
   const finishSale = () => {
     attempt.current = null;
@@ -295,6 +308,8 @@ export function PosScreen() {
       cashOpen={cashOpen}
       equivalents={equivalents}
       onAddEquivalent={onAddEquivalent}
+      usual={usual}
+      onAddUsual={onAddUsual}
       onClose={closeCart}
       titleId={titleId}
       staggerLines={!!titleId}

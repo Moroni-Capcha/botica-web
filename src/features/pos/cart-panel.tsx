@@ -1,13 +1,13 @@
 "use client";
 
-import { memo, useRef } from "react";
+import { memo, useId, useRef } from "react";
 import { Banknote, Box, Minus, Plus, ScanBarcode, ShoppingCart, Sparkles, Stethoscope, Trash2, X } from "lucide-react";
 import type { Customer, Product } from "@/lib/api/types";
 import type { CartLine, Totals } from "@/lib/domain/pharmacy";
 import { Button } from "@/components/ui/button";
 import { RxBadge } from "@/components/ui/badges";
 import { Empty } from "@/components/ui/empty";
-import { Chip } from "@/components/ui/chip";
+import { Chip, chipClass } from "@/components/ui/chip";
 import { hitArea, IconButton } from "@/components/ui/icon-button";
 import { CustomerPicker } from "./customer-picker";
 import { dateShort, soles } from "@/lib/format";
@@ -30,6 +30,9 @@ interface CartPanelProps {
   cashOpen: boolean;
   equivalents: { base: Product; options: Product[] } | null;
   onAddEquivalent: (p: Product) => void;
+  /** Lo que el cliente suele llevar (ya sin lo que está en el carrito ni lo agotado). Vacío: no se muestra la fila. */
+  usual?: Product[];
+  onAddUsual?: (p: Product, el: HTMLElement) => void;
   onClose?: () => void;
   /** Id para el título cuando el panel va dentro de la hoja (la nombra como diálogo). */
   titleId?: string;
@@ -37,7 +40,8 @@ interface CartPanelProps {
   staggerLines?: boolean;
 }
 
-export const CartPanel = memo(function CartPanel({ lines, totals, customer, onCustomer, onQty, onClear, onCharge, canCharge, writable = true, cashOpen, equivalents, onAddEquivalent, onClose, titleId, staggerLines }: CartPanelProps) {
+export const CartPanel = memo(function CartPanel({ lines, totals, customer, onCustomer, onQty, onClear, onCharge, canCharge, writable = true, cashOpen, equivalents, onAddEquivalent, usual = [], onAddUsual, onClose, titleId, staggerLines }: CartPanelProps) {
+  const usualId = useId();
   const rows = useAnimatedList(lines);
   const listRef = useRef<HTMLUListElement>(null);
   useFlipList(listRef, rows);
@@ -62,6 +66,26 @@ export const CartPanel = memo(function CartPanel({ lines, totals, customer, onCu
       <div className="border-b border-line-soft px-4 py-2.5">
         <CustomerPicker customer={customer} onChange={onCustomer} />
         {customer && <p className="mt-1.5 text-micro text-muted">{customer.points} puntos</p>}
+        {customer && onAddUsual && usual.length > 0 && (
+          <div role="group" aria-labelledby={usualId} className="mt-2">
+            <p id={usualId} className="text-micro font-semibold text-muted">Suele llevar</p>
+            <ul className="mt-1 flex flex-wrap gap-2">
+              {usual.map((p, i) => (
+                <li key={p.id} className="animate-stagger-in" style={stagger(i)}>
+                  <button
+                    type="button"
+                    onClick={(e) => onAddUsual(p, e.currentTarget)}
+                    aria-label={`Agregar ${p.name} ${p.conc} al carrito`}
+                    className={cn(chipClass("neutral", { ring: true }), hitArea, "max-w-full gap-1.5 whitespace-normal py-1.5 text-left text-xs transition-colors duration-[var(--dur-fast)] hover:bg-line-soft")}
+                  >
+                    <Plus className="h-3.5 w-3.5" aria-hidden />
+                    {p.name} <span className="font-normal text-muted">{p.conc}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
