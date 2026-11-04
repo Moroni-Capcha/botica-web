@@ -230,7 +230,10 @@ export const AUDIT_RULES: { [K in keyof ApiClient]?: Rule<K, any> } = {
     },
   }),
   createBranch: rule<"createBranch">({
-    ok: ({ result }) => ({ action: "local_creado", entity: "local", entityId: result.branch.id, entityLabel: result.branch.name, branchId: result.branch.id, after: branchFields(result.branch) }),
+    ok: ({ args, result }) => ({
+      action: "local_creado", entity: "local", entityId: result.branch.id, entityLabel: result.branch.name, branchId: result.branch.id,
+      after: { ...branchFields(result.branch), ...(args[0].copyMinStockFrom ? { "Mínimos copiados de": args[0].copyMinStockFrom } : {}) },
+    }),
   }),
   updateBranch: rule<"updateBranch", AuditFields | null>({
     before: (args, look) => {

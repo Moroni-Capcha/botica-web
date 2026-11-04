@@ -19,6 +19,7 @@ import { tokenStore } from "../token";
 import { tenantStore } from "../tenant";
 import { allocateFefo, daysUntil, findPresentation, isValidCmp, documentIsValid, parseDay, round2, IGV, weightedDiscount } from "@/lib/domain/pharmacy";
 import { normalizeProduct, validateProduct } from "@/lib/domain/inventory";
+import { copyMinStock } from "@/lib/domain/min-stock";
 import { isValidLotCode, isValidSupplierDocument, normalizeLotCode } from "@/lib/domain/purchasing";
 import { transferActions, transferCode } from "@/lib/domain/transfers";
 import { allowedMarks, scheduleError, MARK_LABEL } from "@/lib/domain/attendance";
@@ -1022,6 +1023,7 @@ export function createMockClient(): ApiClient {
       const next: BranchInput = { name: input.name.trim(), address: input.address.trim(), series: input.series };
       const e = branchErrors(next, d.branches, "");
       if (hasErrors(e)) fail("DATOS_INVALIDOS", Object.values(e)[0]!);
+      if (input.copyMinStockFrom && !d.branches.some((b) => b.id === input.copyMinStockFrom && b.active)) fail("LOCAL_ORIGEN_INVALIDO", "El local del que quieres copiar los stock mínimos no existe o está desactivado.");
       const id = branchSlug(next.name, d.branches.map((b) => b.id));
       const accounts = d.staff.map(({ pin: _pin, ...s }) => s);
       const accInput: AccountInput | null = input.account ? { name: input.account.name.trim(), role: "encargado", branchId: id, pin: input.account.pin, active: true } : null;
@@ -1033,6 +1035,7 @@ export function createMockClient(): ApiClient {
       d.branches.push(branch);
       d.seq[id] = { b: 0, f: 0 };
       d.cashMovements[id] = [];
+      if (input.copyMinStockFrom) d.products = copyMinStock(d.products, input.copyMinStockFrom, id);
       let account: StaffAccount | null = null;
       if (accInput) {
         const uid = `u${Math.max(0, ...d.staff.map((x) => Number(x.id.slice(1)) || 0)) + 1}`;

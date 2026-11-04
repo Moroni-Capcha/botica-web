@@ -541,6 +541,7 @@ Todo es solo para el administrador (`403 SIN_PERMISO`). Los datos de la botica, 
 - Mismas reglas de nombre, dirección y serie que al editar (la serie no puede repetir la de ningún local, tampoco de uno desactivado).
 - `account` es opcional (`null` = no se crea): cuenta de local para ese local, con las reglas de cuentas de abajo.
 - El local nace sin stock, con la caja cerrada y numeración desde 1. Su stock mínimo por producto es el general (`minStock`) hasta que se ajuste.
+- `copyMinStockFrom` es opcional (id de un local activo, por ejemplo `"principal"`): el backend copia al local nuevo el stock mínimo por producto de ese local (`minStockByBranch`); si un producto no tiene mínimo propio allí, el local nuevo recibe su `minStock` general. Solo se copian los mínimos, nunca el stock. Si el local no existe o está desactivado: `400 LOCAL_ORIGEN_INVALIDO`. Sin el campo, el local nuevo sigue usando el `minStock` de cada producto.
 
 `POST /settings/branches/:id/deactivate` con `{ "reason": "Cierre del local" }` → `Branch` con `active: false`.
 
