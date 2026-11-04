@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { NavLink } from "./nav-link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Ellipsis } from "lucide-react";
@@ -27,10 +27,10 @@ export function MobileNav({ user }: { user: User }) {
           <div className="absolute inset-0 bg-zinc-900/30" />
           <div className="absolute bottom-20 right-3 w-56 overflow-hidden rounded-2xl bg-brand p-1.5 shadow-2xl">
             {rest.map((n) => (
-              <Link key={n.id} href={n.href} className={cn("flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium", pathname.startsWith(n.href) ? "bg-white/10 text-white" : "text-white/70")}>
+              <NavLink key={n.id} href={n.href} className={cn("flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium", pathname.startsWith(n.href) ? "bg-white/10 text-white" : "text-white/70")}>
                 <n.icon className="h-[18px] w-[18px]" />
                 {n.label}
-              </Link>
+              </NavLink>
             ))}
           </div>
         </div>
@@ -39,10 +39,10 @@ export function MobileNav({ user }: { user: User }) {
         {primary.map((n) => {
           const active = pathname.startsWith(n.href);
           return (
-            <Link key={n.id} href={n.href} className={cn(item, active ? "text-white" : "text-white/55")} aria-current={active ? "page" : undefined}>
+            <NavLink key={n.id} href={n.href} className={cn(item, active ? "text-white" : "text-white/55")} aria-current={active ? "page" : undefined}>
               <n.icon className={cn("h-5 w-5", active && "text-accent")} />
               <span className="truncate">{n.short}</span>
-            </Link>
+            </NavLink>
           );
         })}
         {overflow && (

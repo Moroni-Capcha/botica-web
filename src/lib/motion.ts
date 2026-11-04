@@ -44,6 +44,15 @@ export const POP_KEYFRAMES: Keyframe[] = [
   { transform: "scale3d(1, 1, 1)", offset: 1 },
 ];
 
+/**
+ * Salida de una pantalla al cambiar de módulo: se atenúa hasta 0,4 y sube 6 px. No llega a 0 a propósito:
+ * si la pantalla nueva tarda en llegar, la anterior sigue visible (atenuada) en vez de dejar la página en blanco.
+ */
+export const PAGE_EXIT_KEYFRAMES: Keyframe[] = [
+  { opacity: 1, transform: "translate3d(0, 0, 0)" },
+  { opacity: 0.4, transform: "translate3d(0, -6px, 0)" },
+];
+
 /* ---------- FLIP: mover lo que queda cuando algo sale de una lista, solo con transform ---------- */
 
 /** Posición de un elemento respecto al contenedor (no depende del scroll). */
