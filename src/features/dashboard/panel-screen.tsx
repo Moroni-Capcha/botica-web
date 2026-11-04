@@ -144,7 +144,7 @@ export function PanelScreen() {
   return (
     <div className="mx-auto grid max-w-7xl gap-4 p-4 sm:p-6">
       <div className="flex flex-wrap items-end gap-3">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-[14rem] flex-1">
           <p className="text-xl font-semibold tracking-tight text-fg">
             {greeting(now)}, {firstName}
           </p>
