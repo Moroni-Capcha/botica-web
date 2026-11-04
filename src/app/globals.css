@@ -118,6 +118,12 @@ body {
     outline-offset: 2px;
     box-shadow: 0 0 0 2px var(--focus-gap);
   }
+
+  /* Un grid sin columnas explícitas crece hasta el contenido más ancho y se sale de la pantalla en móvil.
+     Con minmax(0, 1fr) la columna se queda en el ancho disponible; las clases grid-cols-* siguen mandando. */
+  :where(.grid) {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @keyframes fade {
