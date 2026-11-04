@@ -88,7 +88,7 @@ El backend valida el local en cada endpoint que recibe `branchId`; el front tamb
 
 ### Públicos (sin token)
 
-`GET /public/config` → `{ pharmacy: Pharmacy, branches: Branch[], expiry: { red: 30, yellow: 90 } }`. `expiry` son los días del semáforo de vencimientos (crítico hasta `red`, por vencer hasta `yellow`). También trae `attendance: { toleranceMinutes: 10, breakMinutes: 60, overtimeAfterMinutes: 15 }` y `purchasing: { coverDays: 15, minShelfDays: 180 }`: días que cubre el pedido sugerido y vida útil mínima al recibir (menos días = advertencia). Ambos se editarán en Ajustes.
+`GET /public/config` → `{ pharmacy: Pharmacy, branches: Branch[], expiry: { red: 30, yellow: 90 } }`. `expiry` son los días del semáforo de vencimientos (crítico hasta `red`, por vencer hasta `yellow`). También trae `attendance: { toleranceMinutes: 10, breakMinutes: 60, overtimeAfterMinutes: 15 }` y `purchasing: { coverDays: 15, minShelfDays: 180 }`: días que cubre el pedido sugerido y vida útil mínima al recibir (menos días = advertencia). Ambos se editarán en Ajustes. `pharmacy.legalName` (razón social) y `pharmacy.fiscalAddress` (dirección fiscal) pueden venir vacíos: significa "aún no configurado".
 
 `GET /auth/staff` → `StaffSummary[]`. Solo nombre, rol y local, nunca el PIN.
 
@@ -110,14 +110,14 @@ En el mock, el dueño de ejemplo es `dueno@botica-huanuco.pe` con contraseña `C
 
 - `priceMonthly`: soles por mes **con IGV** (18 %), con 2 decimales (`round2`). Se calcula desde el precio sin IGV (`PLAN_CATALOG` en `src/lib/domain/plans.ts`).
 
-`POST /public/signup` (sin token) con `{ "boticaName", "code", "ownerName", "email", "password", "plan" }` → `Session` del dueño (`admin`, ya con sesión iniciada). Crea la botica en **prueba de 14 días** (`status: "trial"`, `trialEndsAt` = hoy + 14, día de Lima), con el plan elegido (`plan` = `id` de `PlanOffer`), un local "Principal" (serie `001`) y al dueño como único usuario.
+`POST /public/signup` (sin token) con `{ "boticaName", "code", "ownerName", "email", "password", "plan" }` → `Session` del dueño (`admin`, ya con sesión iniciada). Crea la botica en **prueba de 14 días** (`status: "trial"`, `trialEndsAt` = hoy + 14, día de Lima), con el plan elegido (`plan` = `id` de `PlanOffer`), un local "Principal" (serie `001`) y al dueño como único usuario. La botica nace con `ruc`, `legalName` y `fiscalAddress` vacíos (aún no configurados); se completan en el paso `botica` de la configuración inicial o en Ajustes.
 
 - `code`: minúsculas, números y guiones (3 a 40), `isValidBoticaCode`. `409 CODIGO_EN_USO` si ya existe.
 - `email` válido (`isValidEmail`); `409 CORREO_EN_USO` si otra botica ya lo usa como dueño (el backend debe garantizarlo; el mock solo ve su propia botica). Contraseña con `passwordError`.
 - `400 DATOS_INVALIDOS` si falta el nombre (3 a 40 caracteres), el nombre del dueño o el plan no existe.
 - La contraseña se guarda con hash. Después del registro el front manda `X-Botica: <code>` como en cualquier ingreso.
 
-`GET /setup` (solo `admin`) → `Setup` `{ "done": ["botica", "local"] }`: pasos de la primera configuración ya hechos. Pasos, en orden: `botica` (RUC, dirección y colores), `local` (datos del primer local), `series` (series de comprobantes), `usuario` (primer usuario de mostrador con PIN), `productos` (importar productos o saltar).
+`GET /setup` (solo `admin`) → `Setup` `{ "done": ["botica", "local"] }`: pasos de la primera configuración ya hechos. Pasos, en orden: `botica` (RUC, razón social, dirección fiscal y colores), `local` (datos del primer local), `series` (series de comprobantes), `usuario` (primer usuario de mostrador con PIN), `productos` (importar productos o saltar).
 
 `POST /setup/steps/:step` (solo `admin`) → `Setup`. Marca el paso como hecho (idempotente). `400 DATOS_INVALIDOS` si el paso no existe. Una botica ya configurada (o creada antes de esta función) devuelve todos los pasos hechos.
 
@@ -526,7 +526,7 @@ El front calcula todo lo demás con `src/lib/domain/reports.ts` (pruebas en `rep
 
 Todo es solo para el administrador (`403 SIN_PERMISO`). Los datos de la botica, los locales y las reglas se leen con `GET /public/config`; el front actualiza esa configuración al guardar, y los demás equipos la ven al volver a leerla (cada 10 minutos o al recargar). Las validaciones están en `src/lib/domain/settings.ts` (pruebas en `settings.test.ts`).
 
-`PUT /settings/pharmacy` con `Pharmacy` → `Pharmacy`. Nombre de 3 a 40 caracteres, lema hasta 60, RUC de 11 dígitos que empiece en 10 o 20, colores `#RRGGBB` (se guardan en mayúsculas). El color principal debe tener contraste de al menos 4,5 con texto blanco (fórmula WCAG), porque va de fondo en botones y barra lateral.
+`PUT /settings/pharmacy` con `Pharmacy` → `Pharmacy`. `Pharmacy` trae `legalName` (razón social, hasta 100 caracteres) y `fiscalAddress` (dirección fiscal, hasta 120); ambos son opcionales y vacío significa "aún no configurado": el ticket de 80 mm imprime entonces `name` y la dirección del local. Nombre de 3 a 40 caracteres, lema hasta 60, RUC de 11 dígitos que empiece en 10 o 20, colores `#RRGGBB` (se guardan en mayúsculas). El color principal debe tener contraste de al menos 4,5 con texto blanco (fórmula WCAG), porque va de fondo en botones y barra lateral.
 
 **Locales.** `GET /public/config` trae `branches` (solo activos: donde se vende, se traslada y se elige), `closedBranches` (desactivados, solo para nombrarlos en el historial) y `plan`: `{ "name": "Plan Crece", "maxBranches": 3 }`, que define Digi!HME según lo contratado. Cada `Branch` lleva `active`.
 

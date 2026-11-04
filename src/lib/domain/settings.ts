@@ -32,13 +32,15 @@ export function pharmacyErrors(p: Pharmacy): Errors<Pharmacy> {
     name: p.name.trim().length < 3 ? "Escribe el nombre comercial" : p.name.trim().length > 40 ? "Máximo 40 caracteres" : undefined,
     tagline: p.tagline.trim().length > 60 ? "Máximo 60 caracteres" : undefined,
     ruc: !isValidRuc(p.ruc) ? "11 dígitos, empieza en 10 o 20" : undefined,
+    legalName: p.legalName.trim().length > 100 ? "Máximo 100 caracteres" : undefined,
+    fiscalAddress: p.fiscalAddress.trim().length > 120 ? "Máximo 120 caracteres" : undefined,
     phone: p.phone && !/^[\d\s+()-]{6,20}$/.test(p.phone) ? "Solo números, espacios y guiones" : undefined,
     brand: !isHex(p.brand) ? "Color en formato #RRGGBB" : contrast(p.brand, "#ffffff") < 4.5 ? "Muy claro: el texto blanco encima no se lee (contraste menor a 4,5)" : undefined,
     accent: !isHex(p.accent) ? "Color en formato #RRGGBB" : undefined,
   });
 }
 
-export const normalizePharmacy = (p: Pharmacy): Pharmacy => ({ ...p, name: p.name.trim(), tagline: p.tagline.trim(), phone: p.phone.trim(), brand: p.brand.toUpperCase(), accent: p.accent.toUpperCase() });
+export const normalizePharmacy = (p: Pharmacy): Pharmacy => ({ ...p, name: p.name.trim(), tagline: p.tagline.trim(), legalName: p.legalName.trim(), fiscalAddress: p.fiscalAddress.trim(), phone: p.phone.trim(), brand: p.brand.toUpperCase(), accent: p.accent.toUpperCase() });
 
 /* ------------------------------ Locales ------------------------------ */
 

@@ -104,6 +104,8 @@ export interface Pharmacy {
   name: string;
   tagline: string;
   ruc: string;
+  legalName: string; // razón social; vacío = aún no configurada (el ticket usa `name`)
+  fiscalAddress: string; // dirección fiscal; vacío = el ticket usa la dirección del local
   phone: string;
   brand: string; // color principal, hex
   accent: string; // color de acento, hex

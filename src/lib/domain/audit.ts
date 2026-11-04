@@ -88,7 +88,7 @@ export const FIELD_LABELS: Record<string, { label: string; kind?: Kind }> = {
   type: { label: "Tipo", kind: "enum" }, units: { label: "Unidades" }, discount: { label: "Descuento", kind: "pct" }, lots: { label: "Lotes" }, supplier: { label: "Proveedor" },
   from: { label: "Origen", kind: "branch" }, to: { label: "Destino", kind: "branch" }, openingAmount: { label: "Fondo inicial", kind: "money" }, expected: { label: "Esperado", kind: "money" },
   counted: { label: "Contado", kind: "money" }, difference: { label: "Diferencia", kind: "money" }, tickets: { label: "Tickets" }, amount: { label: "Monto", kind: "money" },
-  note: { label: "Detalle" }, tagline: { label: "Eslogan" }, ruc: { label: "RUC" }, phone: { label: "Teléfono" }, brand: { label: "Color principal" }, accent: { label: "Color de acento" },
+  note: { label: "Detalle" }, tagline: { label: "Eslogan" }, ruc: { label: "RUC" }, legalName: { label: "Razón social" }, fiscalAddress: { label: "Dirección fiscal" }, phone: { label: "Teléfono" }, brand: { label: "Color principal" }, accent: { label: "Color de acento" },
   series: { label: "Serie" }, address: { label: "Dirección" }, via: { label: "Forma de ingreso", kind: "enum" }, email: { label: "Correo" }, plan: { label: "Plan" },
   maxBranches: { label: "Locales permitidos" }, trialEndsAt: { label: "Fin de la prueba" }, days: { label: "Días" },
   "expiry.red": { label: "Vencimiento crítico (días)" }, "expiry.yellow": { label: "Vencimiento por vencer (días)" }, "purchasing.coverDays": { label: "Días de cobertura de compra" },

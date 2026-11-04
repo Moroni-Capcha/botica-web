@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { AccountInput, Branch, Pharmacy, StaffAccount } from "@/lib/api/types";
 import { accountErrors, accountGuard, branchErrors, branchSlug, contrast, deactivateBlockers, docNumber, nextSeries, planUsage, isWeakPin, pharmacyErrors, rulesErrors, toneShift } from "./settings";
 
-const pharmacy: Pharmacy = { name: "Botica Huánuco", tagline: "Botica", ruc: "20609876543", phone: "987 654 321", brand: "#0B4F45", accent: "#3DDC97" };
+const pharmacy: Pharmacy = { name: "Botica Huánuco", tagline: "Botica", ruc: "20609876543", legalName: "Botica Huánuco S.A.C.", fiscalAddress: "Av. Los Próceres 1240", phone: "987 654 321", brand: "#0B4F45", accent: "#3DDC97" };
 const branches: Branch[] = [
   { id: "principal", name: "Principal", address: "Av. Los Próceres 1240", series: "001", active: true },
   { id: "sucursal", name: "Sucursal", address: "Av. Canto Grande 3150", series: "002", active: true },

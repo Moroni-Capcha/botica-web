@@ -34,7 +34,7 @@ import { acceptedResponse, allocateReturn, canResend, creditableLines, creditNot
 import { SEED_DAILY_UNITS, SEED_LOT_PLAN, SEED_PRODUCTS, SEED_SUC_MISSING } from "./seed-data";
 
 const KEY = "bh.mock.v1";
-const VERSION = 16; // subir cuando cambie la forma de los datos: se regeneran
+const VERSION = 17; // subir cuando cambie la forma de los datos: se regeneran
 const DAY = 86_400_000;
 
 /**
@@ -187,7 +187,7 @@ function seed(now: number): MockDb {
     version: VERSION,
     expiry: { red: 30, yellow: 90 },
     purchasing: { coverDays: 15, minShelfDays: 180 },
-    pharmacy: { name: "Botica Huánuco", tagline: "Botica · Atención farmacéutica", ruc: "20609876543", phone: "987 654 321", brand: "#0B4F45", accent: "#3DDC97" },
+    pharmacy: { name: "Botica Huánuco", tagline: "Botica · Atención farmacéutica", ruc: "20609876543", legalName: "Botica Huánuco S.A.C.", fiscalAddress: "Av. Los Próceres 1240, Independencia, Lima", phone: "987 654 321", brand: "#0B4F45", accent: "#3DDC97" },
     branches: [
       { id: "principal", name: "Principal", address: "Av. Los Próceres 1240", series: "001", active: true },
       { id: "sucursal", name: "Sucursal", address: "Av. Canto Grande 3150", series: "002", active: true },
@@ -661,7 +661,7 @@ function seedEmpty(input: SignUpInput, now: number): MockDb {
     version: VERSION,
     expiry: { red: 30, yellow: 90 },
     purchasing: { coverDays: 15, minShelfDays: 180 },
-    pharmacy: { name: input.boticaName.trim(), tagline: "", ruc: "", phone: "", brand: "#0B4F45", accent: "#3DDC97" },
+    pharmacy: { name: input.boticaName.trim(), tagline: "", ruc: "", legalName: "", fiscalAddress: "", phone: "", brand: "#0B4F45", accent: "#3DDC97" },
     branches: [{ id: "principal", name: "Principal", address: "", series: "001", active: true }],
     plan: { name: plan.name, maxBranches: plan.maxBranches },
     boticaCode: input.code,

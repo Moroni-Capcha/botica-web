@@ -116,7 +116,7 @@ const flattenRules = (r: RulesInput): AuditFields => {
 };
 
 const accountFields = (a: { name: string; role: Role; branchId: string | null; active: boolean }): AuditFields => ({ name: a.name, role: a.role, branchId: a.branchId, active: a.active });
-const pharmacyFields = (p: Pharmacy): AuditFields => ({ name: p.name, tagline: p.tagline, ruc: p.ruc, phone: p.phone, brand: p.brand, accent: p.accent });
+const pharmacyFields = (p: Pharmacy): AuditFields => ({ name: p.name, tagline: p.tagline, ruc: p.ruc, legalName: p.legalName, fiscalAddress: p.fiscalAddress, phone: p.phone, brand: p.brand, accent: p.accent });
 const branchFields = (b: Pick<Branch, "name" | "address" | "series">): AuditFields => ({ name: b.name, address: b.address, series: b.series });
 
 const sessionActor = (u: { id: string; name: string; role: Role; branchId: string | null }): AuditActor => ({ id: u.id, name: u.name, role: u.role, branchId: u.branchId });

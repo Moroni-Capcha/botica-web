@@ -169,6 +169,12 @@ function PharmacyForm({ initial }: { initial: Pharmacy }) {
               <Field label="RUC" error={errors.ruc}>
                 <Input inputMode="numeric" maxLength={11} value={f.ruc} onChange={(e) => set("ruc", e.target.value.replace(/\D/g, ""))} className="tabular-nums" aria-invalid={!!errors.ruc} />
               </Field>
+              <Field label="Razón social" error={errors.legalName} hint="Como figura en la SUNAT. Sale en el ticket.">
+                <Input value={f.legalName} onChange={(e) => set("legalName", e.target.value)} placeholder="Ej.: Botica Ejemplo S.A.C." aria-invalid={!!errors.legalName} />
+              </Field>
+              <Field label="Dirección fiscal" error={errors.fiscalAddress} hint="Si la dejas vacía, el ticket usa la dirección del local." className="sm:col-span-2">
+                <Input value={f.fiscalAddress} onChange={(e) => set("fiscalAddress", e.target.value)} aria-invalid={!!errors.fiscalAddress} />
+              </Field>
               <Field label="Teléfono" error={errors.phone}>
                 <Input inputMode="tel" value={f.phone} onChange={(e) => set("phone", e.target.value)} />
               </Field>
