@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
-import { CircleAlert, KeyRound, Lock, Pencil, Plus, Power, RotateCcw, Save, Store, TriangleAlert, UserRound } from "lucide-react";
+import { Ban, CircleAlert, CircleCheck, KeyRound, Lock, Pencil, Plus, Power, RotateCcw, Save, Store, TriangleAlert, UserRound } from "lucide-react";
 import type { Branch, BranchInput, BranchSeries, Pharmacy, StaffAccount } from "@/lib/api/types";
 import type { PublicConfig } from "@/lib/api";
 import { errorMessage } from "@/lib/api";
@@ -12,19 +12,21 @@ import { daysUntil } from "@/lib/domain/pharmacy";
 import { branchErrors, contrast, docNumber, hasErrors, isHex, pharmacyErrors, planUsage, rulesErrors, RULE_LIMITS, toneShift, type Rules } from "@/lib/domain/settings";
 import { BrandMark } from "@/components/brand-mark";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Chip } from "@/components/ui/chip";
 import { Empty } from "@/components/ui/empty";
 import { Field, Input } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
 import { Table, td } from "@/components/ui/table";
 import { notify } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
+import { useMediaQuery } from "@/lib/use-media-query";
 import { useBranchLots } from "@/features/shared/branch-scope";
 import { PlanBilling } from "./plan-billing";
 import { AccountDialog } from "./account-dialog";
 import { CloseBranchDialog, NewBranchDialog } from "./branch-dialogs";
 
 type Tab = "botica" | "locales" | "cuentas" | "reglas" | "plan";
-const card = "rounded-2xl border border-zinc-200 bg-white";
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 export function SettingsScreen() {
@@ -39,16 +41,24 @@ export function SettingsScreen() {
 
   if (!isAdmin) {
     return (
-      <Empty icon={Lock} title="Solo el administrador cambia los ajustes">
-        Si algo de la botica o de tu local está mal, avísale al administrador.
-      </Empty>
+      <div className="mx-auto max-w-5xl p-4 sm:p-6">
+        <Card padding="none">
+          <Empty icon={Lock} title="Solo el administrador cambia los ajustes">
+            Si algo de la botica o de tu local está mal, avísale al administrador.
+          </Empty>
+        </Card>
+      </div>
     );
   }
   if (config.error) {
     return (
-      <Empty icon={TriangleAlert} title="No se pudieron cargar los ajustes">
-        {errorMessage(config.error)}
-      </Empty>
+      <div className="mx-auto max-w-5xl p-4 sm:p-6">
+        <Card padding="none">
+          <Empty icon={TriangleAlert} title="No se pudieron cargar los ajustes">
+            {errorMessage(config.error)}
+          </Empty>
+        </Card>
+      </div>
     );
   }
   const c = config.data;
@@ -68,7 +78,7 @@ export function SettingsScreen() {
         ]}
       />
       {!c ? (
-        <div className={cn(card, "h-72 animate-pulse bg-zinc-50")} />
+        <Card padding="none" className="h-72 animate-pulse bg-sunken" aria-busy="true" />
       ) : (
       <div key={tab} className="animate-swap-in">
       {tab === "botica" ? (
@@ -90,13 +100,13 @@ export function SettingsScreen() {
 
 function SaveBar({ dirty, loading, error, onSave, onReset, children }: { dirty: boolean; loading: boolean; error: unknown; onSave: () => void; onReset: () => void; children?: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 border-t border-zinc-100 px-4 py-3 sm:px-5">
-      <div className="mr-auto min-w-0 text-sm">
-        {error ? <p className="text-rose-600" role="alert">{errorMessage(error)}</p> : children ?? <p className="text-zinc-500">{dirty ? "Tienes cambios sin guardar." : "Sin cambios."}</p>}
+    <div className="flex flex-wrap items-center gap-2 border-t border-line-soft px-4 py-3 sm:px-5">
+      <div className="mr-auto min-w-0 basis-56 text-sm" aria-live="polite">
+        {error ? <p className="text-danger-fg" role="alert">{errorMessage(error)}</p> : children ?? <p className="text-muted">{dirty ? "Tienes cambios sin guardar." : "Sin cambios."}</p>}
       </div>
       <Button onClick={onReset} disabled={!dirty || loading}>Descartar</Button>
       <Button variant="primary" onClick={onSave} loading={loading} disabled={!dirty}>
-        <Save className="h-4 w-4" /> Guardar
+        <Save className="h-4 w-4" aria-hidden /> Guardar
       </Button>
     </div>
   );
@@ -107,8 +117,8 @@ function Section({ title, description, action, children }: { title: string; desc
     <div className="px-4 pt-4 sm:px-5 sm:pt-5">
       <div className="flex items-start gap-2">
         <div className="mr-auto min-w-0">
-          <h2 className="text-sm font-semibold text-zinc-900">{title}</h2>
-          {description && <p className="mt-0.5 text-xs text-zinc-500">{description}</p>}
+          <h2 className="text-sm font-semibold text-fg">{title}</h2>
+          {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
         </div>
         {action}
       </div>
@@ -123,7 +133,7 @@ function ColorField({ label, value, onChange, error, hint }: { label: string; va
   return (
     <Field label={label} error={error} hint={hint}>
       <div className="flex gap-2">
-        <input type="color" value={isHex(value) ? value : "#000000"} onChange={(e) => onChange(e.target.value.toUpperCase())} className="h-10 w-12 shrink-0 cursor-pointer rounded-xl border border-zinc-200 bg-white p-1" aria-label={`${label}: elegir`} />
+        <input type="color" value={isHex(value) ? value : "#000000"} onChange={(e) => onChange(e.target.value.toUpperCase())} className="h-10 w-12 shrink-0 cursor-pointer rounded-xl border border-line-strong bg-surface p-1" aria-label={`${label}: elegir`} />
         <Input value={value} onChange={(e) => onChange(e.target.value.trim())} maxLength={7} className="font-mono uppercase" aria-invalid={!!error} />
       </div>
     </Field>
@@ -145,7 +155,7 @@ function PharmacyForm({ initial }: { initial: Pharmacy }) {
   };
 
   return (
-    <section className={card} aria-label="Datos de la botica">
+    <Card as="section" padding="none" aria-label="Datos de la botica">
       <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
         <div>
           <Section title="Datos de la botica" description="Salen en la pantalla de ingreso, en los comprobantes y en los Excel.">
@@ -171,9 +181,9 @@ function PharmacyForm({ initial }: { initial: Pharmacy }) {
             </div>
           </Section>
         </div>
-        <div className="border-t border-zinc-100 p-4 sm:p-5 lg:border-l lg:border-t-0" style={preview}>
-          <p className="text-xs font-medium text-zinc-600">Vista previa</p>
-          <div className="mt-2 overflow-hidden rounded-2xl border border-zinc-200">
+        <div className="border-t border-line-soft p-4 sm:p-5 lg:border-l lg:border-t-0" style={preview}>
+          <p className="text-xs font-medium text-fg-2">Vista previa</p>
+          <div className="mt-2 overflow-hidden rounded-2xl border border-line">
             <div className="flex items-center gap-3 bg-brand p-4 text-white">
               <BrandMark size={40} />
               <div className="min-w-0">
@@ -181,20 +191,20 @@ function PharmacyForm({ initial }: { initial: Pharmacy }) {
                 <p className="truncate text-xs text-white/70">{f.tagline || "Lema"}</p>
               </div>
             </div>
-            <div className="grid gap-2 bg-white p-4">
+            <div className="grid gap-2 bg-surface p-4">
               <Button variant="primary">Cobrar S/ 24,50</Button>
-              <p className="flex items-center gap-2 text-xs text-zinc-600">
+              <p className="flex items-center gap-2 text-xs text-fg-2">
                 <span className="h-2.5 w-2.5 rounded-full bg-accent" aria-hidden /> Caja abierta
               </p>
-              <p className="text-[11px] text-zinc-400">RUC {f.ruc || "—"} · {f.phone || "sin teléfono"}</p>
+              <p className="text-micro text-muted">RUC {f.ruc || "—"} · {f.phone || "sin teléfono"}</p>
             </div>
           </div>
         </div>
       </div>
       <SaveBar dirty={dirty} loading={save.isPending} error={save.error} onSave={submit} onReset={() => setF(initial)}>
-        {dirty && hasErrors(errors) ? <p className="text-rose-600">Corrige lo marcado para guardar.</p> : undefined}
+        {dirty && hasErrors(errors) ? <p className="text-danger-fg">Corrige lo marcado para guardar.</p> : undefined}
       </SaveBar>
-    </section>
+    </Card>
   );
 }
 
@@ -214,48 +224,48 @@ function Branches({ config }: { config: PublicConfig }) {
 
   return (
     <div className="grid gap-4">
-      <section className={cn(card, "flex flex-wrap items-center gap-4 p-4 sm:p-5")} aria-label="Locales del plan">
+      <Card as="section" className="flex flex-wrap items-center gap-4" aria-label="Locales del plan">
         <div className="mr-auto min-w-0">
-          <h2 className="text-sm font-semibold text-zinc-900">
+          <h2 className="text-sm font-semibold text-fg">
             Usas {plan.active} de {plan.max} {plan.max === 1 ? "local" : "locales"} · {config.plan.name}
           </h2>
-          <div className="mt-2 h-2 w-56 max-w-full overflow-hidden rounded-full bg-zinc-100" role="meter" aria-valuemin={0} aria-valuemax={plan.max} aria-valuenow={plan.active} aria-label="Locales activos del plan">
+          <div className="mt-2 h-2 w-56 max-w-full overflow-hidden rounded-full bg-sunken-strong" role="meter" aria-valuemin={0} aria-valuemax={plan.max} aria-valuenow={plan.active} aria-label="Locales activos del plan">
             <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%` }} />
           </div>
-          <p className="mt-1.5 text-xs text-zinc-500">
+          <p className="mt-1.5 text-xs text-muted">
             {plan.canAdd ? `Puedes abrir ${plan.left === 1 ? "1 local más" : `${plan.left} locales más`}.` : "Llegaste al tope de tu plan. Para abrir otro local, amplía el plan con Digi!HME o desactiva uno."}
           </p>
         </div>
         <Button variant="primary" onClick={() => setCreating(true)} disabled={!plan.canAdd}>
-          <Plus className="h-4 w-4" /> Nuevo local
+          <Plus className="h-4 w-4" aria-hidden /> Nuevo local
         </Button>
-      </section>
+      </Card>
       <div className="grid gap-4 lg:grid-cols-2">
         {config.branches.map((b) => (
           <BranchForm key={JSON.stringify(b)} branch={b} branches={all} series={series.data?.find((s) => s.branchId === b.id)} onClose={config.branches.length > 1 ? () => setClosing(b) : undefined} />
         ))}
       </div>
       {config.closedBranches.length > 0 && (
-        <section className={cn(card, "overflow-hidden")} aria-label="Locales desactivados">
-          <h2 className="px-4 pt-4 text-sm font-semibold text-zinc-900 sm:px-5">Locales desactivados</h2>
-          <p className="px-4 pb-2 text-xs text-zinc-500 sm:px-5">Ya no venden ni reciben mercadería. Su historial sigue en Reportes, Caja y el kardex.</p>
-          <ul className="divide-y divide-zinc-100">
+        <Card as="section" padding="none" className="overflow-hidden" aria-label="Locales desactivados">
+          <h2 className="px-4 pt-4 text-sm font-semibold text-fg sm:px-5">Locales desactivados</h2>
+          <p className="px-4 pb-2 text-xs text-muted sm:px-5">Ya no venden ni reciben mercadería. Su historial sigue en Reportes, Caja y el kardex.</p>
+          <ul className="divide-y divide-line-soft">
             {config.closedBranches.map((b) => (
               <li key={b.id} className="flex flex-wrap items-center gap-3 px-4 py-3 sm:px-5">
-                <Store className="h-4 w-4 text-zinc-400" aria-hidden />
+                <Store className="h-4 w-4 text-muted" aria-hidden />
                 <div className="mr-auto min-w-0">
-                  <p className="text-sm font-medium text-zinc-700">{b.name}</p>
-                  <p className="truncate text-xs text-zinc-500">{b.address} · serie {b.series}</p>
+                  <p className="text-sm font-medium text-fg-2">{b.name}</p>
+                  <p className="truncate text-xs text-muted">{b.address} · serie {b.series}</p>
                 </div>
                 <Button size="sm" onClick={() => reactivate(b)} disabled={!plan.canAdd || setActive.isPending} title={plan.canAdd ? undefined : "Tu plan no tiene cupo para otro local activo"}>
-                  <RotateCcw className="h-3.5 w-3.5" /> Reactivar
+                  <RotateCcw className="h-3.5 w-3.5" aria-hidden /> Reactivar
                 </Button>
               </li>
             ))}
           </ul>
-        </section>
+        </Card>
       )}
-      <p className="text-xs text-zinc-500">
+      <p className="text-xs text-muted">
         Cada serie nueva debe darse de alta en SUNAT y en el proveedor de facturación electrónica antes de emitir comprobantes; coordínalo con soporte de Digi!HME.
       </p>
       {creating && <NewBranchDialog branches={all} onClose={() => setCreating(false)} />}
@@ -279,14 +289,14 @@ function BranchForm({ branch, branches, series, onClose }: { branch: Branch; bra
   };
 
   return (
-    <section className={card} aria-label={`Local ${branch.name}`}>
+    <Card as="section" padding="none" aria-label={`Local ${branch.name}`}>
       <Section
         title={branch.name}
         description={`Código interno: ${branch.id}`}
         action={
           onClose && (
             <Button size="sm" variant="ghost" onClick={onClose}>
-              <Power className="h-3.5 w-3.5" /> Desactivar
+              <Power className="h-3.5 w-3.5" aria-hidden /> Desactivar
             </Button>
           )
         }
@@ -304,9 +314,9 @@ function BranchForm({ branch, branches, series, onClose }: { branch: Branch; bra
         </div>
         <dl className="mt-3 grid grid-cols-2 gap-2 pb-4 text-xs sm:pb-5">
           {(["boleta", "factura"] as const).map((t) => (
-            <div key={t} className="rounded-xl bg-zinc-50 px-3 py-2">
-              <dt className="text-zinc-500">Próxima {t}</dt>
-              <dd className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-zinc-900">
+            <div key={t} className="rounded-xl bg-sunken px-3 py-2">
+              <dt className="text-muted">Próxima {t}</dt>
+              <dd className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-fg">
                 {series ? docNumber(t, branch.series, (t === "boleta" ? series.lastBoleta : series.lastFactura) + 1) : "…"}
               </dd>
             </div>
@@ -315,18 +325,19 @@ function BranchForm({ branch, branches, series, onClose }: { branch: Branch; bra
       </Section>
       <SaveBar dirty={dirty} loading={save.isPending} error={save.error} onSave={submit} onReset={() => setF(initial)}>
         {seriesChanged && !errors.series ? (
-          <p className="flex items-start gap-1.5 text-amber-700">
-            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" /> La serie {f.series} debe estar autorizada en SUNAT. Los comprobantes seguirán desde el último emitido en esa serie.
+          <p className="flex items-start gap-1.5 text-warning-fg">
+            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> La serie {f.series} debe estar autorizada en SUNAT. Los comprobantes seguirán desde el último emitido en esa serie.
           </p>
         ) : undefined}
       </SaveBar>
-    </section>
+    </Card>
   );
 }
 
 /* ------------------------------ Cuentas ------------------------------ */
 
 function Accounts({ branches, closed }: { branches: Branch[]; closed: Branch[] }) {
+  const wide = useMediaQuery("(min-width: 768px)");
   const accounts = useAccounts();
   const me = useSessionStore((s) => s.session?.user.id ?? "");
   const [editing, setEditing] = useState<StaffAccount | "new" | null>(null);
@@ -339,55 +350,93 @@ function Accounts({ branches, closed }: { branches: Branch[]; closed: Branch[] }
   };
 
   return (
-    <section className={cn(card, "overflow-hidden")} aria-label="Cuentas">
+    <Card as="section" padding="none" className="overflow-hidden" aria-label="Cuentas">
       <div className="flex flex-wrap items-start gap-3 p-4 sm:p-5">
         <div className="mr-auto min-w-0">
-          <h2 className="text-sm font-semibold text-zinc-900">Cuentas para ingresar</h2>
-          <p className="mt-0.5 max-w-xl text-xs text-zinc-500">
+          <h2 className="text-sm font-semibold text-fg">Cuentas para ingresar</h2>
+          <p className="mt-0.5 max-w-xl text-xs text-muted">
             El administrador ve todos los locales y los reportes; cada cuenta de local vende, cobra y recibe solo en el suyo. El PIN para marcar asistencia de cada trabajador se cambia en{" "}
             <Link href="/asistencia" className="font-semibold text-brand underline">Asistencia</Link>.
           </p>
         </div>
         <Button variant="primary" onClick={() => setEditing("new")}>
-          <Plus className="h-4 w-4" /> Nueva cuenta
+          <Plus className="h-4 w-4" aria-hidden /> Nueva cuenta
         </Button>
       </div>
       {accounts.error ? (
-        <p className="px-5 pb-5 text-sm text-rose-600">{errorMessage(accounts.error)}</p>
-      ) : (
-        <Table head={["Nombre", "Rol", "Local", "Estado", { label: "", align: "right" }]} minWidth={560}>
+        <p className="px-5 pb-5 text-sm text-danger-fg" role="alert">{errorMessage(accounts.error)}</p>
+      ) : wide ? (
+        <Table head={["Nombre", "Rol", "Local", "Estado", { label: <span className="sr-only">Acciones</span>, align: "right" }]} minWidth={560}>
           {accounts.isLoading && (
             <tr>
-              <td colSpan={5} className={cn(td, "text-zinc-400")}>Cargando…</td>
+              <td colSpan={5} className={cn(td, "text-muted")}>Cargando…</td>
             </tr>
           )}
           {list.map((a) => (
-            <tr key={a.id} className={cn(!a.active && "text-zinc-400")}>
+            <tr key={a.id} className={cn(!a.active && "text-muted")}>
               <td className={td}>
                 <span className="flex items-center gap-2 font-medium">
-                  <UserRound className="h-4 w-4 text-zinc-400" /> {a.name}
-                  {a.id === me && <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-600">Tú</span>}
+                  <UserRound className="h-4 w-4 text-muted" aria-hidden /> {a.name}
+                  {a.id === me && <Chip>Tú</Chip>}
                 </span>
               </td>
               <td className={td}>{a.role === "admin" ? "Administrador" : "Cuenta de local"}</td>
               <td className={td}>{a.role === "admin" ? "Todos" : branchName(a.branchId)}</td>
               <td className={td}>
-                <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", a.active ? "bg-emerald-50 text-emerald-700" : "bg-zinc-100 text-zinc-500")}>{a.active ? "Activa" : "Desactivada"}</span>
+                <ActiveChip active={a.active} />
               </td>
               <td className={cn(td, "text-right")}>
-                <Button size="sm" variant="ghost" onClick={() => setEditing(a)}>
-                  <Pencil className="h-3.5 w-3.5" /> Editar
+                <Button size="sm" variant="ghost" onClick={() => setEditing(a)} aria-label={`Editar ${a.name}`}>
+                  <Pencil className="h-3.5 w-3.5" aria-hidden /> Editar
                 </Button>
               </td>
             </tr>
           ))}
         </Table>
+      ) : (
+        <ul className="grid gap-2 px-3 pb-3" aria-busy={accounts.isLoading}>
+          {accounts.isLoading && <li className="px-1 text-sm text-muted">Cargando…</li>}
+          {list.map((a) => (
+            <li key={a.id}>
+              <Card padding="sm" className={cn(!a.active && "text-muted")}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="flex flex-wrap items-center gap-2 font-semibold">
+                      <UserRound className="h-4 w-4 shrink-0 text-muted" aria-hidden /> {a.name}
+                      {a.id === me && <Chip>Tú</Chip>}
+                    </p>
+                    <p className="mt-0.5 text-caption text-muted">
+                      {a.role === "admin" ? "Administrador" : "Cuenta de local"} · {a.role === "admin" ? "Todos los locales" : branchName(a.branchId)}
+                    </p>
+                  </div>
+                  <ActiveChip active={a.active} />
+                </div>
+                <Button size="sm" variant="ghost" className="mt-2" onClick={() => setEditing(a)} aria-label={`Editar ${a.name}`}>
+                  <Pencil className="h-3.5 w-3.5" aria-hidden /> Editar
+                </Button>
+              </Card>
+            </li>
+          ))}
+        </ul>
       )}
-      <p className="flex items-center gap-1.5 border-t border-zinc-100 px-4 py-3 text-xs text-zinc-500 sm:px-5">
-        <KeyRound className="h-3.5 w-3.5" /> Al cambiar el PIN, el rol o el local de una cuenta, o al desactivarla, se cierran sus sesiones abiertas.
+      <p className="flex items-center gap-1.5 border-t border-line-soft px-4 py-3 text-xs text-muted sm:px-5">
+        <KeyRound className="h-3.5 w-3.5 shrink-0" aria-hidden /> Al cambiar el PIN, el rol o el local de una cuenta, o al desactivarla, se cierran sus sesiones abiertas.
       </p>
       {editing && <AccountDialog account={editing === "new" ? null : editing} accounts={list} branches={branches} currentUserId={me} onClose={() => setEditing(null)} />}
-    </section>
+    </Card>
+  );
+}
+
+/** Estado de la cuenta: tono + icono + texto. */
+function ActiveChip({ active }: { active: boolean }) {
+  return active ? (
+    <Chip tone="success">
+      <CircleCheck className="h-3 w-3 shrink-0" aria-hidden /> Activa
+    </Chip>
+  ) : (
+    <Chip>
+      <Ban className="h-3 w-3 shrink-0" aria-hidden /> Desactivada
+    </Chip>
   );
 }
 
@@ -398,7 +447,7 @@ function NumberField({ label, unit, value, onChange, error, hint }: { label: str
     <Field label={label} error={error} hint={hint}>
       <div className="flex items-center gap-2">
         <Input type="number" inputMode="numeric" value={Number.isFinite(value) ? value : ""} onChange={(e) => onChange(e.target.value === "" ? Number.NaN : Number(e.target.value))} className="w-24 tabular-nums" aria-invalid={!!error} />
-        <span className="text-sm text-zinc-500">{unit}</span>
+        <span className="text-sm text-muted">{unit}</span>
       </div>
     </Field>
   );
@@ -423,15 +472,16 @@ function RulesForm({ config }: { config: PublicConfig }) {
   };
 
   return (
-    <section className={card} aria-label="Reglas de operación">
+    <Card as="section" padding="none" aria-label="Reglas de operación">
       <Section title="Vencimientos" description="Arman el semáforo de lotes en Vencimientos, Inventario, Traslados y el Panel.">
         <div className="grid gap-3 sm:grid-cols-2">
           <NumberField label="Crítico (rojo) hasta" unit="días" value={f.expiry.red} onChange={(v) => set("expiry", "red", v)} error={errors["expiry.red"]} hint={lim("expiry.red")} />
           <NumberField label="Por vencer (ámbar) hasta" unit="días" value={f.expiry.yellow} onChange={(v) => set("expiry", "yellow", v)} error={errors["expiry.yellow"]} hint={lim("expiry.yellow")} />
         </div>
         {shift && (
-          <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            Con estos plazos {shift.changed === 1 ? "cambia de color 1 lote" : `cambian de color ${shift.changed} lotes`}: críticos {shift.before.critico} → {shift.after.critico}, por vencer {shift.before.por_vencer} → {shift.after.por_vencer}.
+          <p className="mt-3 flex items-start gap-1.5 rounded-xl bg-warning-bg px-3 py-2 text-xs text-warning-fg" role="status">
+            <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span>Con estos plazos {shift.changed === 1 ? "cambia de color 1 lote" : `cambian de color ${shift.changed} lotes`}: críticos {shift.before.critico} → {shift.after.critico}, por vencer {shift.before.por_vencer} → {shift.after.por_vencer}.</span>
           </p>
         )}
       </Section>
@@ -449,8 +499,8 @@ function RulesForm({ config }: { config: PublicConfig }) {
         </div>
       </Section>
       <SaveBar dirty={dirty} loading={save.isPending} error={save.error} onSave={submit} onReset={() => setF(initial)}>
-        {dirty && hasErrors(errors) ? <p className="text-rose-600">Corrige lo marcado para guardar.</p> : undefined}
+        {dirty && hasErrors(errors) ? <p className="text-danger-fg">Corrige lo marcado para guardar.</p> : undefined}
       </SaveBar>
-    </section>
+    </Card>
   );
 }

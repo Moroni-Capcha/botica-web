@@ -48,10 +48,10 @@ export function NewBranchDialog({ branches, onClose }: { branches: Branch[]; onC
       onClose={onClose}
       footer={
         <>
-          {create.error && <p className="mr-auto text-sm text-rose-600" role="alert">{errorMessage(create.error)}</p>}
+          {create.error && <p className="mr-auto text-sm text-danger-fg" role="alert">{errorMessage(create.error)}</p>}
           <Button onClick={onClose}>Cancelar</Button>
           <Button variant="primary" loading={create.isPending} onClick={submit}>
-            <Plus className="h-4 w-4" /> Crear local
+            <Plus className="h-4 w-4" aria-hidden /> Crear local
           </Button>
         </>
       }
@@ -72,12 +72,12 @@ export function NewBranchDialog({ branches, onClose }: { branches: Branch[]; onC
         <Field label="Dirección" error={tried ? errors.address : undefined} className="sm:col-span-2">
           <Input value={f.address} onChange={(e) => set("address", e.target.value)} placeholder="Jr. Huallayco 120, Amarilis" aria-invalid={tried && !!errors.address} />
         </Field>
-        <fieldset className="grid gap-3 rounded-2xl border border-zinc-200 p-3 sm:col-span-2 sm:grid-cols-[1fr_140px]">
-          <label className="flex items-start gap-2 text-sm sm:col-span-2">
+        <fieldset className="grid gap-3 rounded-2xl border border-line p-3 sm:col-span-2 sm:grid-cols-[1fr_140px]">
+          <label className="flex min-h-10 items-start gap-2 text-sm sm:col-span-2">
             <input type="checkbox" checked={withAccount} onChange={(e) => setWithAccount(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--brand)]" />
             <span>
               Crear la cuenta del local
-              <span className="block text-xs text-zinc-500">La usa el químico farmacéutico a cargo para vender, cobrar y recibir en este local.</span>
+              <span className="block text-xs text-muted">La usa el químico farmacéutico a cargo para vender, cobrar y recibir en este local.</span>
             </span>
           </label>
           {withAccount && (
@@ -138,35 +138,35 @@ export function CloseBranchDialog({ branch, activeCount, onClose }: { branch: Br
       onClose={onClose}
       footer={
         <>
-          {setActive.error && <p className="mr-auto text-sm text-rose-600" role="alert">{errorMessage(setActive.error)}</p>}
+          {setActive.error && <p className="mr-auto text-sm text-danger-fg" role="alert">{errorMessage(setActive.error)}</p>}
           <Button onClick={onClose}>Cancelar</Button>
           <Button variant="danger" loading={setActive.isPending} disabled={!can} onClick={submit}>
-            <Power className="h-4 w-4" /> Desactivar
+            <Power className="h-4 w-4" aria-hidden /> Desactivar
           </Button>
         </>
       }
     >
       <div className="grid gap-4">
         {loading ? (
-          <p className="text-sm text-zinc-500">Revisando stock, caja y traslados…</p>
+          <p className="text-sm text-muted" role="status">Revisando stock, caja y traslados…</p>
         ) : blockers.length ? (
-          <div className="rounded-xl bg-rose-50 p-3 text-sm text-rose-800" role="alert">
+          <div className="rounded-xl bg-danger-bg p-3 text-sm text-danger-fg" role="alert">
             <p className="font-semibold">Todavía no se puede desactivar:</p>
             <ul className="mt-1 grid gap-1">
               {blockers.map((b) => (
                 <li key={b} className="flex gap-1.5">
-                  <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" /> {b}
+                  <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> {b}
                 </li>
               ))}
             </ul>
           </div>
         ) : (
-          <p className="flex items-center gap-1.5 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">
-            <CircleCheck className="h-4 w-4" /> Sin stock, con la caja cerrada y sin traslados pendientes.
+          <p className="flex items-center gap-1.5 rounded-xl bg-success-bg p-3 text-sm text-success-fg">
+            <CircleCheck className="h-4 w-4" aria-hidden /> Sin stock, con la caja cerrada y sin traslados pendientes.
           </p>
         )}
         {(ownAccounts.length > 0 || ownWorkers.length > 0) && (
-          <p className="text-sm text-zinc-600">
+          <p className="text-sm text-fg-2">
             También se desactivan {[ownAccounts.length && `${ownAccounts.length === 1 ? "1 cuenta" : `${ownAccounts.length} cuentas`} (${ownAccounts.map((a) => a.name).join(", ")})`, ownWorkers.length && `${ownWorkers.length === 1 ? "1 trabajador" : `${ownWorkers.length} trabajadores`}`].filter(Boolean).join(" y ")}. Si alguien pasa a otro local, cámbialo antes en Cuentas o en Asistencia.
           </p>
         )}

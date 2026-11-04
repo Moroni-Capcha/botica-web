@@ -49,10 +49,10 @@ export function SupplierDialog({ supplier, suppliers, onClose }: { supplier: Sup
       onClose={onClose}
       footer={
         <>
-          {save.error && <p className="mr-auto text-sm text-rose-600" role="alert">{errorMessage(save.error)}</p>}
+          {save.error && <p className="mr-auto text-sm text-danger-fg" role="alert">{errorMessage(save.error)}</p>}
           <Button onClick={onClose}>Cancelar</Button>
           <Button variant="primary" loading={save.isPending} onClick={submit}>
-            <Save className="h-4 w-4" /> Guardar
+            <Save className="h-4 w-4" aria-hidden /> Guardar
           </Button>
         </>
       }
@@ -79,7 +79,7 @@ export function SupplierDialog({ supplier, suppliers, onClose }: { supplier: Sup
         <Field label="Días de visita o despacho">
           <Input value={f.visitDays} onChange={(e) => set("visitDays", e.target.value)} placeholder="Lun · Jue" />
         </Field>
-        <label className="flex items-center gap-2 text-sm sm:col-span-2">
+        <label className="flex min-h-10 items-center gap-2 text-sm sm:col-span-2">
           <input type="checkbox" checked={f.active} onChange={(e) => set("active", e.target.checked)} className="h-4 w-4 accent-[var(--brand)]" />
           Activo (aparece al registrar ingresos)
         </label>

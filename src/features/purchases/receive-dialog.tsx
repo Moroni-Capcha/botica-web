@@ -107,19 +107,19 @@ export function ReceiveDialog({ branches, allowed, defaultBranch, products, supp
         <>
           <div className="mr-auto min-w-0 text-sm">
             {create.error ? (
-              <p className="text-rose-600" role="alert">{errorMessage(create.error)}</p>
+              <p className="text-danger-fg" role="alert">{errorMessage(create.error)}</p>
             ) : tried && !ok ? (
-              <p className="text-rose-600" role="alert">{!supplierId ? "Elige el proveedor." : !docOk ? "Revisa la factura o guía." : `Revisa ${errorsCount} ${errorsCount === 1 ? "fila" : "filas"}.`}</p>
+              <p className="text-danger-fg" role="alert">{!supplierId ? "Elige el proveedor." : !docOk ? "Revisa la factura o guía." : `Revisa ${errorsCount} ${errorsCount === 1 ? "fila" : "filas"}.`}</p>
             ) : (
-              <p className="text-zinc-600">
-                {totals.units.toLocaleString("es-PE")} unid. · Subtotal <b className="tabular-nums text-zinc-900">{soles(totals.subtotal)}</b> · IGV {soles(totals.igv)} · Total{" "}
-                <b className="tabular-nums text-zinc-900">{soles(totals.total)}</b>
+              <p className="text-fg-2">
+                {totals.units.toLocaleString("es-PE")} unid. · Subtotal <b className="tabular-nums text-fg">{soles(totals.subtotal)}</b> · IGV {soles(totals.igv)} · Total{" "}
+                <b className="tabular-nums text-fg">{soles(totals.total)}</b>
               </p>
             )}
           </div>
           <Button onClick={onClose}>Cancelar</Button>
           <Button variant="primary" loading={create.isPending} onClick={submit}>
-            <PackagePlus className="h-4 w-4" /> Ingresar {lines.length} {lines.length === 1 ? "lote" : "lotes"}
+            <PackagePlus className="h-4 w-4" aria-hidden /> Ingresar {lines.length} {lines.length === 1 ? "lote" : "lotes"}
           </Button>
         </>
       }
@@ -158,10 +158,10 @@ export function ReceiveDialog({ branches, allowed, defaultBranch, products, supp
             const p = l.productId !== null ? productById.get(l.productId) : undefined;
             const showError = tried && c.error;
             return (
-              <li key={l.key} className={cn("rounded-2xl border p-3", showError ? "border-rose-300 bg-rose-50/40" : c.warning ? "border-amber-300 bg-amber-50/40" : "border-zinc-200")}>
+              <li key={l.key} className={cn("rounded-2xl border p-3", showError ? "border-danger-border bg-danger-bg/40" : c.warning ? "border-warning-border bg-warning-bg/40" : "border-line")}>
                 <div className="grid gap-2 sm:grid-cols-12">
                   <div className="sm:col-span-4">
-                    <span className="mb-1 block text-xs font-medium text-zinc-600">Producto {i + 1}</span>
+                    <span className="mb-1 block text-xs font-medium text-fg-2">Producto {i + 1}</span>
                     <ProductPicker products={products} value={l.productId} onChange={(id) => pickProduct(l.key, id)} invalid={!!(tried && !p)} ariaLabel={`Producto ${i + 1}`} />
                   </div>
                   <Field label="Lote" className="sm:col-span-2">
@@ -196,19 +196,19 @@ export function ReceiveDialog({ branches, allowed, defaultBranch, products, supp
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                   {p && (
-                    <span className="tabular-nums text-zinc-500">
+                    <span className="tabular-nums text-muted">
                       {c.units.toLocaleString("es-PE")} unid. · {soles(c.subtotal)}
                     </span>
                   )}
-                  {c.error && <span className={showError ? "font-semibold text-rose-700" : "text-zinc-400"}>{c.error}</span>}
+                  {c.error && <span className={showError ? "font-semibold text-danger-fg" : "text-muted"}>{c.error}</span>}
                   {!c.error && c.warning && (
-                    <span className="flex items-center gap-1 font-semibold text-amber-800">
-                      <TriangleAlert className="h-3.5 w-3.5 shrink-0" /> {c.warning}
+                    <span className="flex items-center gap-1 font-semibold text-warning-fg">
+                      <TriangleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden /> {c.warning}
                     </span>
                   )}
                   {lines.length > 1 && (
-                    <button type="button" onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))} className="ml-auto inline-flex items-center gap-1 font-medium text-zinc-500 hover:text-rose-600">
-                      <Trash2 className="h-3.5 w-3.5" /> Quitar
+                    <button type="button" onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))} className="ml-auto inline-flex min-h-10 items-center gap-1 rounded-lg px-2 font-medium text-muted hover:text-danger-fg" aria-label={`Quitar lote ${i + 1}`}>
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden /> Quitar
                     </button>
                   )}
                 </div>
@@ -217,7 +217,7 @@ export function ReceiveDialog({ branches, allowed, defaultBranch, products, supp
           })}
         </ol>
         <Button size="sm" variant="ghost" className="w-fit" onClick={() => setLines((ls) => [...ls, mkLine()])}>
-          <Plus className="h-3.5 w-3.5" /> Agregar lote
+          <Plus className="h-3.5 w-3.5" aria-hidden /> Agregar lote
         </Button>
         <button type="submit" className="hidden" aria-hidden tabIndex={-1} />
       </form>
