@@ -8,14 +8,18 @@ import { parseImportSheet, productChanged, productKey, type ImportResult } from 
 import { isValidSupplierDocument } from "@/lib/domain/purchasing";
 import { readSpreadsheetFile } from "@/lib/excel/read-xlsx";
 import { useCreatePurchase, useSaveProduct } from "@/lib/queries";
+import { Card } from "@/components/ui/card";
+import { Chip } from "@/components/ui/chip";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Empty } from "@/components/ui/empty";
 import { Field, Input, Select } from "@/components/ui/field";
 import { Table, td } from "@/components/ui/table";
+import type { Tone } from "@/components/ui/tone";
 import { notify } from "@/components/ui/toast";
 import { dateShort, soles } from "@/lib/format";
 import { cn } from "@/lib/cn";
+import { useMediaQuery } from "@/lib/use-media-query";
 import { downloadImportTemplate } from "./export";
 
 interface Props {
@@ -34,6 +38,7 @@ interface Props {
  * Se revisa todo antes de guardar; las filas con errores se omiten.
  */
 export function ImportDialog({ isAdmin, branches, allowed, defaultBranch, products, suppliers, pharmacy, onClose }: Props) {
+  const wide = useMediaQuery("(min-width: 768px)");
   const fileRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState("");
   const [result, setResult] = useState<ImportResult | null>(null);
@@ -130,31 +135,31 @@ export function ImportDialog({ isAdmin, branches, allowed, defaultBranch, produc
       footer={
         <>
           <p className="mr-auto min-w-0 text-sm" role={saveError ? "alert" : undefined}>
-            {saveError ? <span className="text-rose-600">{saveError}</span> : progress ? <span className="text-zinc-600">{progress}…</span> : null}
+            {saveError ? <span className="text-danger-fg">{saveError}</span> : progress ? <span className="text-fg-2">{progress}…</span> : null}
           </p>
           <Button onClick={onClose} disabled={saving}>Cancelar</Button>
           <Button variant="primary" disabled={!canSave} loading={saving} onClick={() => void save()}>
-            <Upload className="h-4 w-4" /> Importar {plan.valid.length} {plan.valid.length === 1 ? "fila" : "filas"}
+            <Upload className="h-4 w-4" aria-hidden /> Importar {plan.valid.length} {plan.valid.length === 1 ? "fila" : "filas"}
           </Button>
         </>
       }
     >
       <div className="grid gap-4">
-        <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-zinc-50 p-3 text-sm">
-          <p className="min-w-0 flex-1 text-zinc-600">
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-sunken p-3 text-sm">
+          <p className="min-w-0 flex-1 basis-56 text-fg-2">
             1. Descarga la plantilla y llénala, una fila por lote. 2. Súbela aquí. Se aceptan <b>.xlsx</b> y <b>.csv</b>.
           </p>
           <Button size="sm" onClick={() => downloadImportTemplate(pharmacy)}>
-            <Download className="h-3.5 w-3.5" /> Plantilla
+            <Download className="h-3.5 w-3.5" aria-hidden /> Plantilla
           </Button>
           <Button size="sm" variant="dark" loading={reading} onClick={() => fileRef.current?.click()}>
-            <FileUp className="h-3.5 w-3.5" /> {fileName ? "Cambiar archivo" : "Elegir archivo"}
+            <FileUp className="h-3.5 w-3.5" aria-hidden /> {fileName ? "Cambiar archivo" : "Elegir archivo"}
           </Button>
           <input ref={fileRef} type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" className="hidden" onChange={(e) => void onFile(e.target.files?.[0])} />
         </div>
 
-        {readError && <p className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700" role="alert">{readError}</p>}
-        {result?.fatal && <p className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700" role="alert">{result.fatal}</p>}
+        {readError && <p className="rounded-xl bg-danger-bg p-3 text-sm text-danger-fg" role="alert">{readError}</p>}
+        {result?.fatal && <p className="rounded-xl bg-danger-bg p-3 text-sm text-danger-fg" role="alert">{result.fatal}</p>}
 
         {!result && !readError && (
           <Empty icon={FileUp} title="Elige un archivo para revisarlo">
@@ -164,18 +169,18 @@ export function ImportDialog({ isAdmin, branches, allowed, defaultBranch, produc
 
         {result && !result.fatal && (
           <>
-            <div className="flex flex-wrap gap-2 text-xs">
+            <div className="flex flex-wrap gap-2 text-xs" role="status" aria-live="polite">
               <Pill tone="ok">{plan.valid.length} listas</Pill>
               {plan.invalid > 0 && <Pill tone="bad">{plan.invalid} con errores (se omiten)</Pill>}
               {plan.newProducts.length > 0 && <Pill>{plan.newProducts.length} productos nuevos</Pill>}
               {plan.changed.length > 0 && <Pill>{plan.changed.length} productos con cambios</Pill>}
               {plan.lots.length > 0 && <Pill>{plan.lots.length} lotes · {soles(lotsCost)} sin IGV</Pill>}
               {plan.blockedNew > 0 && <Pill tone="bad">{plan.blockedNew} productos nuevos que solo el administrador puede crear</Pill>}
-              {result.missingColumns.length > 0 && <span className="text-zinc-500">Columnas que no vinieron (se usa lo del catálogo): {result.missingColumns.join(", ")}</span>}
+              {result.missingColumns.length > 0 && <span className="text-muted">Columnas que no vinieron (se usa lo del catálogo): {result.missingColumns.join(", ")}</span>}
             </div>
 
             {needsPurchase && (
-              <div className="grid gap-3 rounded-2xl border border-zinc-200 p-3 sm:grid-cols-[1fr_2fr_1.3fr]">
+              <div className="grid gap-3 rounded-2xl border border-line p-3 sm:grid-cols-[1fr_2fr_1.3fr]">
                 <Field label="Los lotes ingresan a">
                   <Select value={branchId} onChange={(e) => setBranchId(e.target.value)} disabled={allowed.length < 2}>
                     {branches.filter((b) => allowed.includes(b.id)).map((b) => (
@@ -196,42 +201,66 @@ export function ImportDialog({ isAdmin, branches, allowed, defaultBranch, produc
               </div>
             )}
 
-            <div className="max-h-[45dvh] overflow-y-auto rounded-xl border border-zinc-200">
-              <Table minWidth={860} head={["Fila", "Producto", "Acción", "Lote", "Vence", { label: "Unid.", align: "right" }, { label: "Precio u.", align: "right" }, "Revisión"]}>
+            {wide ? (
+              <div className="max-h-[45dvh] overflow-y-auto rounded-xl border border-line">
+                <Table minWidth={860} head={["Fila", "Producto", "Acción", "Lote", "Vence", { label: "Unid.", align: "right" }, { label: "Precio u.", align: "right" }, "Revisión"]}>
+                  {result.rows.map((r) => {
+                    const blocked = !isAdmin && r.matchId === null;
+                    const bad = r.errors.length > 0 || blocked;
+                    const action = r.matchId === null ? "Nuevo" : isAdmin && productChanged(r, products) ? "Actualiza" : "Ya existe";
+                    return (
+                      <tr key={r.line} className={bad ? "bg-danger-bg/50" : undefined}>
+                        <td className={cn(td, "text-xs tabular-nums text-muted")}>{r.line}</td>
+                        <td className={td}>
+                          <p className="font-medium">
+                            {r.product.name} <span className="font-normal text-muted">{r.product.conc}</span>
+                          </p>
+                          <p className="text-xs text-muted">{r.product.lab || "Sin laboratorio"} · {r.product.category || "Sin tipo"}</p>
+                        </td>
+                        <td className={td}>
+                          <ActionChip action={action} />
+                        </td>
+                        <td className={cn(td, "text-xs tabular-nums")}>{r.lot?.lotCode || "—"}</td>
+                        <td className={cn(td, "whitespace-nowrap text-xs tabular-nums")}>{r.lot?.expiresOn ? dateShort(r.lot.expiresOn) : "—"}</td>
+                        <td className={cn(td, "text-right text-xs tabular-nums")}>{r.lot ? r.lot.units.toLocaleString("es-PE") : "—"}</td>
+                        <td className={cn(td, "text-right text-xs tabular-nums")}>{soles(r.product.priceUnit)}</td>
+                        <td className={cn(td, "max-w-[260px] text-xs")}>
+                          <Review bad={bad} text={bad ? (blocked ? "Producto nuevo: solo el administrador puede crearlo" : r.errors.join(" · ")) : r.warnings.join(" · ") || "Lista"} />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </Table>
+              </div>
+            ) : (
+              <ul className="grid max-h-[45dvh] gap-2 overflow-y-auto">
                 {result.rows.map((r) => {
                   const blocked = !isAdmin && r.matchId === null;
                   const bad = r.errors.length > 0 || blocked;
                   const action = r.matchId === null ? "Nuevo" : isAdmin && productChanged(r, products) ? "Actualiza" : "Ya existe";
                   return (
-                    <tr key={r.line} className={bad ? "bg-rose-50/50" : undefined}>
-                      <td className={cn(td, "text-xs tabular-nums text-zinc-400")}>{r.line}</td>
-                      <td className={td}>
-                        <p className="font-medium">
-                          {r.product.name} <span className="font-normal text-zinc-500">{r.product.conc}</span>
+                    <li key={r.line}>
+                      <Card padding="sm" className={cn(bad && "border-danger-border bg-danger-bg/50")}>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-caption tabular-nums text-muted">Fila {r.line}</span>
+                          <ActionChip action={action} />
+                        </div>
+                        <p className="mt-1 font-semibold text-fg">
+                          {r.product.name} <span className="font-normal text-muted">{r.product.conc}</span>
                         </p>
-                        <p className="text-xs text-zinc-500">{r.product.lab || "Sin laboratorio"} · {r.product.category || "Sin tipo"}</p>
-                      </td>
-                      <td className={cn(td, "text-xs font-semibold", action === "Nuevo" ? "text-sky-700" : action === "Actualiza" ? "text-amber-700" : "text-zinc-500")}>{action}</td>
-                      <td className={cn(td, "text-xs tabular-nums")}>{r.lot?.lotCode || "—"}</td>
-                      <td className={cn(td, "whitespace-nowrap text-xs tabular-nums")}>{r.lot?.expiresOn ? dateShort(r.lot.expiresOn) : "—"}</td>
-                      <td className={cn(td, "text-right text-xs tabular-nums")}>{r.lot ? r.lot.units.toLocaleString("es-PE") : "—"}</td>
-                      <td className={cn(td, "text-right text-xs tabular-nums")}>{soles(r.product.priceUnit)}</td>
-                      <td className={cn(td, "max-w-[260px] text-xs")}>
-                        {bad ? (
-                          <span className="flex gap-1 text-rose-700">
-                            <CircleAlert className="mt-px h-3.5 w-3.5 shrink-0" /> {blocked ? "Producto nuevo: solo el administrador puede crearlo" : r.errors.join(" · ")}
-                          </span>
-                        ) : (
-                          <span className="flex gap-1 text-zinc-500">
-                            <CircleCheck className="mt-px h-3.5 w-3.5 shrink-0 text-emerald-600" /> {r.warnings.join(" · ") || "Lista"}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
+                        <p className="text-caption text-muted">{r.product.lab || "Sin laboratorio"} · {r.product.category || "Sin tipo"}</p>
+                        <p className="mt-1 text-caption tabular-nums text-muted">
+                          Lote {r.lot?.lotCode || "—"} · vence {r.lot?.expiresOn ? dateShort(r.lot.expiresOn) : "—"} · {r.lot ? r.lot.units.toLocaleString("es-PE") : "—"} unid. · {soles(r.product.priceUnit)} u.
+                        </p>
+                        <div className="mt-2 border-t border-line-soft pt-2 text-xs">
+                          <Review bad={bad} text={bad ? (blocked ? "Producto nuevo: solo el administrador puede crearlo" : r.errors.join(" · ")) : r.warnings.join(" · ") || "Lista"} />
+                        </div>
+                      </Card>
+                    </li>
                   );
                 })}
-              </Table>
-            </div>
+              </ul>
+            )}
           </>
         )}
       </div>
@@ -239,6 +268,25 @@ export function ImportDialog({ isAdmin, branches, allowed, defaultBranch, produc
   );
 }
 
+/** Qué se hará con la fila: tono + texto (nuevo, actualiza o ya existe). */
+function ActionChip({ action }: { action: "Nuevo" | "Actualiza" | "Ya existe" }) {
+  const tone: Tone = action === "Nuevo" ? "info" : action === "Actualiza" ? "warning" : "neutral";
+  return <Chip tone={tone}>{action}</Chip>;
+}
+
+/** Resultado de revisar la fila: icono + texto, con el color del tono. */
+function Review({ bad, text }: { bad: boolean; text: string }) {
+  return bad ? (
+    <span className="flex gap-1 text-danger-fg">
+      <CircleAlert className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden /> {text}
+    </span>
+  ) : (
+    <span className="flex gap-1 text-muted">
+      <CircleCheck className="mt-px h-3.5 w-3.5 shrink-0 text-success-fg" aria-hidden /> {text}
+    </span>
+  );
+}
+
 function Pill({ children, tone }: { children: ReactNode; tone?: "ok" | "bad" }) {
-  return <span className={cn("rounded-full px-2.5 py-1 font-semibold", tone === "ok" ? "bg-emerald-50 text-emerald-700" : tone === "bad" ? "bg-rose-50 text-rose-700" : "bg-zinc-100 text-zinc-700")}>{children}</span>;
+  return <span className={cn("rounded-full px-2.5 py-1 font-semibold", tone === "ok" ? "bg-success-bg text-success-fg" : tone === "bad" ? "bg-danger-bg text-danger-fg" : "bg-sunken text-fg-2")}>{children}</span>;
 }
