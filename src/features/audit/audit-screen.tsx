@@ -9,6 +9,8 @@ import { limaDay } from "@/lib/domain/account";
 import { ACTION_GROUPS, ENTITY_LABEL, actionLabel, actorRole, auditRangeError, changeSummary, entityLabelOf } from "@/lib/domain/audit";
 import { DEFAULT_PAGE_SIZE } from "@/lib/domain/pagination";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Chip } from "@/components/ui/chip";
 import { Empty } from "@/components/ui/empty";
 import { Field, Input, Select } from "@/components/ui/field";
 import { Pagination } from "@/components/ui/pagination";
@@ -105,7 +107,7 @@ export function AuditScreen() {
         </div>
         <div className="flex flex-wrap gap-2 sm:ml-auto">
           <Button onClick={() => void doExport()} loading={exporting} disabled={!!rangeError || !log.data?.total}>
-            <FileSpreadsheet className="h-4 w-4 text-emerald-600" /> Excel
+            <FileSpreadsheet className="h-4 w-4 text-success" aria-hidden /> Excel
           </Button>
         </div>
       </div>
@@ -141,9 +143,9 @@ export function AuditScreen() {
         </Field>
       </div>
 
-      {rangeError && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800" role="alert">{rangeError}</p>}
+      {rangeError && <p className="rounded-xl bg-warning-bg p-3 text-sm text-warning-fg" role="alert">{rangeError}</p>}
 
-      <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white" aria-label="Registro de auditoría">
+      <Card as="section" padding="none" className="overflow-hidden" aria-label="Registro de auditoría">
         {rangeError ? null : log.error ? (
           <Empty icon={TriangleAlert} title="No se pudo cargar la auditoría">
             {errorMessage(log.error)}{" "}
@@ -154,7 +156,7 @@ export function AuditScreen() {
         ) : log.isLoading ? (
           <div className="grid gap-2 p-4 sm:p-5" aria-busy="true">
             {Array.from({ length: 6 }, (_, i) => (
-              <div key={i} className="h-12 animate-pulse rounded-xl bg-zinc-100" />
+              <div key={i} className="h-12 animate-pulse rounded-xl bg-sunken" />
             ))}
           </div>
         ) : rows.length === 0 ? (
@@ -163,28 +165,56 @@ export function AuditScreen() {
           </Empty>
         ) : (
           <div className={cn("transition-opacity", log.isFetching && "opacity-60")} aria-busy={log.isFetching}>
-            <Table minWidth={880} head={["Fecha", "Persona", "Acción", "Detalle"]}>
+            <p className="sr-only" role="status" aria-live="polite">{log.data?.total ?? rows.length} {(log.data?.total ?? rows.length) === 1 ? "registro" : "registros"}</p>
+            <ul className="divide-y divide-line-soft md:hidden">
+              {rows.map((e) => {
+                const detail = changeSummary(e.before, e.after, { branchName });
+                return (
+                  <li key={e.id} className="grid gap-1 px-4 py-3 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                      {e.action === "sesion_fallida" ? (
+                        <Chip tone="danger"><TriangleAlert className="h-3 w-3" aria-hidden />{actionLabel(e.action)}</Chip>
+                      ) : (
+                        <span className="font-medium">{actionLabel(e.action)}</span>
+                      )}
+                      <span className="text-xs tabular-nums text-fg-2">{dateShort(e.at)} {timeShort(e.at)}</span>
+                    </div>
+                    <span className="font-medium text-fg">{e.entityLabel}</span>
+                    {detail && <span className="break-words text-xs text-muted">{detail}</span>}
+                    <span className="text-xs text-muted">
+                      {e.userName} · {actorRole(e)}
+                      {e.branchId ? ` · ${branchName(e.branchId)}` : ""} · {entityLabelOf(e.entity)}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+            <Table className="hidden md:block" minWidth={880} head={["Fecha", "Persona", "Acción", "Detalle"]}>
               {rows.map((e) => {
                 const detail = changeSummary(e.before, e.after, { branchName });
                 return (
                   <tr key={e.id}>
-                    <td className={cn(td, "whitespace-nowrap text-xs tabular-nums text-zinc-600")}>
+                    <td className={cn(td, "whitespace-nowrap text-xs tabular-nums text-fg-2")}>
                       {dateShort(e.at)} {timeShort(e.at)}
                     </td>
                     <td className={td}>
                       <span className="block font-medium">{e.userName}</span>
-                      <span className="block text-xs text-zinc-500">
+                      <span className="block text-xs text-muted">
                         {actorRole(e)}
                         {e.branchId ? ` · ${branchName(e.branchId)}` : ""}
                       </span>
                     </td>
                     <td className={td}>
-                      <span className={cn("block font-medium", e.action === "sesion_fallida" && "text-rose-700")}>{actionLabel(e.action)}</span>
-                      <span className="block text-xs text-zinc-500">{entityLabelOf(e.entity)}</span>
+                      {e.action === "sesion_fallida" ? (
+                        <Chip tone="danger"><TriangleAlert className="h-3 w-3" aria-hidden />{actionLabel(e.action)}</Chip>
+                      ) : (
+                        <span className="block font-medium">{actionLabel(e.action)}</span>
+                      )}
+                      <span className="block text-xs text-muted">{entityLabelOf(e.entity)}</span>
                     </td>
                     <td className={cn(td, "max-w-[460px] text-xs")}>
-                      <span className="block font-medium text-zinc-800">{e.entityLabel}</span>
-                      {detail && <span className="block break-words text-zinc-500">{detail}</span>}
+                      <span className="block font-medium text-fg">{e.entityLabel}</span>
+                      {detail && <span className="block break-words text-muted">{detail}</span>}
                     </td>
                   </tr>
                 );
@@ -193,7 +223,7 @@ export function AuditScreen() {
           </div>
         )}
         {!rangeError && log.data && <Pagination page={log.data.page} pageSize={log.data.pageSize} total={log.data.total} onPage={setPage} busy={log.isFetching} noun="registros" />}
-      </section>
+      </Card>
     </div>
   );
 }
