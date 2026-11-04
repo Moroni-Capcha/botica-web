@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Coffee, Fingerprint, LogIn, LogOut, type LucideIcon } from "lucide-react";
+import { AlarmClock, ArrowLeft, CircleCheck, Coffee, Fingerprint, LogIn, LogOut, type LucideIcon } from "lucide-react";
 import type { AttendanceMark, Branch, BranchId, MarkType } from "@/lib/api/types";
 import { apiMode, errorMessage, isApiError } from "@/lib/api";
 import { allowedMarks, hm, MARK_LABEL } from "@/lib/domain/attendance";
 import { useClock, useConfig, useKioskWorkers } from "@/lib/queries";
+import { Chip } from "@/components/ui/chip";
 import { Dialog } from "@/components/ui/dialog";
 import { Segmented } from "@/components/ui/segmented";
 import { initials, timeShort } from "@/lib/format";
@@ -13,10 +14,10 @@ import { cn } from "@/lib/cn";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "←"];
 const MARK_UI: Record<MarkType, { icon: LucideIcon; tone: string }> = {
-  entrada: { icon: LogIn, tone: "bg-emerald-600" },
-  ref_ini: { icon: Coffee, tone: "bg-amber-500" },
-  ref_fin: { icon: Coffee, tone: "bg-amber-600" },
-  salida: { icon: LogOut, tone: "bg-zinc-900" },
+  entrada: { icon: LogIn, tone: "bg-success" },
+  ref_ini: { icon: Coffee, tone: "bg-warning" },
+  ref_fin: { icon: Coffee, tone: "bg-warning" },
+  salida: { icon: LogOut, tone: "bg-fg" },
 };
 const MOCK_PINS: Record<string, string> = { w1: "4101", w2: "4102", w3: "4103", w4: "4104", w5: "4201", w6: "4202", w7: "4203" };
 
@@ -113,16 +114,17 @@ export function KioskDialog({ branches, fixedBranch, onClose }: { branches: Bran
           <span className={cn("grid h-16 w-16 animate-pop place-items-center rounded-full text-white", MARK_UI[done.type].tone)}>
             {(() => {
               const Icon = MARK_UI[done.type].icon;
-              return <Icon className="h-8 w-8" />;
+              return <Icon className="h-8 w-8" aria-hidden />;
             })()}
           </span>
-          <p className="mt-4 text-sm font-medium text-zinc-500">{MARK_LABEL[done.type]} registrada</p>
+          <p className="mt-4 text-sm font-medium text-muted">{MARK_LABEL[done.type]} registrada</p>
           <p className="mt-1 text-5xl font-semibold tracking-tight tabular-nums">{timeShort(done.at)}</p>
           <p className="mt-2 text-sm font-semibold">{done.name}</p>
           {done.type === "entrada" && (
-            <p className={cn("mt-2 rounded-full px-3 py-1 text-xs font-semibold", done.late > tolerance ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700")}>
+            <Chip tone={done.late > tolerance ? "danger" : "success"} className="mt-2 px-3 py-1 text-xs">
+              {done.late > tolerance ? <AlarmClock className="h-3.5 w-3.5 shrink-0" aria-hidden /> : <CircleCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />}
               {done.late > tolerance ? `Tardanza de ${done.late} min` : "A tiempo"}
-            </p>
+            </Chip>
           )}
         </div>
       ) : !sel ? (
@@ -140,9 +142,9 @@ export function KioskDialog({ branches, fixedBranch, onClose }: { branches: Bran
             />
           )}
           {workers.isLoading ? (
-            <div className="grid grid-cols-2 gap-2">{Array.from({ length: 4 }, (_, i) => <div key={i} className="h-16 animate-pulse rounded-2xl bg-zinc-100" />)}</div>
+            <div className="grid grid-cols-2 gap-2">{Array.from({ length: 4 }, (_, i) => <div key={i} className="h-16 animate-pulse rounded-2xl bg-sunken" />)}</div>
           ) : workers.error ? (
-            <p className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{errorMessage(workers.error)}</p>
+            <p className="rounded-xl bg-danger-bg p-3 text-sm text-danger-fg" role="alert">{errorMessage(workers.error)}</p>
           ) : (
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2" role="list">
               {workers.data?.map((w) => {
@@ -159,31 +161,31 @@ export function KioskDialog({ branches, fixedBranch, onClose }: { branches: Bran
                       setPinOk(false);
                       setError(null);
                     }}
-                    className="flex items-center gap-2.5 rounded-2xl border border-zinc-200 p-3 text-left transition hover:border-zinc-400 active:scale-[0.98]"
+                    className="flex min-h-14 items-center gap-2.5 rounded-2xl border border-line p-3 text-left transition duration-[var(--dur-fast)] hover:border-line-strong hover:bg-subtle active:scale-[0.98]"
                   >
-                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-zinc-100 text-xs font-bold text-zinc-600">{initials(w.name)}</span>
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-sunken text-xs font-bold text-fg-2" aria-hidden>{initials(w.name)}</span>
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-semibold">{w.name}</span>
-                      <span className={cn("block truncate text-[11px]", !last ? "text-zinc-400" : last.type === "salida" ? "text-zinc-500" : "font-semibold text-emerald-700")}>{state}</span>
+                      <span className={cn("block truncate text-micro", !last || last.type === "salida" ? "text-muted" : "font-semibold text-success-fg")}>{state}</span>
                     </span>
                   </button>
                 );
               })}
             </div>
           )}
-          <p className="flex items-center gap-1.5 text-[11px] text-zinc-500">
-            <Fingerprint className="h-3.5 w-3.5" /> Cada trabajador tiene su PIN personal. El administrador ve las marcas en Asistencia.
+          <p className="flex items-center gap-1.5 text-micro text-muted">
+            <Fingerprint className="h-3.5 w-3.5" aria-hidden /> Cada trabajador tiene su PIN personal. El administrador ve las marcas en Asistencia.
           </p>
         </div>
       ) : (
         <div className="grid gap-4">
-          <div className="flex items-center gap-3 rounded-2xl bg-zinc-50 p-3">
-            <span className="grid h-10 w-10 place-items-center rounded-full bg-accent text-sm font-bold text-zinc-900">{initials(sel.name)}</span>
+          <div className="flex items-center gap-3 rounded-2xl bg-sunken p-3">
+            <span className="grid h-10 w-10 place-items-center rounded-full bg-accent text-sm font-bold text-fg" aria-hidden>{initials(sel.name)}</span>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold">{sel.name}</p>
-              <p className="truncate text-xs text-zinc-500">{sel.role} · hoy: {sel.today.length ? sel.today.map((m) => `${MARK_LABEL[m.type].split(" ")[0]} ${timeShort(m.at)}`).join(" · ") : "sin marcas"}</p>
+              <p className="truncate text-xs text-muted">{sel.role} · hoy: {sel.today.length ? sel.today.map((m) => `${MARK_LABEL[m.type].split(" ")[0]} ${timeShort(m.at)}`).join(" · ") : "sin marcas"}</p>
             </div>
-            <button type="button" onClick={reset} className="text-xs font-medium text-zinc-500 hover:text-zinc-800">
+            <button type="button" onClick={reset} className="inline-grid h-10 place-items-center rounded-lg px-2 text-xs font-medium text-muted transition-colors duration-[var(--dur-fast)] hover:text-fg">
               Cambiar
             </button>
           </div>
@@ -191,10 +193,10 @@ export function KioskDialog({ branches, fixedBranch, onClose }: { branches: Bran
             <div>
               <div className={cn("flex justify-center gap-3", error && "animate-shake")} aria-label={`${pin.length} de 4 dígitos`}>
                 {[0, 1, 2, 3].map((i) => (
-                  <span key={i} className={cn("h-3 w-3 rounded-full", i < pin.length ? (error ? "bg-rose-600" : "bg-brand") : "bg-zinc-200")} />
+                  <span key={i} className={cn("h-3 w-3 rounded-full", i < pin.length ? (error ? "bg-danger" : "bg-brand") : "bg-sunken-strong")} />
                 ))}
               </div>
-              <p className="mt-2 h-4 text-center text-xs text-zinc-500" role={error ? "alert" : undefined}>
+              <p className="mt-2 h-4 text-center text-xs text-muted" role={error ? "alert" : undefined}>
                 {error ?? (apiMode === "mock" && MOCK_PINS[sel.id] ? `PIN de prueba: ${MOCK_PINS[sel.id]}` : "Ingresa tu PIN personal")}
               </p>
               <div className="mx-auto mt-3 grid max-w-[240px] grid-cols-3 gap-2">
@@ -202,8 +204,8 @@ export function KioskDialog({ branches, fixedBranch, onClose }: { branches: Bran
                   k === "" ? (
                     <span key={i} />
                   ) : (
-                    <button key={i} type="button" onClick={() => press(k)} className="h-11 rounded-xl bg-zinc-100 text-lg font-medium tabular-nums transition hover:bg-zinc-200 active:scale-95" aria-label={k === "←" ? "Borrar" : k}>
-                      {k === "←" ? <ArrowLeft className="mx-auto h-5 w-5" /> : k}
+                    <button key={i} type="button" onClick={() => press(k)} className="h-12 rounded-xl bg-sunken text-lg font-medium tabular-nums transition duration-[var(--dur-fast)] hover:bg-sunken-strong active:scale-95" aria-label={k === "←" ? "Borrar" : k}>
+                      {k === "←" ? <ArrowLeft className="mx-auto h-5 w-5" aria-hidden /> : k}
                     </button>
                   ),
                 )}
@@ -211,8 +213,8 @@ export function KioskDialog({ branches, fixedBranch, onClose }: { branches: Bran
             </div>
           ) : (
             <div className="grid gap-2">
-              <p className="text-center text-xs text-zinc-500">
-                Son las <b className="tabular-nums text-zinc-900">{timeShort(now)}</b>. ¿Qué vas a marcar?
+              <p className="text-center text-xs text-muted">
+                Son las <b className="tabular-nums text-fg">{timeShort(now)}</b>. ¿Qué vas a marcar?
               </p>
               <div className="grid grid-cols-2 gap-2">
                 {(Object.keys(MARK_LABEL) as MarkType[]).map((type) => {
@@ -224,14 +226,14 @@ export function KioskDialog({ branches, fixedBranch, onClose }: { branches: Bran
                       type="button"
                       disabled={!ok || clock.isPending}
                       onClick={() => mark(type)}
-                      className={cn("flex h-20 flex-col items-center justify-center gap-1.5 rounded-2xl text-sm font-semibold transition active:scale-[0.98] disabled:cursor-not-allowed", ok ? `${MARK_UI[type].tone} text-white` : "bg-zinc-100 text-zinc-300")}
+                      className={cn("flex h-20 flex-col items-center justify-center gap-1.5 rounded-2xl text-sm font-semibold transition active:scale-[0.98] disabled:cursor-not-allowed", ok ? `${MARK_UI[type].tone} text-white` : "bg-sunken text-muted opacity-60")}
                     >
-                      <Icon className="h-5 w-5" /> {MARK_LABEL[type]}
+                      <Icon className="h-5 w-5" aria-hidden /> {MARK_LABEL[type]}
                     </button>
                   );
                 })}
               </div>
-              {error && <p className="text-center text-xs font-medium text-rose-600" role="alert">{error}</p>}
+              {error && <p className="text-center text-xs font-medium text-danger-fg" role="alert">{error}</p>}
             </div>
           )}
         </div>
