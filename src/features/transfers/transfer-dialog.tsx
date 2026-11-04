@@ -102,17 +102,17 @@ export function TransferDialog({ seed, user, branches, products, stock, onClose,
       footer={
         <>
           <p className="mr-auto min-w-0 text-sm" role={action.error ? "alert" : undefined}>
-            {action.error ? <span className="text-rose-600">{errorMessage(action.error)}</span> : <span className="text-zinc-600">{totalUnits.toLocaleString("es-PE")} unid. en {lines.length} {lines.length === 1 ? "fila" : "filas"}</span>}
+            {action.error ? <span className="text-danger-fg">{errorMessage(action.error)}</span> : <span className="text-fg-2">{totalUnits.toLocaleString("es-PE")} unid. en {lines.length} {lines.length === 1 ? "fila" : "filas"}</span>}
           </p>
           <Button onClick={onClose}>Cancelar</Button>
           <Button variant="primary" loading={action.isPending} onClick={submit}>
             {mode === "send" ? (
               <>
-                <Send className="h-4 w-4" /> Enviar a {name(to)}
+                <Send className="h-4 w-4" aria-hidden /> Enviar a {name(to)}
               </>
             ) : (
               <>
-                <ClipboardList className="h-4 w-4" /> Enviar pedido
+                <ClipboardList className="h-4 w-4" aria-hidden /> Enviar pedido
               </>
             )}
           </Button>
@@ -134,7 +134,7 @@ export function TransferDialog({ seed, user, branches, products, stock, onClose,
               ))}
             </Select>
           </Field>
-          <ArrowRight className="mb-3 hidden h-5 w-5 text-zinc-400 sm:block" />
+          <ArrowRight className="mb-3 hidden h-5 w-5 text-muted sm:block" aria-hidden />
           <Field label="Hacia" className="w-full sm:w-56">
             <Select value={to} onChange={(e) => setTo(e.target.value)} disabled={toOptions(from).length < 2}>
               {toOptions(from).map((b) => (
@@ -143,7 +143,7 @@ export function TransferDialog({ seed, user, branches, products, stock, onClose,
             </Select>
           </Field>
           {!isAdmin && (
-            <p className="pb-2.5 text-xs text-zinc-500">{mode === "send" ? "Envías desde tu local." : "Es un pedido: tu stock no cambia hasta que llegue."}</p>
+            <p className="pb-2.5 text-xs text-muted">{mode === "send" ? "Envías desde tu local." : "Es un pedido: tu stock no cambia hasta que llegue."}</p>
           )}
         </div>
 
@@ -154,10 +154,10 @@ export function TransferDialog({ seed, user, branches, products, stock, onClose,
             const lots = p ? sellableLots(originLots, p.id, now).sort((a, b) => parseDay(a.expiresOn) - parseDay(b.expiresOn)) : [];
             const showError = tried && c.error;
             return (
-              <li key={l.key} className={cn("rounded-2xl border p-3", showError ? "border-rose-300 bg-rose-50/40" : "border-zinc-200")}>
+              <li key={l.key} className={cn("rounded-2xl border p-3", showError ? "border-danger-border bg-danger-bg/40" : "border-line")}>
                 <div className="grid gap-2 sm:grid-cols-12">
                   <div className={mode === "send" ? "sm:col-span-5" : "sm:col-span-8"}>
-                    <span className="mb-1 block text-xs font-medium text-zinc-600">Producto {i + 1}</span>
+                    <span className="mb-1 block text-xs font-medium text-fg-2">Producto {i + 1}</span>
                     <ProductPicker products={pickable} value={l.productId} invalid={!!(tried && !p)} ariaLabel={`Producto ${i + 1}`} onChange={(id) => update(l.key, { productId: id, lotId: null, mode: id !== null && (productById.get(id)?.unitsPerBox ?? 1) > 1 ? "caja" : "unidad" })} />
                   </div>
                   {mode === "send" && (
@@ -186,14 +186,14 @@ export function TransferDialog({ seed, user, branches, products, stock, onClose,
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                   {p && (
-                    <span className="text-zinc-500">
+                    <span className="text-muted">
                       {c.units.toLocaleString("es-PE")} unid. · {name(from)} tiene {stockLabel(p, stock.get(`${from}:${p.id}`) ?? 0)} · {name(to)} tiene {stockLabel(p, stock.get(`${to}:${p.id}`) ?? 0)}
                     </span>
                   )}
-                  {c.error && <span className={showError ? "font-semibold text-rose-700" : "text-zinc-400"}>{c.error}</span>}
+                  {c.error && <span className={showError ? "font-semibold text-danger-fg" : "text-muted"}>{c.error}</span>}
                   {lines.length > 1 && (
-                    <button type="button" onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))} className="ml-auto inline-flex items-center gap-1 font-medium text-zinc-500 hover:text-rose-600">
-                      <Trash2 className="h-3.5 w-3.5" /> Quitar
+                    <button type="button" onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))} className="ml-auto inline-flex min-h-10 items-center gap-1 rounded-lg px-2 font-medium text-muted hover:text-danger-fg" aria-label={`Quitar producto ${i + 1}`}>
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden /> Quitar
                     </button>
                   )}
                 </div>
@@ -202,7 +202,7 @@ export function TransferDialog({ seed, user, branches, products, stock, onClose,
           })}
         </ol>
         <Button size="sm" variant="ghost" className="w-fit" onClick={() => setLines((ls) => [...ls, mkLine()])}>
-          <Plus className="h-3.5 w-3.5" /> Agregar producto
+          <Plus className="h-3.5 w-3.5" aria-hidden /> Agregar producto
         </Button>
         <Field label="Nota (opcional)">
           <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ej.: lo lleva el motorizado a las 4 p. m." maxLength={200} />
