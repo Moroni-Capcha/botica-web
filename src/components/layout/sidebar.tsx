@@ -41,7 +41,6 @@ export function Sidebar({ user, onLogout }: { user: User; onLogout: () => void }
               <span className={cn("absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-accent transition-opacity", active ? "opacity-100" : "opacity-0")} />
               <Icon className={cn("h-[18px] w-[18px]", active && "text-accent")} />
               {n.label}
-              {!n.ready && <span className="ml-auto rounded-full bg-white/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white/50">Pronto</span>}
             </NavLink>
           );
         })}

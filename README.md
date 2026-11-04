@@ -132,7 +132,6 @@ src/
       clientes/         Clientes y recompras
       reportes/         Reportes de venta (administrador)
       ajustes/          Ajustes (administrador)
-      [module]/         Aviso de módulo en construcción (hoy no queda ninguno)
   features/pos/         Pantalla de venta: catálogo, carrito, cobro, comprobante
   features/expiry/      Vencimientos: semáforo, prioridad de venta, baja/canje, Excel
   features/inventory/   Inventario valorizado, ficha del producto, kardex, alta y edición

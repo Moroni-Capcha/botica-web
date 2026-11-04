@@ -8,7 +8,7 @@ import { accountErrors, branchErrors, deactivateBlockers, hasErrors, nextSeries 
 import { useAccounts, useBranchStock, useCash, useCreateBranch, useSetBranchActive, useTransfers, useWorkers } from "@/lib/queries";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Field, Input } from "@/components/ui/field";
+import { Field, Input, Select } from "@/components/ui/field";
 import { notify } from "@/components/ui/toast";
 
 /** Alta de un local, con su cuenta de ingreso si se marca la casilla. */
@@ -17,6 +17,8 @@ export function NewBranchDialog({ branches, onClose }: { branches: Branch[]; onC
   const [withAccount, setWithAccount] = useState(true);
   const [acc, setAcc] = useState({ name: "", pin: "" });
   const [tried, setTried] = useState(false);
+  const activeBranches = branches.filter((b) => b.active);
+  const [copyFrom, setCopyFrom] = useState(() => activeBranches[0]?.id ?? "");
   const accounts = useAccounts();
   const create = useCreateBranch();
   const set = <K extends keyof BranchInput>(k: K, v: BranchInput[K]) => setF((x) => ({ ...x, [k]: v }));
@@ -31,7 +33,7 @@ export function NewBranchDialog({ branches, onClose }: { branches: Branch[]; onC
     setTried(true);
     if (!ok) return;
     create.mutate(
-      { ...f, name: f.name.trim(), address: f.address.trim(), account: withAccount ? { name: acc.name.trim(), pin: acc.pin } : null },
+      { ...f, name: f.name.trim(), address: f.address.trim(), account: withAccount ? { name: acc.name.trim(), pin: acc.pin } : null, ...(copyFrom ? { copyMinStockFrom: copyFrom } : {}) },
       {
         onSuccess: (r) => {
           notify(r.account ? `${r.branch.name} creado con la cuenta de ${r.account.name}. Abre su caja para empezar a vender.` : `${r.branch.name} creado. Crea su cuenta en Cuentas y PIN.`);
@@ -72,6 +74,16 @@ export function NewBranchDialog({ branches, onClose }: { branches: Branch[]; onC
         <Field label="Dirección" error={tried ? errors.address : undefined} className="sm:col-span-2">
           <Input value={f.address} onChange={(e) => set("address", e.target.value)} placeholder="Jr. Huallayco 120, Amarilis" aria-invalid={tried && !!errors.address} />
         </Field>
+        {activeBranches.length > 0 && (
+          <Field label="Copiar los stock mínimos de" hint="Los mínimos de cada producto se copian a este local. Después puedes cambiarlos." className="sm:col-span-2">
+            <Select value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)}>
+              {activeBranches.map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+              <option value="">No copiar (usa el mínimo general)</option>
+            </Select>
+          </Field>
+        )}
         <fieldset className="grid gap-3 rounded-2xl border border-line p-3 sm:col-span-2 sm:grid-cols-[1fr_140px]">
           <label className="flex min-h-10 items-start gap-2 text-sm sm:col-span-2">
             <input type="checkbox" checked={withAccount} onChange={(e) => setWithAccount(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--brand)]" />

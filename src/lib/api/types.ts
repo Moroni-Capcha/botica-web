@@ -744,6 +744,8 @@ export interface BranchInput {
 export interface BranchCreateInput extends BranchInput {
   /** Si viene, se crea también la cuenta de local para ingresar. */
   account: { name: string; pin: string } | null;
+  /** Local activo del que se copian los stock mínimos por producto (nunca el stock). Sin él, el local nuevo usa el mínimo general de cada producto. */
+  copyMinStockFrom?: BranchId;
 }
 
 export interface BranchCreated {
