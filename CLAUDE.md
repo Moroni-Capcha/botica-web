@@ -94,4 +94,4 @@ Reglas nuevas al tocar estas piezas:
 - **Monitoreo:** todo lo que sale hacia Sentry pasa por `src/lib/domain/privacy.ts`; usa `captureException` / `captureMessage` de `src/lib/monitoring.ts`, nunca el SDK directo.
 - **Listas largas:** `page` y `pageSize` según "Paginación en el servidor" de `docs/API.md`; en endpoints existentes, opcional y compatible hacia atrás.
 
-Detalles menores pendientes: copiar los stock mínimos de otro local al crear uno, sugerir en el POS lo que el cliente "suele llevar", quitar la ruta `[module]`.
+Detalles menores pendientes: copiar los stock mínimos de otro local al crear uno y sugerir en el POS lo que el cliente "suele llevar".
