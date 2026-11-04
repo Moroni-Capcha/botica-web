@@ -1,16 +1,24 @@
 "use client";
 
-import { Receipt } from "lucide-react";
+import { AlarmClock, Check, CircleCheck, Clock, Lock, Minus, Receipt, type LucideIcon } from "lucide-react";
 import type { PublicConfig } from "@/lib/api";
 import { useAccount } from "@/lib/queries";
 import { ALL_MODULES, STATUS_LABEL, daysLeft, effectiveStatus, limaDay } from "@/lib/domain/account";
 import { planUsage } from "@/lib/domain/settings";
 import { NAV } from "@/lib/nav";
 import { cn } from "@/lib/cn";
+import { Card } from "@/components/ui/card";
+import { Chip } from "@/components/ui/chip";
 import { Empty } from "@/components/ui/empty";
+import type { Tone } from "@/components/ui/tone";
 
-const card = "rounded-2xl border border-zinc-200 bg-white";
-const BADGE = { trial: "bg-sky-50 text-sky-700", active: "bg-emerald-50 text-emerald-700", overdue: "bg-amber-50 text-amber-800", suspended: "bg-rose-50 text-rose-700" } as const;
+/** Estado de la cuenta: tono + icono + texto (el color nunca va solo). */
+const BADGE: Record<"trial" | "active" | "overdue" | "suspended", { tone: Tone; icon: LucideIcon }> = {
+  trial: { tone: "info", icon: Clock },
+  active: { tone: "success", icon: CircleCheck },
+  overdue: { tone: "warning", icon: AlarmClock },
+  suspended: { tone: "danger", icon: Lock },
+};
 const fmtDay = (d: string) => new Intl.DateTimeFormat("es-PE", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${d}T00:00:00Z`));
 
 /** Pestaña "Plan y facturación": plan, uso de locales, estado de la cuenta y módulos incluidos. */
@@ -19,8 +27,12 @@ export function PlanBilling({ config }: { config: PublicConfig }) {
   const plan = planUsage([...config.branches, ...config.closedBranches], config.plan.maxBranches);
   const today = limaDay(Date.now());
 
-  if (isLoading) return <div className={cn(card, "h-72 animate-pulse bg-zinc-50")} />;
-  if (isError || !account) return <Empty icon={Receipt} title="No se pudo leer tu plan">Intenta de nuevo en un momento.</Empty>;
+  if (isLoading) return <Card padding="none" className="h-72 animate-pulse bg-sunken" aria-busy="true" />;
+  if (isError || !account) return (
+      <Card padding="none">
+        <Empty icon={Receipt} title="No se pudo leer tu plan">Intenta de nuevo en un momento.</Empty>
+      </Card>
+    );
 
   const status = effectiveStatus(account, today);
   const when =
@@ -37,42 +49,59 @@ export function PlanBilling({ config }: { config: PublicConfig }) {
 
   return (
     <div className="grid gap-4">
-      <section className={cn(card, "grid gap-4 p-4 sm:grid-cols-3 sm:p-5")} aria-label="Resumen del plan">
+      <Card as="section" className="grid gap-4 sm:grid-cols-3" aria-label="Resumen del plan">
         <div>
-          <p className="text-xs font-medium text-zinc-500">Plan</p>
-          <p className="mt-1 text-lg font-semibold text-zinc-900">{config.plan.name}</p>
+          <p className="text-xs font-medium text-muted">Plan</p>
+          <p className="mt-1 text-lg font-semibold text-fg">{config.plan.name}</p>
         </div>
         <div>
-          <p className="text-xs font-medium text-zinc-500">Locales</p>
-          <p className="mt-1 text-lg font-semibold tabular-nums text-zinc-900">
+          <p className="text-xs font-medium text-muted">Locales</p>
+          <p className="mt-1 text-lg font-semibold tabular-nums text-fg">
             {plan.active} de {plan.max}
           </p>
         </div>
         <div>
-          <p className="text-xs font-medium text-zinc-500">Estado de la cuenta</p>
+          <p className="text-xs font-medium text-muted">Estado de la cuenta</p>
           <p className="mt-1">
-            <span className={cn("inline-block rounded-full px-2.5 py-1 text-xs font-semibold", BADGE[status])}>{STATUS_LABEL[status]}</span>
+            <StatusChip status={status} />
           </p>
         </div>
-        {when && <p className="text-sm text-zinc-600 sm:col-span-3">{when}</p>}
-      </section>
+        {when && <p className="text-sm text-fg-2 sm:col-span-3">{when}</p>}
+      </Card>
 
-      <section className={cn(card, "p-4 sm:p-5")} aria-label="Módulos incluidos">
-        <h2 className="text-sm font-semibold text-zinc-900">Módulos de tu plan</h2>
+      <Card as="section" aria-label="Módulos incluidos">
+        <h2 className="text-sm font-semibold text-fg">Módulos de tu plan</h2>
         <ul className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {modules.map((m) => (
-            <li key={m.id} className={cn("flex items-center justify-between rounded-xl border px-3 py-2 text-sm", m.included ? "border-zinc-200 text-zinc-800" : "border-dashed border-zinc-200 text-zinc-400")}>
+            <li key={m.id} className={cn("flex min-h-11 items-center justify-between gap-2 rounded-xl border px-3 py-2 text-sm", m.included ? "border-line text-fg" : "border-dashed border-line text-muted")}>
               {m.label}
-              <span className="text-[11px] font-semibold">{m.included ? "Incluido" : "No incluido"}</span>
+              {m.included ? (
+                <Chip tone="success">
+                  <Check className="h-3 w-3 shrink-0" aria-hidden /> Incluido
+                </Chip>
+              ) : (
+                <Chip>
+                  <Minus className="h-3 w-3 shrink-0" aria-hidden /> No incluido
+                </Chip>
+              )}
             </li>
           ))}
         </ul>
-      </section>
+      </Card>
 
-      <section className={cn(card, "p-4 sm:p-5")} aria-label="Facturas">
-        <h2 className="text-sm font-semibold text-zinc-900">Facturas</h2>
-        <p className="mt-2 text-sm text-zinc-500">Próximamente: facturas de tu plan.</p>
-      </section>
+      <Card as="section" aria-label="Facturas">
+        <h2 className="text-sm font-semibold text-fg">Facturas</h2>
+        <p className="mt-2 text-sm text-muted">Próximamente: facturas de tu plan.</p>
+      </Card>
     </div>
+  );
+}
+
+function StatusChip({ status }: { status: keyof typeof BADGE }) {
+  const { tone, icon: Icon } = BADGE[status];
+  return (
+    <Chip tone={tone} className="px-2.5 py-1 text-xs">
+      <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden /> {STATUS_LABEL[status]}
+    </Chip>
   );
 }
