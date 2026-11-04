@@ -46,12 +46,12 @@ export function Sidebar({ user, onLogout }: { user: User; onLogout: () => void }
         })}
       </nav>
       <div className="m-3 flex items-center gap-3 rounded-xl bg-white/5 p-3">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-accent text-xs font-bold text-zinc-900">{initials(user.name)}</span>
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-accent text-xs font-bold text-fg">{initials(user.name)}</span>
         <div className="min-w-0 flex-1 leading-tight">
           <p className="truncate text-sm font-medium">{user.name}</p>
           <p className="truncate text-xs text-white/50">{place}</p>
         </div>
-        <button type="button" onClick={onLogout} className="rounded-lg p-1.5 text-white/60 transition hover:bg-white/10 hover:text-white" aria-label="Cerrar turno">
+        <button type="button" onClick={onLogout} className="grid h-10 w-10 place-items-center rounded-lg text-white/60 transition hover:bg-white/10 hover:text-white" aria-label="Cerrar turno">
           <LogOut className="h-4 w-4" />
         </button>
       </div>

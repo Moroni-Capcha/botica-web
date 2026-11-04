@@ -24,7 +24,7 @@ export function MobileNav({ user }: { user: User }) {
     <>
       {more && (
         <div className="fixed inset-0 z-40 md:hidden" onClick={() => setMore(false)}>
-          <div className="absolute inset-0 bg-zinc-900/30" />
+          <div className="absolute inset-0 bg-scrim" />
           <div className="absolute bottom-20 right-3 w-56 overflow-hidden rounded-2xl bg-brand p-1.5 shadow-2xl">
             {rest.map((n) => (
               <NavLink key={n.id} href={n.href} className={cn("flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium", pathname.startsWith(n.href) ? "bg-white/10 text-white" : "text-white/70")}>

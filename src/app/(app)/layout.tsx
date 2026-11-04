@@ -39,7 +39,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   );
 
   if (!hydrated || !session) {
-    return <div className="grid min-h-dvh place-items-center text-sm text-zinc-500">Cargando…</div>;
+    return <div className="grid min-h-dvh place-items-center text-sm text-muted">Cargando…</div>;
   }
 
   const logout = async () => {
@@ -51,7 +51,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const current = NAV.find((n) => pathname.startsWith(n.href));
 
   return (
-    <div className="flex h-dvh w-full overflow-hidden bg-canvas text-zinc-900">
+    <div className="flex h-dvh w-full overflow-hidden bg-canvas text-fg">
       <Sidebar user={session.user} onLogout={logout} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar title={current?.label ?? ""} user={session.user} onLogout={logout} />
