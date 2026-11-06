@@ -3,7 +3,7 @@
  * El backend debería aplicar los mismos casos (ver "Consola interna de Digi!HME" en docs/API.md).
  * Reutiliza el estado de cuenta de `account.ts` (prueba, activa, vencida, suspendida).
  */
-import type { Account, AccountStatus, TenantAction, TenantSummary } from "@/lib/api/types";
+import type { Account, AccountStatus, AuditEntry, Role, TenantAction, TenantDetail, TenantHistoryAction, TenantSummary, VoucherStatus } from "@/lib/api/types";
 import { daysLeft, effectiveStatus } from "./account";
 import { findPlan } from "./plans";
 
@@ -136,4 +136,51 @@ export function accountDeadline(t: Pick<TenantSummary, "status" | "trialEndsAt" 
   }
   if (t.renewsAt && t.status === "active") return `Renueva el ${t.renewsAt}`;
   return "";
+}
+
+/* ------------------------------ Detalle de una botica (solo lectura) ------------------------------ */
+
+const HISTORY_LIMIT = 20;
+const ACTIVITY_DAYS = 30;
+
+/** Lo que el historial muestra de cada acción de Digi!HME. */
+export const HISTORY_LABEL: Record<TenantHistoryAction, string> = {
+  plan_cambiado: "Cambio de plan",
+  prueba_extendida: "Prueba extendida",
+  cuenta_suspendida: "Cuenta suspendida",
+  cuenta_reactivada: "Cuenta reactivada",
+};
+
+export const isTenantHistoryAction = (action: string): action is TenantHistoryAction => action in HISTORY_LABEL;
+
+export const roleLabel = (role: Role): string => (role === "admin" ? "Administrador" : "Encargado");
+
+/** Acciones de Digi!HME de la auditoría de una botica: la más reciente primero, máximo 20. Solo la fecha, la acción y el motivo. */
+export function tenantHistory(log: Pick<AuditEntry, "at" | "action" | "userId" | "after">[]): TenantDetail["history"] {
+  return log
+    .flatMap((e) => (e.userId === null && isTenantHistoryAction(e.action) ? [{ at: e.at, action: e.action, reason: typeof e.after?.reason === "string" ? e.after.reason : "" }] : []))
+    .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
+    .slice(0, HISTORY_LIMIT);
+}
+
+/** Ventas de los últimos 30 días y sus comprobantes por estado ante SUNAT (los anulados no cuentan). */
+export function tenantActivity(
+  sales: { id: string; createdAt: string }[],
+  voucherStatus: (saleId: string) => VoucherStatus,
+  now: number,
+): TenantDetail["activity"] {
+  const since = now - ACTIVITY_DAYS * DAY;
+  const vouchers = { accepted: 0, pending: 0, rejected: 0 };
+  let count = 0;
+  let last: string | null = null;
+  for (const s of sales) {
+    if (!last || Date.parse(s.createdAt) > Date.parse(last)) last = s.createdAt;
+    if (Date.parse(s.createdAt) < since) continue;
+    count += 1;
+    const st = voucherStatus(s.id);
+    if (st === "aceptado") vouchers.accepted += 1;
+    else if (st === "pendiente") vouchers.pending += 1;
+    else if (st === "rechazado") vouchers.rejected += 1;
+  }
+  return { salesLast30Days: count, vouchersLast30Days: vouchers, lastSaleAt: last };
 }

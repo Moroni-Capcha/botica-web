@@ -1010,6 +1010,24 @@ export interface TenantPage extends Page<TenantSummary> {
   counts: Record<AccountStatus, number>;
 }
 
+/** Acciones de Digi!HME que aparecen en el historial de una botica. */
+export type TenantHistoryAction = "plan_cambiado" | "prueba_extendida" | "cuenta_suspendida" | "cuenta_reactivada";
+
+/** Detalle de solo lectura de una botica para el soporte. Nunca lleva DNI, nombres de clientes, PIN ni líneas de venta. */
+export interface TenantDetail {
+  tenant: TenantSummary;
+  branches: { id: string; name: string; active: boolean; closed: boolean }[];
+  staff: { name: string; role: Role; active: boolean; lastLoginAt: string | null }[];
+  activity: {
+    salesLast30Days: number;
+    /** Comprobantes de los últimos 30 días por estado ante SUNAT. */
+    vouchersLast30Days: { accepted: number; pending: number; rejected: number };
+    lastSaleAt: string | null;
+  };
+  /** Acciones de Digi!HME sobre la botica, la más reciente primero, máximo 20. */
+  history: { at: string; action: TenantHistoryAction; reason: string }[];
+}
+
 /** Lo que Digi!HME puede hacer con una botica. Siempre lleva un motivo (queda en la auditoría de la botica). */
 export type TenantAction =
   | { action: "change_plan"; planId: string; reason: string }

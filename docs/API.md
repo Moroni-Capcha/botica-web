@@ -702,6 +702,31 @@ Pantalla `/consola` para el equipo de Digi!HME (el operador de la plataforma). *
 - `404 BOTICA_NO_ENCONTRADA` si el código no existe.
 - **Operador de prueba del mock (no existe en producción):** `soporte@digi-hme.pe` · `Consola2026!`. El token vive en `sessionStorage` bajo `bh.platform.session`, aparte de `bh.session` (la botica).
 
+`GET /platform/tenants/:code` → `TenantDetail`: el detalle de solo lectura de una botica para el soporte de Digi!HME (se abre desde el nombre de la botica en la lista). Mismo token de operador, sin `X-Botica`. `404 BOTICA_NO_ENCONTRADA` si el código no existe.
+
+```json
+{
+  "tenant": { "code": "botica-huanuco", "name": "Botica Huánuco", "planId": "crece", "planName": "Plan Crece", "maxBranches": 3, "status": "active", "renewsAt": "2026-12-01", "createdAt": "2026-07-05T09:00:00-05:00", "lastActivityAt": "2026-11-02T08:41:00-05:00", "branches": 2, "users": 3 },
+  "branches": [
+    { "id": "principal", "name": "Botica Huánuco Principal", "active": true, "closed": false },
+    { "id": "norte", "name": "Local Norte", "active": false, "closed": true }
+  ],
+  "staff": [
+    { "name": "María Quispe", "role": "admin", "active": true, "lastLoginAt": "2026-11-02T08:41:00-05:00" },
+    { "name": "Rosa Tello", "role": "encargado", "active": true, "lastLoginAt": null }
+  ],
+  "activity": { "salesLast30Days": 128, "vouchersLast30Days": { "accepted": 120, "pending": 5, "rejected": 3 }, "lastSaleAt": "2026-11-02T08:30:00-05:00" },
+  "history": [
+    { "at": "2026-10-20T10:15:00-05:00", "action": "plan_cambiado", "reason": "Abrió un tercer local" }
+  ]
+}
+```
+
+- `branches`: todos los locales; `closed` es lo contrario de `active` (un local desactivado conserva su historial). `staff`: cuentas con su nombre para mostrar, rol (`admin` o `encargado`) y último ingreso (`lastLoginAt`, `null` si nunca).
+- `activity`: ventas de los últimos 30 días y cuántos comprobantes de esos 30 días están aceptados, pendientes o rechazados por SUNAT (los anulados no cuentan). `lastSaleAt` es `null` si nunca vendió.
+- `history`: acciones de Digi!HME sobre esa botica (`plan_cambiado`, `prueba_extendida`, `cuenta_suspendida`, `cuenta_reactivada`), de la más reciente a la más antigua, máximo 20, con el motivo que dio el operador (`reason`).
+- **Privacidad:** el detalle nunca incluye DNI, nombres de clientes, PIN, ni las líneas de las ventas. Solo conteos, fechas, plan, nombres de locales y nombres y roles del personal.
+
 ## Próximas entregas
 
 Todos los módulos del front están definidos. Los cambios al contrato se agregan a este documento antes de construir la pantalla.

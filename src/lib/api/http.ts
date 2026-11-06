@@ -3,7 +3,7 @@ import type { ApiClient, BranchStock, NewCustomer, PlatformClient, PublicConfig 
 import { ApiError, isSessionExpiry } from "./errors";
 import type { PlanOffer, SignUpInput, Setup, SetupStep, Account, AccountInput, BoticaPublic, Branch, BranchCreateInput, BranchCreated, BranchInput, BranchSeries, Pharmacy, RulesInput, StaffAccount, SalesReportLine, ContactRequest, CustomerInput, CustomerPurchase, CustomerSummary, RefillInfo, Dashboard, AttendanceMark, ClockRequest, KioskWorker, ManualMarkRequest, Worker, WorkerInput } from "./types";
 import type { ApiErrorBody, BranchId, CashCloseRequest, CashClosing, CashMovement, CashMovementRequest, CashSession, CashSummary, Customer, Kardex, Lot, Product, ProductInput, ProductVelocity, Purchase, PurchaseRequest, Supplier, SupplierInput, Transfer, TransferAskRequest, TransferSendRequest, Sale, SaleRequest, Session, StaffSummary, User, WriteOffRequest } from "./types";
-import type { CreditNote, CreditNoteRequest, Voucher, VoidRequest, SaleSyncRequest, SaleSyncResponse, AuditEntry, AuditQuery, CustomersQuery, Page, PlatformSession, TenantAction, TenantPage, TenantSummary, TenantsQuery } from "./types";
+import type { CreditNote, CreditNoteRequest, Voucher, VoidRequest, SaleSyncRequest, SaleSyncResponse, AuditEntry, AuditQuery, CustomersQuery, Page, PlatformSession, TenantAction, TenantDetail, TenantPage, TenantSummary, TenantsQuery } from "./types";
 import { tenantStore } from "./tenant";
 import { platformTokenStore, tokenStore, type TokenStore } from "./token";
 import { connection } from "./connection";
@@ -59,6 +59,7 @@ export function createHttpPlatformClient(baseUrl: string): PlatformClient {
     logout: () => request<void>("POST", "/platform/logout"),
     listTenants: ({ q, status, page, pageSize }: TenantsQuery = {}) =>
       request<TenantPage>("GET", `/platform/tenants${query({ ...(q ? { q } : {}), ...(status ? { status } : {}), ...(page ? { page: String(page) } : {}), ...(pageSize ? { pageSize: String(pageSize) } : {}) })}`),
+    getTenant: (code) => request<TenantDetail>("GET", `/platform/tenants/${encodeURIComponent(code)}`),
     updateTenant: (code, input: TenantAction) => request<TenantSummary>("PATCH", `/platform/tenants/${encodeURIComponent(code)}`, input),
   };
 }

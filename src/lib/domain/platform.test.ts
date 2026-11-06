@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Account, TenantAction, TenantSummary } from "@/lib/api/types";
 import { ALL_MODULES } from "./account";
 import { findPlan } from "./plans";
-import { MAX_TRIAL_EXTENSION_DAYS, accountDeadline, activityLabel, addDays, applyTenantAction, countTenants, filterTenants, reasonError, tenantActions, type TenantState } from "./platform";
+import { MAX_TRIAL_EXTENSION_DAYS, accountDeadline, activityLabel, addDays, applyTenantAction, countTenants, filterTenants, reasonError, tenantActions, tenantActivity, tenantHistory, roleLabel, HISTORY_LABEL, type TenantState } from "./platform";
 
 const TODAY = "2026-11-02";
 const reason = "Pidió más tiempo para decidir";
@@ -148,5 +148,48 @@ describe("consola · lista", () => {
     expect(accountDeadline({ status: "overdue", trialEndsAt: "2026-10-31" }, TODAY)).toBe("Prueba vencida hace 2 días");
     expect(accountDeadline({ status: "active", renewsAt: "2026-12-01" }, TODAY)).toBe("Renueva el 2026-12-01");
     expect(accountDeadline({ status: "suspended" }, TODAY)).toBe("");
+  });
+});
+
+describe("consola · detalle de una botica", () => {
+  const NOW = Date.parse("2026-11-06T12:00:00Z");
+  const daysAgo = (n: number) => new Date(NOW - n * 86_400_000).toISOString();
+
+  it("cuenta solo los últimos 30 días y los comprobantes por estado; los anulados no cuentan", () => {
+    const sales = [
+      { id: "a", createdAt: daysAgo(1) },
+      { id: "b", createdAt: daysAgo(10) },
+      { id: "c", createdAt: daysAgo(20) },
+      { id: "d", createdAt: daysAgo(25) },
+      { id: "old", createdAt: daysAgo(45) },
+    ];
+    const status = { a: "aceptado", b: "pendiente", c: "rechazado", d: "anulado", old: "aceptado" } as const;
+    const r = tenantActivity(sales, (id) => status[id as keyof typeof status], NOW);
+    expect(r).toEqual({ salesLast30Days: 4, vouchersLast30Days: { accepted: 1, pending: 1, rejected: 1 }, lastSaleAt: daysAgo(1) });
+  });
+
+  it("sin ventas, la última venta es null", () => {
+    expect(tenantActivity([], () => "aceptado", NOW)).toEqual({ salesLast30Days: 0, vouchersLast30Days: { accepted: 0, pending: 0, rejected: 0 }, lastSaleAt: null });
+  });
+
+  it("el historial solo trae acciones de Digi!HME, de la más reciente a la más antigua, máximo 20", () => {
+    const log = [
+      { at: daysAgo(30), action: "plan_cambiado" as const, userId: null, after: { reason: "Subió de plan" } },
+      { at: daysAgo(2), action: "cuenta_suspendida" as const, userId: null, after: { reason: "Pago pendiente" } },
+      { at: daysAgo(1), action: "venta_registrada" as const, userId: "u1", after: null },
+      { at: daysAgo(5), action: "plan_cambiado" as const, userId: "u1", after: { reason: "no es de Digi!HME" } },
+      ...Array.from({ length: 25 }, (_, i) => ({ at: daysAgo(40 + i), action: "prueba_extendida" as const, userId: null, after: { reason: `r${i}` } })),
+    ];
+    const h = tenantHistory(log);
+    expect(h).toHaveLength(20);
+    expect(h.slice(0, 2).map((e) => e.action)).toEqual(["cuenta_suspendida", "plan_cambiado"]);
+    expect(h[0]!.reason).toBe("Pago pendiente");
+    expect(h.every((e, i) => i === 0 || Date.parse(h[i - 1]!.at) >= Date.parse(e.at))).toBe(true);
+  });
+
+  it("etiquetas en español claro", () => {
+    expect(HISTORY_LABEL.cuenta_reactivada).toBe("Cuenta reactivada");
+    expect(roleLabel("admin")).toBe("Administrador");
+    expect(roleLabel("encargado")).toBe("Encargado");
   });
 });

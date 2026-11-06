@@ -17,6 +17,7 @@ import { Table, td } from "@/components/ui/table";
 import { dateShort } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { TenantActionDialog } from "./tenant-action-dialog";
+import { TenantDetailDialog } from "./tenant-detail-dialog";
 
 const STATUS_STYLE: Record<AccountStatus, { badge: string; card: string }> = {
   active: { badge: "bg-success-bg text-success-fg", card: "text-success-fg" },
@@ -34,6 +35,7 @@ export function ConsoleScreen({ session, onLogout }: { session: PlatformSession;
   const q = useDeferredValue(text.trim());
   const [status, setStatus] = useState<AccountStatus | null>(null);
   const [page, setPage] = useState(1);
+  const [detail, setDetail] = useState<TenantSummary | null>(null);
   const [dialog, setDialog] = useState<{ tenant: TenantSummary; kind: TenantAction["action"] } | null>(null);
 
   const query = useMemo(() => ({ page, pageSize: DEFAULT_PAGE_SIZE, ...(q ? { q } : {}), ...(status ? { status } : {}) }), [page, q, status]);
@@ -139,8 +141,10 @@ export function ConsoleScreen({ session, onLogout }: { session: PlatformSession;
                   return (
                     <tr key={t.code}>
                       <td className={td}>
-                        <span className="block font-semibold">{t.name}</span>
-                        <span className="block text-xs text-muted">{t.code}</span>
+                        <button type="button" onClick={() => setDetail(t)} aria-label={`Ver el detalle de ${t.name}`} className="-my-1 block min-h-10 rounded-lg py-1 text-left hover:underline focus-visible:outline-2 focus-visible:outline-offset-2">
+                          <span className="block font-semibold">{t.name}</span>
+                          <span className="block text-xs text-muted">{t.code}</span>
+                        </button>
                       </td>
                       <td className={cn(td, "whitespace-nowrap")}>{t.planName}</td>
                       <td className={td}>
@@ -189,6 +193,7 @@ export function ConsoleScreen({ session, onLogout }: { session: PlatformSession;
         </section>
       </main>
 
+      {detail && <TenantDetailDialog code={detail.code} name={detail.name} onClose={() => setDetail(null)} />}
       {dialog && <TenantActionDialog tenant={dialog.tenant} kind={dialog.kind} onClose={() => setDialog(null)} />}
     </div>
   );
