@@ -30,5 +30,7 @@ Browser check (parent, dev server): 1568 px console with metrics (MRR S/ 129.80 
 Observations (not fixed): the four metric tiles and the four status filter cards repeat the same counts; the single bar in "Boticas nuevas por mes" is gray, not a brand color.
 NOT checked: the lists with data (needs a stale or ending trial botica), the detail after a Digi!HME action, real phone.
 
+Follow-up fix (parent, inline): the metric tiles now show MRR, new botica this month, no-activity count and trials ending soon, so they no longer repeat the status filter cards; the chart no longer uses `highlightKey`, so the bar takes the series color. typecheck, 443 tests and build pass; not re-checked on screen.
+
 ## Next step
-User decides push/PR. Optional: merge the duplicate status cards with the filter, and color the chart bar.
+User decides merge.

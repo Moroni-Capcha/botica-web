@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Ban, CheckCircle2, Clock, TriangleAlert, WalletCards, type LucideIcon } from "lucide-react";
+import { Building2, Clock, TriangleAlert, WalletCards, type LucideIcon } from "lucide-react";
 import type { TenantSummary } from "@/lib/api/types";
 import { errorMessage } from "@/lib/api";
 import { useMetrics } from "@/lib/queries";
@@ -102,16 +102,16 @@ export function MetricsPanel({ now, today, onOpen }: { now: number; today: strin
     <section className="grid min-w-0 gap-3" aria-label="Resumen de la plataforma">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Tile icon={WalletCards} label="Ingreso mensual" value={soles(m.monthlyRecurringRevenue.withIgv)} hint={`${soles(m.monthlyRecurringRevenue.withoutIgv)} sin IGV`} tone="text-fg-2" />
-        <Tile icon={CheckCircle2} label="Activas" value={m.counts.active} hint="Pagan su plan" tone="text-success-fg" />
-        <Tile icon={Clock} label="En prueba" value={m.counts.trial} hint="Probando gratis" tone="text-info-fg" />
-        <Tile icon={Ban} label="Vencidas o suspendidas" value={m.counts.overdue + m.counts.suspended} hint={`${m.counts.overdue} vencidas · ${m.counts.suspended} suspendidas`} tone="text-danger-fg" />
+        <Tile icon={Building2} label="Altas este mes" value={m.newTenantsByMonth[m.newTenantsByMonth.length - 1]?.count ?? 0} hint={`${newTotal} en los últimos 6 meses`} tone="text-success-fg" />
+        <Tile icon={TriangleAlert} label="Sin actividad" value={m.inactive.length} hint="14 días o más sin usar el sistema" tone="text-warning-fg" />
+        <Tile icon={Clock} label="Pruebas por vencer" value={m.trialsEndingSoon.length} hint="Terminan en 7 días o menos" tone="text-info-fg" />
       </div>
 
       <div className="grid min-w-0 gap-3 lg:grid-cols-3">
         <section className="min-w-0 rounded-2xl border border-line bg-surface p-4 lg:col-span-1" aria-label="Boticas nuevas por mes">
           <h2 className="text-sm font-semibold">Boticas nuevas por mes</h2>
           <p className="mb-2 text-xs text-muted">{newTotal === 0 ? "Ninguna en los últimos 6 meses" : `${newTotal} en los últimos 6 meses`}</p>
-          <ColumnChart data={data} series={SERIES} height={190} format={(n) => String(n)} ariaLabel="Boticas nuevas por mes, últimos 6 meses" emptyText="Aún no hay altas" highlightKey={data[data.length - 1]?.key} />
+          <ColumnChart data={data} series={SERIES} height={190} format={(n) => String(n)} ariaLabel="Boticas nuevas por mes, últimos 6 meses" emptyText="Aún no hay altas" />
         </section>
 
         <ListCard title="Sin actividad" hint="Activas o en prueba, 14 días o más sin usar el sistema" empty="Todas las boticas usaron el sistema en los últimos 14 días." count={m.inactive.length}>
