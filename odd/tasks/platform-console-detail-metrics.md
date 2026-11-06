@@ -28,7 +28,8 @@ One delegated writer per phase (sonnet, no git); parent verifies (typecheck, tes
 Two delegated writers (sonnet), one per phase. Parent: `npm run typecheck` clean; `npm test` 46 files / 443 tests pass; `npm run build` passes; palette `rg` over `src/features/platform` clean.
 Browser check (parent, dev server): 1568 px console with metrics (MRR S/ 129.80 con IGV, chart, empty "Sin actividad" and "Pruebas por vencer" states) and the detail dialog (branches, staff with role and last login, 30-day sales and SUNAT counts, empty Digi!HME history; no DNI, customer names or PIN). 390 and 768 px: no page overflow (375/375 and 753/753); the detail opens as a bottom sheet at 390 px.
 Observations (not fixed): the four metric tiles and the four status filter cards repeat the same counts; the single bar in "Boticas nuevas por mes" is gray, not a brand color.
-NOT checked: the lists with data (needs a stale or ending trial botica), the detail after a Digi!HME action, real phone.
+Data check after merge (parent, dev server, two mock boticas cloned in localStorage, one with a trial ending in 3 days and one idle for 30 days): "Sin actividad" listed the idle botica ("Hace 30 días") and "Pruebas por vencer" the trial ("Quedan 3 días"); tiles and chart (green bar) correct. Suspending the idle botica from the console refreshed the metrics on its own (MRR S/ 259.60 to S/ 129.80, Sin actividad 1 to 0, Suspendida 1), and its detail showed "Cuenta suspendida" with the reason in the history.
+NOT checked: real phone, the lists with more than one row.
 
 Follow-up fix (parent, inline): the metric tiles now show MRR, new botica this month, no-activity count and trials ending soon, so they no longer repeat the status filter cards; the chart no longer uses `highlightKey`, so the bar takes the series color. typecheck, 443 tests and build pass; not re-checked on screen.
 
