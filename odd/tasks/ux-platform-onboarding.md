@@ -20,7 +20,8 @@ One delegated writer (sonnet, no git); parent verifies with typecheck, tests, an
 
 ## Progress / evidence
 Delegated writer (sonnet), one pass. Parent: `npm run typecheck` clean; `npm test` 46 files / 421 tests pass; palette `rg` over both folders returns nothing; no stray JSX. Leftover `text-white` on brand/navy/success fills is intentional.
-NOT checked on screen: console, login and signup in the browser; `npm run build`.
+`npm run build` passes. Browser check (parent, dev server, 1568 px): console login, console list with status cards and badges, "Cambiar de plan" dialog (opened and closed, nothing submitted), and signup step 1 render correctly with tokens.
+NOT checked on screen: 390/768 px, signup steps 2-3, suspend/reactivate dialogs, real phone.
 
 ## Next step
-User decides push/PR. Browser check of /consola and signup pending.
+User decides push/PR.
