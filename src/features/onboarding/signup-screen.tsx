@@ -79,7 +79,7 @@ export function SignupScreen() {
   };
 
   return (
-    <main className="min-h-dvh bg-white px-4 py-8 sm:px-8">
+    <main className="min-h-dvh bg-surface px-4 py-8 sm:px-8">
       <div className="mx-auto w-full max-w-3xl">
         <header className="flex items-center justify-between gap-3">
           <DigiHmeLogo height={30} />
@@ -93,11 +93,11 @@ export function SignupScreen() {
         <ol className="mt-8 flex items-center gap-2" aria-label="Pasos del registro">
           {STEPS.map((label, i) => (
             <li key={label} className="flex flex-1 items-center gap-2" aria-current={i === step ? "step" : undefined}>
-              <span className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-semibold", i <= step ? "bg-brand text-white" : "bg-zinc-100 text-zinc-500", i === step && "ring-4 ring-brand/15")}>
+              <span className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-semibold", i <= step ? "bg-brand text-white" : "bg-sunken text-muted", i === step && "ring-4 ring-brand/15")}>
                 {i < step ? <Check className="h-4 w-4" /> : i + 1}
               </span>
-              <span className={cn("text-sm", i === step ? "font-semibold text-zinc-900" : "text-zinc-500")}>{label}</span>
-              {i < STEPS.length - 1 && <span className="h-px flex-1 bg-zinc-200" />}
+              <span className={cn("text-sm", i === step ? "font-semibold text-fg" : "text-muted")}>{label}</span>
+              {i < STEPS.length - 1 && <span className="h-px flex-1 bg-line" />}
             </li>
           ))}
         </ol>
@@ -105,11 +105,11 @@ export function SignupScreen() {
         {step === 0 && (
           <section className="mt-8">
             <h1 className="text-2xl font-semibold tracking-tight">Elige tu plan</h1>
-            <p className="mt-1 text-sm text-zinc-500">{TRIAL_DAYS} días gratis, sin tarjeta. Puedes cambiar de plan cuando quieras.</p>
+            <p className="mt-1 text-sm text-muted">{TRIAL_DAYS} días gratis, sin tarjeta. Puedes cambiar de plan cuando quieras.</p>
             <div className="mt-5 grid gap-3 sm:grid-cols-3" role="radiogroup" aria-label="Plan">
-              {plans.isLoading && [0, 1, 2].map((i) => <div key={i} className="h-56 animate-pulse rounded-2xl bg-zinc-100" />)}
+              {plans.isLoading && [0, 1, 2].map((i) => <div key={i} className="h-56 animate-pulse rounded-2xl bg-sunken" />)}
               {plans.isError && (
-                <button type="button" onClick={() => void plans.refetch()} className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-left text-sm text-rose-700 sm:col-span-3">
+                <button type="button" onClick={() => void plans.refetch()} className="rounded-2xl border border-danger-border bg-danger-bg p-4 text-left text-sm text-danger-fg sm:col-span-3">
                   No se pudieron cargar los planes. Toca para reintentar.
                 </button>
               )}
@@ -127,7 +127,7 @@ export function SignupScreen() {
           <form onSubmit={submit} noValidate className="mt-8 grid max-w-xl gap-4">
             <div>
               <h1 className="text-2xl font-semibold tracking-tight">Cuéntanos de tu botica</h1>
-              <p className="mt-1 text-sm text-zinc-500">
+              <p className="mt-1 text-sm text-muted">
                 Plan elegido: <strong>{plan?.name}</strong>
                 {plan && ` · ${soles(plan.priceMonthly)} al mes después de la prueba`}.
               </p>
@@ -167,13 +167,13 @@ export function SignupScreen() {
             <Field label="Contraseña" hint="Mínimo 8 caracteres." error={errors.password}>
               <div className="relative">
                 <Input type={show ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" className="pr-11" aria-invalid={!!errors.password} />
-                <button type="button" onClick={() => setShow((v) => !v)} className="absolute inset-y-0 right-0 grid w-10 place-items-center text-zinc-500 hover:text-zinc-800" aria-label={show ? "Ocultar contraseña" : "Mostrar contraseña"} aria-pressed={show}>
+                <button type="button" onClick={() => setShow((v) => !v)} className="absolute inset-y-0 right-0 grid w-10 place-items-center text-muted hover:text-fg" aria-label={show ? "Ocultar contraseña" : "Mostrar contraseña"} aria-pressed={show}>
                   {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
             </Field>
             {formError && (
-              <p role="alert" className="text-sm text-rose-600">
+              <p role="alert" className="text-sm text-danger-fg">
                 {formError}
               </p>
             )}
@@ -190,14 +190,14 @@ export function SignupScreen() {
 
         {step === 2 && session && (
           <section className="mt-10 max-w-xl">
-            <span className="grid h-12 w-12 place-items-center rounded-full bg-emerald-50 text-emerald-600">
+            <span className="grid h-12 w-12 place-items-center rounded-full bg-success-bg text-success">
               <CircleCheck className="h-7 w-7" />
             </span>
             <h1 className="mt-4 text-2xl font-semibold tracking-tight">¡Tu botica está lista!</h1>
-            <p className="mt-2 text-sm text-zinc-600">
+            <p className="mt-2 text-sm text-fg-2">
               <strong>{boticaName.trim()}</strong> ya tiene {TRIAL_DAYS} días de prueba gratis. Para ingresar otro día usa el código <strong>{normalizeBoticaCode(code)}</strong> y tu correo.
             </p>
-            <p className="mt-2 text-sm text-zinc-600">En el panel te guiamos con lo que falta: tus datos, tu local, tus series, un usuario de mostrador y tus productos.</p>
+            <p className="mt-2 text-sm text-fg-2">En el panel te guiamos con lo que falta: tus datos, tu local, tus series, un usuario de mostrador y tus productos.</p>
             <Button variant="primary" size="lg" className="mt-6" onClick={() => router.replace(homeFor(session.user))}>
               Ir a mi panel
             </Button>
@@ -216,13 +216,13 @@ function PlanCard({ plan, selected, onSelect }: { plan: PlanOffer; selected: boo
       role="radio"
       aria-checked={selected}
       onClick={onSelect}
-      className={cn("flex flex-col rounded-2xl border p-4 text-left transition active:scale-[0.99]", selected ? "border-brand bg-brand/5 ring-2 ring-brand" : "border-zinc-200 bg-white hover:border-zinc-300")}
+      className={cn("flex flex-col rounded-2xl border p-4 text-left transition active:scale-[0.99]", selected ? "border-brand bg-brand/5 ring-2 ring-brand" : "border-line bg-surface hover:border-line-strong")}
     >
-      <span className="text-sm font-semibold text-zinc-900">{plan.name}</span>
-      <span className="mt-2 text-2xl font-semibold tabular-nums text-zinc-900">{soles(plan.priceMonthly)}</span>
-      <span className="text-xs text-zinc-500">al mes, con IGV</span>
-      <span className="mt-3 text-sm text-zinc-700">{plan.maxBranches === 1 ? "1 local" : `Hasta ${plan.maxBranches} locales`}</span>
-      <span className="mt-2 text-xs leading-relaxed text-zinc-500">{labels.join(" · ")}</span>
+      <span className="text-sm font-semibold text-fg">{plan.name}</span>
+      <span className="mt-2 text-2xl font-semibold tabular-nums text-fg">{soles(plan.priceMonthly)}</span>
+      <span className="text-xs text-muted">al mes, con IGV</span>
+      <span className="mt-3 text-sm text-fg-2">{plan.maxBranches === 1 ? "1 local" : `Hasta ${plan.maxBranches} locales`}</span>
+      <span className="mt-2 text-xs leading-relaxed text-muted">{labels.join(" · ")}</span>
     </button>
   );
 }

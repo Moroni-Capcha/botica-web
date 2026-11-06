@@ -27,6 +27,6 @@ export function ConsoleApp() {
     [signOut],
   );
 
-  if (!hydrated) return <div className="grid min-h-dvh place-items-center text-sm text-zinc-500">Cargando…</div>;
+  if (!hydrated) return <div className="grid min-h-dvh place-items-center text-sm text-muted">Cargando…</div>;
   return session ? <ConsoleScreen session={session} onLogout={signOut} /> : <PlatformLogin />;
 }

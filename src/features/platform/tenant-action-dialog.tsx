@@ -68,7 +68,7 @@ export function TenantActionDialog({ tenant, kind, onClose }: { tenant: TenantSu
       onClose={onClose}
       footer={
         <>
-          {mutation.error && <p className="mr-auto text-sm text-rose-600" role="alert">{errorMessage(mutation.error)}</p>}
+          {mutation.error && <p className="mr-auto text-sm text-danger-fg" role="alert">{errorMessage(mutation.error)}</p>}
           <Button onClick={onClose}>Volver</Button>
           <Button variant={kind === "suspend" ? "danger" : "primary"} disabled={!!problem} loading={mutation.isPending} onClick={submit}>
             {ACTION_TITLE[kind]}
@@ -83,8 +83,8 @@ export function TenantActionDialog({ tenant, kind, onClose }: { tenant: TenantSu
           submit();
         }}
       >
-        <p className="rounded-xl bg-zinc-50 p-3 text-sm text-zinc-700">
-          <b>{tenant.name}</b> <span className="text-zinc-500">({tenant.code})</span> · {tenant.planName}
+        <p className="rounded-xl bg-subtle p-3 text-sm text-fg-2">
+          <b>{tenant.name}</b> <span className="text-muted">({tenant.code})</span> · {tenant.planName}
           {tenant.trialEndsAt && tenant.status !== "active" ? ` · prueba hasta el ${dateShort(tenant.trialEndsAt)}` : ""}
         </p>
 
