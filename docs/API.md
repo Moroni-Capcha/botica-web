@@ -727,6 +727,28 @@ Pantalla `/consola` para el equipo de Digi!HME (el operador de la plataforma). *
 - `history`: acciones de Digi!HME sobre esa botica (`plan_cambiado`, `prueba_extendida`, `cuenta_suspendida`, `cuenta_reactivada`), de la más reciente a la más antigua, máximo 20, con el motivo que dio el operador (`reason`).
 - **Privacidad:** el detalle nunca incluye DNI, nombres de clientes, PIN, ni las líneas de las ventas. Solo conteos, fechas, plan, nombres de locales y nombres y roles del personal.
 
+`GET /platform/metrics` → `PlatformMetrics`: el resumen de la plataforma para la parte de arriba de la consola, sobre **todas** las boticas. Mismo token de operador, sin `X-Botica`.
+
+```json
+{
+  "counts": { "trial": 4, "active": 12, "overdue": 2, "suspended": 1 },
+  "newTenantsByMonth": [
+    { "month": "2026-06", "count": 1 }, { "month": "2026-07", "count": 0 }, { "month": "2026-08", "count": 3 },
+    { "month": "2026-09", "count": 2 }, { "month": "2026-10", "count": 4 }, { "month": "2026-11", "count": 1 }
+  ],
+  "inactive": [{ "code": "farmacia-sol", "name": "Farmacia Sol", "planId": "inicio", "planName": "Plan Inicio", "maxBranches": 1, "status": "active", "renewsAt": "2026-12-01", "createdAt": "2026-08-05T09:00:00-05:00", "lastActivityAt": "2026-10-10T18:20:00-05:00", "branches": 1, "users": 2 }],
+  "trialsEndingSoon": [{ "code": "botica-nueva", "name": "Botica Nueva", "planId": "crece", "planName": "Plan Crece", "maxBranches": 3, "status": "trial", "trialEndsAt": "2026-11-05", "createdAt": "2026-10-22T09:00:00-05:00", "lastActivityAt": "2026-11-02T08:41:00-05:00", "branches": 1, "users": 1 }],
+  "monthlyRecurringRevenue": { "withIgv": 1547.4, "withoutIgv": 1311.36 }
+}
+```
+
+- `counts`: boticas por estado (`effectiveStatus`), igual que `TenantPage.counts` pero sobre todas, sin filtros.
+- `newTenantsByMonth`: los últimos 6 meses calendario, el actual al final, `"YYYY-MM"` en hora de Lima (America/Lima) según `createdAt`. Los meses sin altas llevan `count: 0`.
+- `inactive`: boticas con estado `active` o `trial` cuya última actividad (`lastActivityAt`) fue hace 14 días o más, o que nunca tuvieron (`null`). Máximo 10, la más inactiva primero (las que nunca tuvieron actividad van primero).
+- `trialsEndingSoon`: boticas en `trial` cuya prueba termina en los próximos 7 días (hoy incluido) y aún no venció. Máximo 10, la que vence antes primero.
+- `monthlyRecurringRevenue`: suma de lo que pagan por mes las boticas con estado `active`, según su plan (precio con IGV 18 %, `round2`); `withoutIgv` es ese total sin el IGV. No cuenta pruebas, vencidas ni suspendidas.
+- **Privacidad:** solo conteos, fechas, plan y los mismos campos de `TenantSummary`. Nunca datos personales.
+
 ## Próximas entregas
 
 Todos los módulos del front están definidos. Los cambios al contrato se agregan a este documento antes de construir la pantalla.

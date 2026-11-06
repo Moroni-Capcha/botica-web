@@ -1028,6 +1028,20 @@ export interface TenantDetail {
   history: { at: string; action: TenantHistoryAction; reason: string }[];
 }
 
+/** Resumen de la plataforma para la consola: todas las boticas, sin datos personales. */
+export interface PlatformMetrics {
+  /** Boticas por estado, sobre todas. */
+  counts: Record<AccountStatus, number>;
+  /** Últimos 6 meses (el actual al final), "YYYY-MM" en hora de Lima, con ceros. */
+  newTenantsByMonth: { month: string; count: number }[];
+  /** Activas o en prueba sin actividad hace 14 días o más (o nunca). Máximo 10, la más inactiva primero. */
+  inactive: TenantSummary[];
+  /** En prueba que termina en 7 días o menos y aún no venció. Máximo 10, la que vence antes primero. */
+  trialsEndingSoon: TenantSummary[];
+  /** Lo que pagan por mes las boticas activas, según su plan. */
+  monthlyRecurringRevenue: { withIgv: number; withoutIgv: number };
+}
+
 /** Lo que Digi!HME puede hacer con una botica. Siempre lleva un motivo (queda en la auditoría de la botica). */
 export type TenantAction =
   | { action: "change_plan"; planId: string; reason: string }

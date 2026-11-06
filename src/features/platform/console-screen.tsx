@@ -16,6 +16,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { Table, td } from "@/components/ui/table";
 import { dateShort } from "@/lib/format";
 import { cn } from "@/lib/cn";
+import { MetricsPanel } from "./metrics-panel";
 import { TenantActionDialog } from "./tenant-action-dialog";
 import { TenantDetailDialog } from "./tenant-detail-dialog";
 
@@ -75,6 +76,8 @@ export function ConsoleScreen({ session, onLogout }: { session: PlatformSession;
           <h1 className="text-xl font-semibold tracking-tight">Boticas clientes</h1>
           <p className="mt-0.5 text-sm text-muted">Plan, estado de la cuenta y actividad. Cada cambio pide un motivo y queda en la auditoría de la botica.</p>
         </div>
+
+        <MetricsPanel now={now} today={today} onOpen={setDetail} />
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" role="group" aria-label="Boticas por estado">
           {STATUS_ORDER.map((s) => (

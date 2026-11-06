@@ -10,7 +10,7 @@ import { platformTokenStore } from "../token";
 import type { AuditAction, AuditFields, PlatformOperator, PlatformSession, TenantAction, TenantSummary } from "../types";
 import { limaDay } from "@/lib/domain/account";
 import { isValidEmail, normalizeEmail } from "@/lib/domain/auth";
-import { applyTenantAction, countTenants, filterTenants, tenantActivity, tenantHistory, tenantStatus } from "@/lib/domain/platform";
+import { applyTenantAction, buildPlatformMetrics, countTenants, filterTenants, tenantActivity, tenantHistory, tenantStatus } from "@/lib/domain/platform";
 import { paginate } from "@/lib/domain/pagination";
 import { PLAN_CATALOG } from "@/lib/domain/plans";
 import { PLATFORM_ACTOR, appendAudit } from "./audit";
@@ -98,6 +98,12 @@ export function createMockPlatformClient(): PlatformClient {
         activity: tenantActivity(db.sales, (id) => db.vouchers[id]?.status ?? "aceptado", now),
         history: tenantHistory(db.audit),
       };
+    },
+    async getMetrics() {
+      await wait();
+      requireOperator();
+      const now = Date.now();
+      return buildPlatformMetrics(allTenants(limaDay(now)), now);
     },
     async updateTenant(code, input) {
       await wait(260);

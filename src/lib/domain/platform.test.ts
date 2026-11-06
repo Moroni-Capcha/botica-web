@@ -3,6 +3,7 @@ import type { Account, TenantAction, TenantSummary } from "@/lib/api/types";
 import { ALL_MODULES } from "./account";
 import { findPlan } from "./plans";
 import { MAX_TRIAL_EXTENSION_DAYS, accountDeadline, activityLabel, addDays, applyTenantAction, countTenants, filterTenants, reasonError, tenantActions, tenantActivity, tenantHistory, roleLabel, HISTORY_LABEL, type TenantState } from "./platform";
+import { INACTIVE_DAYS, addMonths, buildPlatformMetrics, inactiveTenants, limaMonth, monthlyRecurringRevenue, newTenantsByMonth, trialsEndingSoon } from "./platform";
 
 const TODAY = "2026-11-02";
 const reason = "Pidió más tiempo para decidir";
@@ -191,5 +192,127 @@ describe("consola · detalle de una botica", () => {
     expect(HISTORY_LABEL.cuenta_reactivada).toBe("Cuenta reactivada");
     expect(roleLabel("admin")).toBe("Administrador");
     expect(roleLabel("encargado")).toBe("Encargado");
+  });
+});
+
+describe("consola · métricas de la plataforma", () => {
+  // 2 de noviembre de 2026, mediodía en Lima (UTC-5).
+  const NOW = Date.parse("2026-11-02T12:00:00-05:00");
+  const DAYMS = 86_400_000;
+  const tenant = (code: string, extra: Partial<TenantSummary> = {}): TenantSummary => ({
+    code, name: code, planId: "inicio", planName: "Plan Inicio", maxBranches: 1, status: "active", createdAt: "2026-10-01T10:00:00-05:00",
+    lastActivityAt: "2026-11-01T10:00:00-05:00", branches: 1, users: 1, ...extra,
+  });
+  const codes = (l: TenantSummary[]) => l.map((t) => t.code);
+
+  it("el mes se calcula en hora de Lima, no en UTC", () => {
+    expect(limaMonth(Date.parse("2026-10-01T04:59:59Z"))).toBe("2026-09");
+    expect(limaMonth(Date.parse("2026-10-01T05:00:00Z"))).toBe("2026-10");
+    expect(addMonths("2026-01", -1)).toBe("2025-12");
+    expect(addMonths("2026-11", 2)).toBe("2027-01");
+  });
+
+  it("altas por mes: 6 meses, el actual al final y con ceros", () => {
+    const r = newTenantsByMonth([], NOW);
+    expect(r.map((m) => m.month)).toEqual(["2026-06", "2026-07", "2026-08", "2026-09", "2026-10", "2026-11"]);
+    expect(r.every((m) => m.count === 0)).toBe(true);
+  });
+
+  it("altas por mes: cuenta por mes de Lima, respeta los bordes y ignora lo anterior a 6 meses", () => {
+    const r = newTenantsByMonth(
+      [
+        "2026-10-01T04:59:59Z", // 30 sep 23:59 en Lima -> septiembre
+        "2026-10-01T05:00:00Z", // 1 oct 00:00 en Lima -> octubre
+        "2026-11-01T04:59:59Z", // 31 oct 23:59 en Lima -> octubre
+        "2026-11-02T10:00:00Z", // noviembre
+        "2026-06-01T05:00:00Z", // 1 jun en Lima -> junio (primer mes)
+        "2026-06-01T04:59:59Z", // 31 may en Lima -> fuera
+        "no es una fecha",
+      ],
+      NOW,
+    );
+    expect(Object.fromEntries(r.map((m) => [m.month, m.count]))).toEqual({ "2026-06": 1, "2026-07": 0, "2026-08": 0, "2026-09": 1, "2026-10": 2, "2026-11": 1 });
+  });
+
+  it("altas por mes: cambio de año", () => {
+    const r = newTenantsByMonth(["2026-01-15T10:00:00-05:00"], Date.parse("2026-02-10T10:00:00-05:00"));
+    expect(r.map((m) => m.month)).toEqual(["2025-09", "2025-10", "2025-11", "2025-12", "2026-01", "2026-02"]);
+    expect(r[4]!.count).toBe(1);
+  });
+
+  it("sin actividad: el umbral es de 14 días exactos", () => {
+    expect(INACTIVE_DAYS).toBe(14);
+    const exact = tenant("exacto", { lastActivityAt: new Date(NOW - 14 * DAYMS).toISOString() });
+    const justUnder = tenant("casi", { lastActivityAt: new Date(NOW - 14 * DAYMS + 1).toISOString() });
+    expect(codes(inactiveTenants([exact, justUnder], NOW))).toEqual(["exacto"]);
+  });
+
+  it("sin actividad: solo activas o en prueba, y las que nunca tuvieron van primero", () => {
+    const list = [
+      tenant("vieja", { lastActivityAt: new Date(NOW - 40 * DAYMS).toISOString() }),
+      tenant("nunca-prueba", { status: "trial", trialEndsAt: "2026-11-20", lastActivityAt: null }),
+      tenant("media", { lastActivityAt: new Date(NOW - 20 * DAYMS).toISOString() }),
+      tenant("vencida", { status: "overdue", lastActivityAt: null }),
+      tenant("suspendida", { status: "suspended", lastActivityAt: null }),
+      tenant("reciente"),
+    ];
+    expect(codes(inactiveTenants(list, NOW))).toEqual(["nunca-prueba", "vieja", "media"]);
+  });
+
+  it("sin actividad: máximo 10", () => {
+    const list = Array.from({ length: 15 }, (_, i) => tenant(`b${String(i).padStart(2, "0")}`, { lastActivityAt: null }));
+    expect(inactiveTenants(list, NOW)).toHaveLength(10);
+  });
+
+  it("pruebas por vencer: de hoy a 7 días, la que vence antes primero", () => {
+    const trial = (code: string, trialEndsAt: string) => tenant(code, { status: "trial", trialEndsAt });
+    const list = [trial("d7", "2026-11-09"), trial("d8", "2026-11-10"), trial("hoy", "2026-11-02"), trial("d3", "2026-11-05"), trial("ayer", "2026-11-01")];
+    expect(codes(trialsEndingSoon(list, "2026-11-02"))).toEqual(["hoy", "d3", "d7"]);
+  });
+
+  it("pruebas por vencer: ignora las que no están en prueba y limita a 10", () => {
+    const list = [tenant("activa", { status: "active", trialEndsAt: "2026-11-04" }), tenant("vencida", { status: "overdue", trialEndsAt: "2026-11-01" }), tenant("sin-fecha", { status: "trial" })];
+    expect(trialsEndingSoon(list, "2026-11-02")).toEqual([]);
+    const many = Array.from({ length: 12 }, (_, i) => tenant(`t${i}`, { status: "trial", trialEndsAt: "2026-11-05" }));
+    expect(trialsEndingSoon(many, "2026-11-02")).toHaveLength(10);
+  });
+
+  it("ingreso mensual: suma solo las activas, con IGV y sin IGV", () => {
+    expect(monthlyRecurringRevenue([])).toEqual({ withIgv: 0, withoutIgv: 0 });
+    const r = monthlyRecurringRevenue([
+      { status: "active", planId: "inicio" }, // 59,00
+      { status: "active", planId: "crece" }, // 129,80
+      { status: "active", planId: "cadena" }, // 247,80
+      { status: "trial", planId: "cadena" },
+      { status: "overdue", planId: "crece" },
+      { status: "suspended", planId: "inicio" },
+      { status: "active", planId: null },
+      { status: "active", planId: "plan-que-ya-no-existe" },
+    ]);
+    expect(r).toEqual({ withIgv: 436.6, withoutIgv: 370 });
+  });
+
+  it("ingreso mensual: redondea a 2 decimales", () => {
+    const r = monthlyRecurringRevenue(Array.from({ length: 7 }, () => ({ status: "active" as const, planId: "crece" })));
+    expect(r.withIgv).toBe(908.6);
+    expect(r.withoutIgv).toBe(770);
+    const odd = monthlyRecurringRevenue([{ status: "active", planId: "inicio" }, { status: "active", planId: "inicio" }, { status: "active", planId: "inicio" }]);
+    expect(odd.withIgv).toBe(177);
+    expect(Number.isInteger(Math.round(odd.withoutIgv * 100))).toBe(true);
+    expect(odd.withoutIgv).toBe(150);
+  });
+
+  it("arma el resumen completo con la misma lista", () => {
+    const list = [
+      tenant("a", { createdAt: "2026-11-01T10:00:00-05:00" }),
+      tenant("b", { status: "trial", trialEndsAt: "2026-11-04", lastActivityAt: null, createdAt: "2026-10-20T10:00:00-05:00" }),
+      tenant("c", { status: "suspended" }),
+    ];
+    const m = buildPlatformMetrics(list, NOW);
+    expect(m.counts).toEqual({ trial: 1, active: 1, overdue: 0, suspended: 1 });
+    expect(m.newTenantsByMonth.slice(-2).map((x) => x.count)).toEqual([2, 1]);
+    expect(codes(m.inactive)).toEqual(["b"]);
+    expect(codes(m.trialsEndingSoon)).toEqual(["b"]);
+    expect(m.monthlyRecurringRevenue).toEqual({ withIgv: 59, withoutIgv: 50 });
   });
 });

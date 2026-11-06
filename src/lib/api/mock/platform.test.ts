@@ -193,6 +193,31 @@ describe("mock: consola interna de Digi!HME", () => {
     });
   });
 
+  describe("métricas de la plataforma", () => {
+    it("exige la sesión del operador", async () => {
+      setOperator(boticaToken);
+      expect((await rejects(platform.getMetrics())).code).toBe("NO_AUTORIZADO");
+      setOperator(operatorToken);
+    });
+
+    it("resume todas las boticas y coincide con la lista", async () => {
+      const m = await run(platform.getMetrics());
+      const all = await run(platform.listTenants({ pageSize: 100 }));
+      expect(m.counts).toEqual(all.counts);
+      expect(m.newTenantsByMonth).toHaveLength(6);
+      expect(m.newTenantsByMonth.every((x) => /^\d{4}-\d{2}$/.test(x.month) && x.count >= 0)).toBe(true);
+      expect(m.inactive.length).toBeLessThanOrEqual(10);
+      expect(m.trialsEndingSoon.length).toBeLessThanOrEqual(10);
+      expect(m.monthlyRecurringRevenue.withIgv).toBeGreaterThanOrEqual(m.monthlyRecurringRevenue.withoutIgv);
+    });
+
+    it("no lleva datos personales", async () => {
+      const text = JSON.stringify(await run(platform.getMetrics()));
+      expect(text).not.toMatch(/\b\d{8}\b|\b\d{11}\b/);
+      expect(text).not.toMatch(/"(pin|password|email|customerName|customerDocId|items|document)"/);
+    });
+  });
+
   it("pagina la lista de boticas", async () => {
     const all = await run(platform.listTenants({ pageSize: 100 }));
     expect(all.total).toBeGreaterThanOrEqual(2);
