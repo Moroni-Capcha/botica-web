@@ -19,10 +19,10 @@ import { cn } from "@/lib/cn";
 import { TenantActionDialog } from "./tenant-action-dialog";
 
 const STATUS_STYLE: Record<AccountStatus, { badge: string; card: string }> = {
-  active: { badge: "bg-emerald-50 text-emerald-700", card: "text-emerald-700" },
-  trial: { badge: "bg-sky-50 text-sky-700", card: "text-sky-700" },
-  overdue: { badge: "bg-amber-50 text-amber-800", card: "text-amber-800" },
-  suspended: { badge: "bg-rose-50 text-rose-700", card: "text-rose-700" },
+  active: { badge: "bg-success-bg text-success-fg", card: "text-success-fg" },
+  trial: { badge: "bg-info-bg text-info-fg", card: "text-info-fg" },
+  overdue: { badge: "bg-warning-bg text-warning-fg", card: "text-warning-fg" },
+  suspended: { badge: "bg-danger-bg text-danger-fg", card: "text-danger-fg" },
 };
 const STATUS_ORDER: AccountStatus[] = ["active", "trial", "overdue", "suspended"];
 
@@ -48,18 +48,18 @@ export function ConsoleScreen({ session, onLogout }: { session: PlatformSession;
   };
 
   return (
-    <div className="min-h-dvh bg-zinc-50 text-zinc-900" style={{ ["--brand" as string]: DIGIHME.navy, ["--accent" as string]: DIGIHME.cyan }}>
-      <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white">
+    <div className="min-h-dvh bg-subtle text-fg" style={{ ["--brand" as string]: DIGIHME.navy, ["--accent" as string]: DIGIHME.cyan }}>
+      <header className="sticky top-0 z-20 border-b border-line bg-surface">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
           <DigiHmeLogo height={30} />
           <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white" style={{ background: DIGIHME.navy }}>
             <ShieldCheck className="h-3.5 w-3.5" /> Consola interna
           </span>
-          {apiMode === "mock" && <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800">Datos de prueba</span>}
+          {apiMode === "mock" && <span className="rounded-full bg-warning-bg px-2.5 py-1 text-[11px] font-semibold text-warning-fg">Datos de prueba</span>}
           <div className="ml-auto flex items-center gap-3">
             <div className="hidden text-right leading-tight sm:block">
               <p className="text-sm font-medium">{session.operator.name}</p>
-              <p className="text-xs text-zinc-500">{session.operator.email}</p>
+              <p className="text-xs text-muted">{session.operator.email}</p>
             </div>
             <Button size="sm" onClick={logout}>
               <LogOut className="h-3.5 w-3.5" /> Salir
@@ -71,7 +71,7 @@ export function ConsoleScreen({ session, onLogout }: { session: PlatformSession;
       <main className="mx-auto grid max-w-7xl gap-4 p-4 sm:p-6">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Boticas clientes</h1>
-          <p className="mt-0.5 text-sm text-zinc-500">Plan, estado de la cuenta y actividad. Cada cambio pide un motivo y queda en la auditoría de la botica.</p>
+          <p className="mt-0.5 text-sm text-muted">Plan, estado de la cuenta y actividad. Cada cambio pide un motivo y queda en la auditoría de la botica.</p>
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" role="group" aria-label="Boticas por estado">
@@ -84,9 +84,9 @@ export function ConsoleScreen({ session, onLogout }: { session: PlatformSession;
                 setStatus(status === s ? null : s);
                 setPage(1);
               }}
-              className={cn("rounded-2xl border bg-white p-4 text-left transition hover:border-zinc-300 focus-visible:outline-2 focus-visible:outline-offset-2", status === s ? "border-zinc-900 ring-1 ring-zinc-900" : "border-zinc-200")}
+              className={cn("rounded-2xl border bg-surface p-4 text-left transition hover:border-line-strong focus-visible:outline-2 focus-visible:outline-offset-2", status === s ? "border-fg ring-1 ring-fg" : "border-line")}
             >
-              <span className="block text-xs font-medium text-zinc-500">{STATUS_LABEL[s]}</span>
+              <span className="block text-xs font-medium text-muted">{STATUS_LABEL[s]}</span>
               <span className={cn("mt-1 block text-2xl font-semibold tabular-nums", STATUS_STYLE[s].card)}>{counts ? counts[s] : "…"}</span>
             </button>
           ))}
@@ -94,7 +94,7 @@ export function ConsoleScreen({ session, onLogout }: { session: PlatformSession;
 
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative w-full max-w-md">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <Input
               value={text}
               onChange={(e) => {
@@ -106,13 +106,13 @@ export function ConsoleScreen({ session, onLogout }: { session: PlatformSession;
               aria-label="Buscar botica"
             />
           </div>
-          <p className="text-xs text-zinc-500">{tenants.data ? `${total} ${total === 1 ? "botica" : "boticas"}${q || status ? " con esos filtros" : ""}` : ""}</p>
+          <p className="text-xs text-muted">{tenants.data ? `${total} ${total === 1 ? "botica" : "boticas"}${q || status ? " con esos filtros" : ""}` : ""}</p>
           <Button size="sm" className="ml-auto" onClick={() => void tenants.refetch()} loading={tenants.isFetching && !tenants.isLoading}>
             <RefreshCw className="h-3.5 w-3.5" /> Actualizar
           </Button>
         </div>
 
-        <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white" aria-label="Lista de boticas">
+        <section className="overflow-hidden rounded-2xl border border-line bg-surface" aria-label="Lista de boticas">
           {tenants.error ? (
             <Empty icon={TriangleAlert} title="No se pudo cargar la lista">
               {errorMessage(tenants.error)}{" "}
@@ -123,7 +123,7 @@ export function ConsoleScreen({ session, onLogout }: { session: PlatformSession;
           ) : tenants.isLoading ? (
             <div className="grid gap-2 p-4 sm:p-5" aria-busy="true">
               {Array.from({ length: 5 }, (_, i) => (
-                <div key={i} className="h-14 animate-pulse rounded-xl bg-zinc-100" />
+                <div key={i} className="h-14 animate-pulse rounded-xl bg-sunken" />
               ))}
             </div>
           ) : rows.length === 0 ? (
@@ -140,19 +140,19 @@ export function ConsoleScreen({ session, onLogout }: { session: PlatformSession;
                     <tr key={t.code}>
                       <td className={td}>
                         <span className="block font-semibold">{t.name}</span>
-                        <span className="block text-xs text-zinc-500">{t.code}</span>
+                        <span className="block text-xs text-muted">{t.code}</span>
                       </td>
                       <td className={cn(td, "whitespace-nowrap")}>{t.planName}</td>
                       <td className={td}>
                         <span className={cn("inline-block whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold", STATUS_STYLE[t.status].badge)}>{STATUS_LABEL[t.status]}</span>
-                        {deadline && <span className="mt-0.5 block text-[11px] text-zinc-500">{deadline}</span>}
+                        {deadline && <span className="mt-0.5 block text-[11px] text-muted">{deadline}</span>}
                       </td>
-                      <td className={cn(td, "whitespace-nowrap text-xs tabular-nums text-zinc-600")}>{dateShort(t.createdAt)}</td>
-                      <td className={cn(td, "whitespace-nowrap text-xs text-zinc-600")} title={t.lastActivityAt ?? undefined}>
+                      <td className={cn(td, "whitespace-nowrap text-xs tabular-nums text-fg-2")}>{dateShort(t.createdAt)}</td>
+                      <td className={cn(td, "whitespace-nowrap text-xs text-fg-2")} title={t.lastActivityAt ?? undefined}>
                         {activityLabel(t.lastActivityAt, now)}
                       </td>
                       <td className={cn(td, "whitespace-nowrap text-right tabular-nums")}>
-                        {t.branches} <span className="text-xs text-zinc-400">/ {t.maxBranches}</span>
+                        {t.branches} <span className="text-xs text-muted">/ {t.maxBranches}</span>
                       </td>
                       <td className={cn(td, "text-right tabular-nums")}>{t.users}</td>
                       <td className={cn(td, "whitespace-nowrap text-right")}>
@@ -168,7 +168,7 @@ export function ConsoleScreen({ session, onLogout }: { session: PlatformSession;
                             </Button>
                           )}
                           {can.suspend && (
-                            <Button size="sm" variant="secondary" className="text-rose-700" onClick={() => setDialog({ tenant: t, kind: "suspend" })}>
+                            <Button size="sm" variant="secondary" className="text-danger-fg" onClick={() => setDialog({ tenant: t, kind: "suspend" })}>
                               <Ban className="h-3.5 w-3.5" /> Suspender
                             </Button>
                           )}
