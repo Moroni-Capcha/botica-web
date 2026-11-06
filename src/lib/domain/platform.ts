@@ -3,9 +3,10 @@
  * El backend debería aplicar los mismos casos (ver "Consola interna de Digi!HME" en docs/API.md).
  * Reutiliza el estado de cuenta de `account.ts` (prueba, activa, vencida, suspendida).
  */
-import type { Account, AccountStatus, TenantAction, TenantSummary } from "@/lib/api/types";
-import { daysLeft, effectiveStatus } from "./account";
-import { findPlan } from "./plans";
+import type { Account, AccountStatus, AuditEntry, PlatformMetrics, Role, TenantAction, TenantDetail, TenantHistoryAction, TenantSummary, VoucherStatus } from "@/lib/api/types";
+import { daysLeft, effectiveStatus, limaDay } from "./account";
+import { IGV, round2 } from "./pharmacy";
+import { findPlan, priceWithIgv } from "./plans";
 
 export const MAX_TRIAL_EXTENSION_DAYS = 60;
 export const REASON_MIN = 5;
@@ -136,4 +137,122 @@ export function accountDeadline(t: Pick<TenantSummary, "status" | "trialEndsAt" 
   }
   if (t.renewsAt && t.status === "active") return `Renueva el ${t.renewsAt}`;
   return "";
+}
+
+/* ------------------------------ Detalle de una botica (solo lectura) ------------------------------ */
+
+const HISTORY_LIMIT = 20;
+const ACTIVITY_DAYS = 30;
+
+/** Lo que el historial muestra de cada acción de Digi!HME. */
+export const HISTORY_LABEL: Record<TenantHistoryAction, string> = {
+  plan_cambiado: "Cambio de plan",
+  prueba_extendida: "Prueba extendida",
+  cuenta_suspendida: "Cuenta suspendida",
+  cuenta_reactivada: "Cuenta reactivada",
+};
+
+export const isTenantHistoryAction = (action: string): action is TenantHistoryAction => action in HISTORY_LABEL;
+
+export const roleLabel = (role: Role): string => (role === "admin" ? "Administrador" : "Encargado");
+
+/** Acciones de Digi!HME de la auditoría de una botica: la más reciente primero, máximo 20. Solo la fecha, la acción y el motivo. */
+export function tenantHistory(log: Pick<AuditEntry, "at" | "action" | "userId" | "after">[]): TenantDetail["history"] {
+  return log
+    .flatMap((e) => (e.userId === null && isTenantHistoryAction(e.action) ? [{ at: e.at, action: e.action, reason: typeof e.after?.reason === "string" ? e.after.reason : "" }] : []))
+    .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
+    .slice(0, HISTORY_LIMIT);
+}
+
+/** Ventas de los últimos 30 días y sus comprobantes por estado ante SUNAT (los anulados no cuentan). */
+export function tenantActivity(
+  sales: { id: string; createdAt: string }[],
+  voucherStatus: (saleId: string) => VoucherStatus,
+  now: number,
+): TenantDetail["activity"] {
+  const since = now - ACTIVITY_DAYS * DAY;
+  const vouchers = { accepted: 0, pending: 0, rejected: 0 };
+  let count = 0;
+  let last: string | null = null;
+  for (const s of sales) {
+    if (!last || Date.parse(s.createdAt) > Date.parse(last)) last = s.createdAt;
+    if (Date.parse(s.createdAt) < since) continue;
+    count += 1;
+    const st = voucherStatus(s.id);
+    if (st === "aceptado") vouchers.accepted += 1;
+    else if (st === "pendiente") vouchers.pending += 1;
+    else if (st === "rechazado") vouchers.rejected += 1;
+  }
+  return { salesLast30Days: count, vouchersLast30Days: vouchers, lastSaleAt: last };
+}
+
+/* ------------------------------ Métricas de la plataforma ------------------------------ */
+
+export const INACTIVE_DAYS = 14;
+export const TRIAL_WARNING_DAYS = 7;
+export const METRICS_LIST_LIMIT = 10;
+export const METRICS_MONTHS = 6;
+
+/** Mes local "YYYY-MM" (America/Lima) de un instante. */
+export const limaMonth = (ms: number): string => limaDay(ms).slice(0, 7);
+
+/** Suma meses a un "YYYY-MM". */
+export function addMonths(month: string, n: number): string {
+  const [y, m] = month.split("-").map(Number);
+  const total = (y ?? 1970) * 12 + ((m ?? 1) - 1) + n;
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, "0")}`;
+}
+
+/** Altas por mes de los últimos 6 meses (el actual al final), con ceros en los meses sin altas. Cuenta por `createdAt` en hora de Lima. */
+export function newTenantsByMonth(createdAt: string[], now: number): PlatformMetrics["newTenantsByMonth"] {
+  const current = limaMonth(now);
+  const months = Array.from({ length: METRICS_MONTHS }, (_, i) => addMonths(current, i - (METRICS_MONTHS - 1)));
+  const counts = new Map(months.map((m) => [m, 0]));
+  for (const iso of createdAt) {
+    const ms = Date.parse(iso);
+    if (!Number.isFinite(ms)) continue;
+    const m = limaMonth(ms);
+    if (counts.has(m)) counts.set(m, (counts.get(m) ?? 0) + 1);
+  }
+  return months.map((month) => ({ month, count: counts.get(month) ?? 0 }));
+}
+
+/** Activas o en prueba sin actividad hace 14 días o más (o nunca). La más inactiva primero; las que nunca tuvieron actividad, al inicio. Máximo 10. */
+export function inactiveTenants(list: TenantSummary[], now: number): TenantSummary[] {
+  const idle = (t: TenantSummary) => (t.lastActivityAt && Number.isFinite(Date.parse(t.lastActivityAt)) ? now - Date.parse(t.lastActivityAt) : Infinity);
+  return list
+    .filter((t) => (t.status === "active" || t.status === "trial") && idle(t) >= INACTIVE_DAYS * DAY)
+    .sort((a, b) => idle(b) - idle(a) || a.name.localeCompare(b.name, "es"))
+    .slice(0, METRICS_LIST_LIMIT);
+}
+
+/** Pruebas que terminan dentro de los próximos 7 días (hoy incluido) y aún no vencen. La que vence antes primero. Máximo 10. */
+export function trialsEndingSoon(list: TenantSummary[], today: string): TenantSummary[] {
+  const left = (t: TenantSummary) => (t.trialEndsAt ? daysLeft(t.trialEndsAt, today) : Infinity);
+  return list
+    .filter((t) => t.status === "trial" && t.trialEndsAt && left(t) >= 0 && left(t) <= TRIAL_WARNING_DAYS)
+    .sort((a, b) => left(a) - left(b) || a.name.localeCompare(b.name, "es"))
+    .slice(0, METRICS_LIST_LIMIT);
+}
+
+/** Lo que pagan por mes las boticas activas (precio del plan con IGV, `round2`) y ese total sin IGV. Un plan que ya no existe no suma. */
+export function monthlyRecurringRevenue(list: Pick<TenantSummary, "status" | "planId">[]): PlatformMetrics["monthlyRecurringRevenue"] {
+  let withIgv = 0;
+  for (const t of list) {
+    const plan = t.status === "active" && t.planId ? findPlan(t.planId) : undefined;
+    if (plan) withIgv += priceWithIgv(plan.basePrice);
+  }
+  withIgv = round2(withIgv);
+  return { withIgv, withoutIgv: round2(withIgv / (1 + IGV)) };
+}
+
+/** Resumen completo de la plataforma sobre todas las boticas. `now` se inyecta para que sea determinista. */
+export function buildPlatformMetrics(list: TenantSummary[], now: number): PlatformMetrics {
+  return {
+    counts: countTenants(list),
+    newTenantsByMonth: newTenantsByMonth(list.map((t) => t.createdAt), now),
+    inactive: inactiveTenants(list, now),
+    trialsEndingSoon: trialsEndingSoon(list, limaDay(now)),
+    monthlyRecurringRevenue: monthlyRecurringRevenue(list),
+  };
 }

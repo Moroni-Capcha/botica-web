@@ -10,7 +10,7 @@ import { platformTokenStore } from "../token";
 import type { AuditAction, AuditFields, PlatformOperator, PlatformSession, TenantAction, TenantSummary } from "../types";
 import { limaDay } from "@/lib/domain/account";
 import { isValidEmail, normalizeEmail } from "@/lib/domain/auth";
-import { applyTenantAction, countTenants, filterTenants, tenantStatus } from "@/lib/domain/platform";
+import { applyTenantAction, buildPlatformMetrics, countTenants, filterTenants, tenantActivity, tenantHistory, tenantStatus } from "@/lib/domain/platform";
 import { paginate } from "@/lib/domain/pagination";
 import { PLAN_CATALOG } from "@/lib/domain/plans";
 import { PLATFORM_ACTOR, appendAudit } from "./audit";
@@ -82,6 +82,28 @@ export function createMockPlatformClient(): PlatformClient {
       const counts = countTenants(searched);
       const page = paginate(filterTenants(searched, { status: query.status }), query);
       return { ...page, counts };
+    },
+    async getTenant(code) {
+      await wait();
+      requireOperator();
+      const db = tenantDb(code) ?? fail("BOTICA_NO_ENCONTRADA", "No encontramos una botica con ese código.", 404);
+      const now = Date.now();
+      const lastLogin = new Map<string, string>();
+      for (const e of db.audit) if (e.action === "sesion_iniciada" && e.userId && (lastLogin.get(e.userId) ?? "") < e.at) lastLogin.set(e.userId, e.at);
+      // Solo nombres para mostrar, roles, conteos y fechas: nunca PIN, correo, DNI ni nombres de clientes.
+      return {
+        tenant: summarize(db, limaDay(now)),
+        branches: db.branches.map((b) => ({ id: b.id, name: b.name, active: b.active, closed: !b.active })),
+        staff: db.staff.map((s) => ({ name: s.name, role: s.role, active: s.active, lastLoginAt: lastLogin.get(s.id) ?? null })),
+        activity: tenantActivity(db.sales, (id) => db.vouchers[id]?.status ?? "aceptado", now),
+        history: tenantHistory(db.audit),
+      };
+    },
+    async getMetrics() {
+      await wait();
+      requireOperator();
+      const now = Date.now();
+      return buildPlatformMetrics(allTenants(limaDay(now)), now);
     },
     async updateTenant(code, input) {
       await wait(260);

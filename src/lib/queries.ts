@@ -41,6 +41,8 @@ export const qk = {
   kardex: (productId: number, branchId: BranchId | null, days: number, page?: number, pageSize?: number) => ["kardex", productId, branchId, days, page ?? null, pageSize ?? null] as const,
   vouchers: (from: string, to: string, branchId: BranchId | null) => ["vouchers", from, to, branchId] as const,
   creditNotes: (from: string, to: string, branchId: BranchId | null) => ["credit-notes", from, to, branchId] as const,
+  platformMetrics: ["platform-metrics"] as const,
+  tenant: (code: string) => ["platform-tenant", code] as const,
   tenants: (q: TenantsQuery) => ["platform-tenants", q.q ?? "", q.status ?? null, q.page ?? 1, q.pageSize ?? null] as const,
   audit: (q: AuditQuery) => ["audit", q.from, q.to, q.userId ?? null, q.action ?? null, q.entity ?? null, q.page ?? 1, q.pageSize ?? null] as const,
 };
@@ -418,10 +420,21 @@ export const useAuditLog = (query: AuditQuery, enabled = true) =>
 export const useTenants = (query: TenantsQuery, enabled = true) =>
   useQuery({ queryKey: qk.tenants(query), queryFn: () => platformApi.listTenants(query), staleTime: 15_000, enabled, placeholderData: (prev) => prev });
 
+/** Detalle de solo lectura de una botica (consola interna). */
+export const useTenant = (code: string | null) =>
+  useQuery({ queryKey: qk.tenant(code ?? ""), queryFn: () => platformApi.getTenant(code ?? ""), enabled: !!code, staleTime: 15_000 });
+
+/** Resumen de la plataforma (consola interna). */
+export const useMetrics = (enabled = true) => useQuery({ queryKey: qk.platformMetrics, queryFn: () => platformApi.getMetrics(), staleTime: 30_000, enabled });
+
 export function useUpdateTenant() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ code, input }: { code: string; input: TenantAction }) => platformApi.updateTenant(code, input),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ["platform-tenants"] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["platform-tenants"] });
+      void qc.invalidateQueries({ queryKey: ["platform-tenant"] });
+      void qc.invalidateQueries({ queryKey: qk.platformMetrics });
+    },
   });
 }

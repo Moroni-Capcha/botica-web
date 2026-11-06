@@ -10,7 +10,7 @@ import type {
   AccountInput, BranchCreateInput, BranchCreated, Plan, BranchInput, BranchSeries, RulesInput, StaffAccount,
   StaffSummary, Supplier, SupplierInput, Transfer, TransferAskRequest, TransferSendRequest, User, BranchId, WriteOffRequest,
   CreditNote, CreditNoteRequest, Voucher, VoidRequest, SaleSyncRequest, SaleSyncResponse,
-  AuditEntry, AuditQuery, CustomersQuery, Page, PlatformSession, TenantAction, TenantPage, TenantSummary, TenantsQuery,
+  AuditEntry, AuditQuery, CustomersQuery, Page, PlatformMetrics, PlatformSession, TenantAction, TenantDetail, TenantPage, TenantSummary, TenantsQuery,
 } from "./types";
 
 export interface PublicConfig {
@@ -201,6 +201,10 @@ export interface PlatformClient {
   logout(): Promise<void>;
   /** Boticas clientes, siempre por páginas, con el conteo por estado. */
   listTenants(query?: TenantsQuery): Promise<TenantPage>;
+  /** Detalle de solo lectura de una botica. BOTICA_NO_ENCONTRADA (404) si el código no existe. */
+  getTenant(code: string): Promise<TenantDetail>;
+  /** Resumen de la plataforma: conteos, altas por mes, boticas sin actividad, pruebas por vencer e ingreso mensual. */
+  getMetrics(): Promise<PlatformMetrics>;
   /** Cambiar de plan, extender la prueba, suspender o reactivar. Devuelve la botica ya actualizada. */
   updateTenant(code: string, input: TenantAction): Promise<TenantSummary>;
 }

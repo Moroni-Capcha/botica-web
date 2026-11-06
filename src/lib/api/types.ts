@@ -1010,6 +1010,38 @@ export interface TenantPage extends Page<TenantSummary> {
   counts: Record<AccountStatus, number>;
 }
 
+/** Acciones de Digi!HME que aparecen en el historial de una botica. */
+export type TenantHistoryAction = "plan_cambiado" | "prueba_extendida" | "cuenta_suspendida" | "cuenta_reactivada";
+
+/** Detalle de solo lectura de una botica para el soporte. Nunca lleva DNI, nombres de clientes, PIN ni líneas de venta. */
+export interface TenantDetail {
+  tenant: TenantSummary;
+  branches: { id: string; name: string; active: boolean; closed: boolean }[];
+  staff: { name: string; role: Role; active: boolean; lastLoginAt: string | null }[];
+  activity: {
+    salesLast30Days: number;
+    /** Comprobantes de los últimos 30 días por estado ante SUNAT. */
+    vouchersLast30Days: { accepted: number; pending: number; rejected: number };
+    lastSaleAt: string | null;
+  };
+  /** Acciones de Digi!HME sobre la botica, la más reciente primero, máximo 20. */
+  history: { at: string; action: TenantHistoryAction; reason: string }[];
+}
+
+/** Resumen de la plataforma para la consola: todas las boticas, sin datos personales. */
+export interface PlatformMetrics {
+  /** Boticas por estado, sobre todas. */
+  counts: Record<AccountStatus, number>;
+  /** Últimos 6 meses (el actual al final), "YYYY-MM" en hora de Lima, con ceros. */
+  newTenantsByMonth: { month: string; count: number }[];
+  /** Activas o en prueba sin actividad hace 14 días o más (o nunca). Máximo 10, la más inactiva primero. */
+  inactive: TenantSummary[];
+  /** En prueba que termina en 7 días o menos y aún no venció. Máximo 10, la que vence antes primero. */
+  trialsEndingSoon: TenantSummary[];
+  /** Lo que pagan por mes las boticas activas, según su plan. */
+  monthlyRecurringRevenue: { withIgv: number; withoutIgv: number };
+}
+
 /** Lo que Digi!HME puede hacer con una botica. Siempre lleva un motivo (queda en la auditoría de la botica). */
 export type TenantAction =
   | { action: "change_plan"; planId: string; reason: string }

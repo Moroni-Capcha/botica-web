@@ -153,6 +153,71 @@ describe("mock: consola interna de Digi!HME", () => {
     });
   });
 
+  describe("detalle de una botica", () => {
+    it("responde 404 si el código no existe y exige la sesión del operador", async () => {
+      expect((await rejects(platform.getTenant("no-existe"))).code).toBe("BOTICA_NO_ENCONTRADA");
+      expect((await rejects(platform.getTenant("no-existe"))).status).toBe(404);
+      setOperator(boticaToken);
+      expect((await rejects(platform.getTenant("botica-huanuco"))).code).toBe("NO_AUTORIZADO");
+      setOperator(operatorToken);
+    });
+
+    it("trae locales, personal, actividad y el historial de Digi!HME (lo más reciente primero)", async () => {
+      await run(platform.updateTenant("botica-huanuco", { action: "suspend", reason: "Pago pendiente de octubre" }));
+      await run(platform.updateTenant("botica-huanuco", { action: "reactivate", reason: "Pagó la factura" }));
+      const d = await run(platform.getTenant("botica-huanuco"));
+      expect(d.tenant.code).toBe("botica-huanuco");
+      expect(d.branches.length).toBeGreaterThanOrEqual(2);
+      expect(d.branches.every((b) => b.closed === !b.active)).toBe(true);
+      expect(d.staff.length).toBeGreaterThanOrEqual(3);
+      expect(d.staff.some((s) => s.role === "admin")).toBe(true);
+      expect(d.activity.salesLast30Days).toBeGreaterThan(0);
+      const v = d.activity.vouchersLast30Days;
+      expect(v.accepted + v.pending + v.rejected).toBeLessThanOrEqual(d.activity.salesLast30Days);
+      expect(d.history.length).toBeLessThanOrEqual(20);
+      expect(d.history.slice(0, 2).map((h) => h.action)).toEqual(["cuenta_reactivada", "cuenta_suspendida"]);
+      expect(d.history[1]!.reason).toBe("Pago pendiente de octubre");
+      expect(d.history.every((h, i) => i === 0 || Date.parse(d.history[i - 1]!.at) >= Date.parse(h.at))).toBe(true);
+    });
+
+    it("no filtra DNI, nombres de clientes, PIN ni líneas de venta", async () => {
+      const d = await run(platform.getTenant("botica-huanuco"));
+      const text = JSON.stringify(d);
+      expect(text).not.toMatch(/\b\d{8}\b|\b\d{11}\b/);
+      expect(text).not.toMatch(/"(pin|password|email|customerName|customerDocId|items|document)"/);
+      const pins = [...text.matchAll(/"(?:1234|1111|2222|4101|4102|4103|4104|4201|4202|4203)"/g)];
+      expect(pins).toEqual([]);
+      const customers = await run(api.listCustomers());
+      for (const c of customers.slice(0, 20)) expect(text).not.toContain(c.name);
+      expect(Object.keys(d.staff[0]!).sort()).toEqual(["active", "lastLoginAt", "name", "role"]);
+    });
+  });
+
+  describe("métricas de la plataforma", () => {
+    it("exige la sesión del operador", async () => {
+      setOperator(boticaToken);
+      expect((await rejects(platform.getMetrics())).code).toBe("NO_AUTORIZADO");
+      setOperator(operatorToken);
+    });
+
+    it("resume todas las boticas y coincide con la lista", async () => {
+      const m = await run(platform.getMetrics());
+      const all = await run(platform.listTenants({ pageSize: 100 }));
+      expect(m.counts).toEqual(all.counts);
+      expect(m.newTenantsByMonth).toHaveLength(6);
+      expect(m.newTenantsByMonth.every((x) => /^\d{4}-\d{2}$/.test(x.month) && x.count >= 0)).toBe(true);
+      expect(m.inactive.length).toBeLessThanOrEqual(10);
+      expect(m.trialsEndingSoon.length).toBeLessThanOrEqual(10);
+      expect(m.monthlyRecurringRevenue.withIgv).toBeGreaterThanOrEqual(m.monthlyRecurringRevenue.withoutIgv);
+    });
+
+    it("no lleva datos personales", async () => {
+      const text = JSON.stringify(await run(platform.getMetrics()));
+      expect(text).not.toMatch(/\b\d{8}\b|\b\d{11}\b/);
+      expect(text).not.toMatch(/"(pin|password|email|customerName|customerDocId|items|document)"/);
+    });
+  });
+
   it("pagina la lista de boticas", async () => {
     const all = await run(platform.listTenants({ pageSize: 100 }));
     expect(all.total).toBeGreaterThanOrEqual(2);
