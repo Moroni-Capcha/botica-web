@@ -18,14 +18,17 @@ S1 `GET /platform/tenants/:code` -> `TenantDetail`: `{ tenant: TenantSummary, br
 S2 `GET /platform/metrics` -> `PlatformMetrics`: `{ counts by status, newTenantsByMonth: [{ month: "YYYY-MM", count }] (last 6), inactive: TenantSummary[] (no activity for 14+ days, active or trial, max 10), trialsEndingSoon: TenantSummary[] (trial ends within 7 days, max 10), monthlyRecurringRevenue: number (sum of plan prices of status active, sin IGV and con IGV both as fields) }`.
 
 ## Tasks
-- [ ] S1 Tenant detail: contract + types + http + mock + `domain/platform.ts` helpers with tests + dialog/page from the console list (row click) + docs.
-- [ ] S2 Metrics: contract + types + http + mock + pure rules with tests + metrics block on `/consola` + docs.
+- [x] S1 (2720e4a) Tenant detail: contract + types + http + mock + `domain/platform.ts` helpers with tests + dialog from the console list (click the botica name) + docs.
+- [x] S2 Metrics: contract + types + http + mock + pure rules with tests + metrics block on `/consola` + docs.
 
 ## Route per task
 One delegated writer per phase (sonnet, no git); parent verifies (typecheck, tests, build, `rg` for raw palette and leaked JSX, privacy check on payloads, browser check) and commits per phase.
 
 ## Progress / evidence
-Pending.
+Two delegated writers (sonnet), one per phase. Parent: `npm run typecheck` clean; `npm test` 46 files / 443 tests pass; `npm run build` passes; palette `rg` over `src/features/platform` clean.
+Browser check (parent, dev server): 1568 px console with metrics (MRR S/ 129.80 con IGV, chart, empty "Sin actividad" and "Pruebas por vencer" states) and the detail dialog (branches, staff with role and last login, 30-day sales and SUNAT counts, empty Digi!HME history; no DNI, customer names or PIN). 390 and 768 px: no page overflow (375/375 and 753/753); the detail opens as a bottom sheet at 390 px.
+Observations (not fixed): the four metric tiles and the four status filter cards repeat the same counts; the single bar in "Boticas nuevas por mes" is gray, not a brand color.
+NOT checked: the lists with data (needs a stale or ending trial botica), the detail after a Digi!HME action, real phone.
 
 ## Next step
-Delegate S1.
+User decides push/PR. Optional: merge the duplicate status cards with the filter, and color the chart bar.
