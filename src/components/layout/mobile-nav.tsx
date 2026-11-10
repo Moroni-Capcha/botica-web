@@ -69,7 +69,7 @@ export function MobileNav({ user }: { user: User }) {
           const active = pathname.startsWith(n.href);
           const badge = badges[n.id];
           return (
-            <NavLink key={n.id} href={n.href} className={cn(item, active ? "text-white" : "text-white/55")} aria-current={active ? "page" : undefined} aria-label={badge ? `${n.label}: ${badge.label}` : undefined}>
+            <NavLink key={n.id} href={n.href} className={cn(item, active ? "text-white" : "text-white/65")} aria-current={active ? "page" : undefined} aria-label={badge ? `${n.label}: ${badge.label}` : undefined}>
               <span className="relative">
                 <n.icon className={cn("h-5 w-5", active && "text-accent")} />
                 {badge && <BadgeDot tone={badge.tone} className="absolute -right-1 -top-1" />}
@@ -78,7 +78,7 @@ export function MobileNav({ user }: { user: User }) {
             </NavLink>
           );
         })}
-        <button type="button" onClick={() => setMore((m) => !m)} className={cn(item, "text-white/55")} aria-expanded={more} aria-label={hiddenLabel ? `Más. ${hiddenLabel}` : "Más"}>
+        <button type="button" onClick={() => setMore((m) => !m)} className={cn(item, "text-white/65")} aria-expanded={more} aria-label={hiddenLabel ? `Más. ${hiddenLabel}` : "Más"}>
           <span className="relative">
             <Ellipsis className="h-5 w-5" />
             {hidden.length > 0 && <BadgeDot tone={hiddenTone} className="absolute -right-1 -top-1" />}

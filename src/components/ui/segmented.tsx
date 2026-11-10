@@ -44,7 +44,7 @@ export function Segmented<T extends string>({ options, value, onChange, full, la
           )}
         >
           {o.label}
-          {o.count !== undefined && <span className="rounded-full bg-sunken-strong px-1.5 text-micro font-bold tabular-nums">{o.count}</span>}
+          {o.count !== undefined && <span className="rounded-full bg-sunken-strong px-1.5 text-micro font-bold tabular-nums text-fg-2">{o.count}</span>}
         </button>
       ))}
     </div>
