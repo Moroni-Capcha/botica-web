@@ -37,7 +37,7 @@ export function shouldHandleShortcut(e: ShortcutEventLike, s: ShortcutState): Po
 /** Esc en el buscador: primero borra el texto; con el buscador vacío, suelta el foco. */
 export const searchEscapeAction = (text: string): "clear" | "blur" => (text ? "clear" : "blur");
 
-const isEditable = (el: Element | null) =>
+export const isEditable = (el: Element | null) =>
   !!el && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement || (el instanceof HTMLElement && el.isContentEditable));
 
 interface Options {

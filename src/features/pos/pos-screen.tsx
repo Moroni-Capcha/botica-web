@@ -28,6 +28,7 @@ import { ProductCard } from "./product-card";
 import { CartPanel } from "./cart-panel";
 import { CartSheet } from "./cart-sheet";
 import { searchEscapeAction, usePosShortcuts } from "./use-pos-shortcuts";
+import { usePosScanner } from "./use-pos-scanner";
 import { PaymentDialog } from "./payment-dialog";
 import { ReceiptDialog } from "./receipt-dialog";
 
@@ -181,7 +182,16 @@ export function PosScreen() {
     if (target) {
       add(target, "unidad");
       setQ("");
+    } else if (code && results.length === 0) {
+      notify(`No encontramos «${code}»`, "warn");
     }
+  };
+
+  /** Lector de código de barras con el foco fuera del buscador. */
+  const onScan = (code: string) => {
+    const target = productList.find((p) => p.barcode === code);
+    if (target) add(target, "unidad");
+    else notify(`No hay un producto con el código ${code}`, "warn");
   };
 
   const equivalents = useMemo(() => {
@@ -212,6 +222,7 @@ export function PosScreen() {
   };
 
   usePosShortcuts({ searchRef, dialogOpen: paying || !!receipt || cartOpen, canCharge, onPay: openPayment });
+  usePosScanner({ disabled: paying || !!receipt || cartOpen, onScan });
 
   /* Al cerrar el cobro o el comprobante, el foco vuelve al buscador (en pantallas táctiles no, para no subir el teclado). */
   const dialogOpen = paying || !!receipt;
