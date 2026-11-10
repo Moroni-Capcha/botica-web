@@ -100,7 +100,7 @@ export const useCustomerPurchases = (id: number | null) => useQuery({ queryKey: 
 export const useSuppliers = () => useQuery({ queryKey: qk.suppliers, queryFn: api.listSuppliers, staleTime: 5 * 60_000 });
 export const usePurchases = (branchId: BranchId | null, days: number) =>
   useQuery({ queryKey: qk.purchases(branchId, days), queryFn: () => api.listPurchases({ branchId: branchId ?? undefined, days }), staleTime: 30_000 });
-export const useCash = (branchId: BranchId) => useQuery({ queryKey: qk.cash(branchId), queryFn: () => api.getCashSession(branchId) });
+export const useCash = (branchId: BranchId, enabled = true) => useQuery({ queryKey: qk.cash(branchId), queryFn: () => api.getCashSession(branchId), enabled });
 export const useCustomerSearch = (q: string, enabled: boolean) =>
   useQuery({ queryKey: qk.customers(q), queryFn: () => api.searchCustomers(q), enabled, staleTime: 30_000 });
 

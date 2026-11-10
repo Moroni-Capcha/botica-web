@@ -8,6 +8,8 @@ import type { User } from "@/lib/api/types";
 import { navFor } from "@/lib/nav";
 import { useAccount } from "@/lib/queries";
 import { cn } from "@/lib/cn";
+import { useNavBadges } from "./use-nav-badges";
+import { BadgeDot } from "./nav-badge";
 
 const MAX = 5;
 
@@ -15,6 +17,7 @@ export function MobileNav({ user }: { user: User }) {
   const pathname = usePathname();
   const [more, setMore] = useState(false);
   const nav = navFor(user, useAccount().data?.modules);
+  const badges = useNavBadges(user, nav.map((n) => n.id));
   const overflow = nav.length > MAX;
   const primary = overflow ? nav.slice(0, MAX - 1) : nav;
   const rest = overflow ? nav.slice(MAX - 1) : [];
@@ -38,9 +41,13 @@ export function MobileNav({ user }: { user: User }) {
       <nav className="fixed inset-x-0 bottom-0 z-30 flex justify-around border-t border-white/10 bg-brand px-1 pb-[env(safe-area-inset-bottom)] md:hidden" aria-label="Módulos">
         {primary.map((n) => {
           const active = pathname.startsWith(n.href);
+          const badge = badges[n.id];
           return (
-            <NavLink key={n.id} href={n.href} className={cn(item, active ? "text-white" : "text-white/55")} aria-current={active ? "page" : undefined}>
-              <n.icon className={cn("h-5 w-5", active && "text-accent")} />
+            <NavLink key={n.id} href={n.href} className={cn(item, active ? "text-white" : "text-white/55")} aria-current={active ? "page" : undefined} aria-label={badge ? `${n.label}: ${badge.label}` : undefined}>
+              <span className="relative">
+                <n.icon className={cn("h-5 w-5", active && "text-accent")} />
+                {badge && <BadgeDot tone={badge.tone} className="absolute -right-1 -top-1" />}
+              </span>
               <span className="truncate">{n.short}</span>
             </NavLink>
           );

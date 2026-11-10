@@ -7,22 +7,25 @@ export interface NavItem {
   label: string;
   short: string;
   icon: LucideIcon;
+  /** Sección del menú lateral. */
+  group: string;
 }
 
+/** Orden = orden del menú lateral (por tarea) y de la barra del celular (los primeros). */
 export const NAV: NavItem[] = [
-  { id: "panel", href: "/panel", label: "Panel del día", short: "Panel", icon: LayoutDashboard },
-  { id: "pos", href: "/pos", label: "Punto de venta", short: "Vender", icon: ShoppingCart },
-  { id: "vencimientos", href: "/vencimientos", label: "Vencimientos", short: "Venc.", icon: CalendarClock },
-  { id: "inventario", href: "/inventario", label: "Inventario", short: "Stock", icon: Package },
-  { id: "traslados", href: "/traslados", label: "Traslados", short: "Traslados", icon: ArrowLeftRight },
-  { id: "compras", href: "/compras", label: "Compras", short: "Compras", icon: Truck },
-  { id: "clientes", href: "/clientes", label: "Clientes", short: "Clientes", icon: Users },
-  { id: "caja", href: "/caja", label: "Caja", short: "Caja", icon: Wallet },
-  { id: "comprobantes", href: "/comprobantes", label: "Comprobantes", short: "SUNAT", icon: FileText },
-  { id: "asistencia", href: "/asistencia", label: "Asistencia", short: "Asistencia", icon: Clock },
-  { id: "reportes", href: "/reportes", label: "Reportes", short: "Reportes", icon: ChartColumn },
-  { id: "auditoria", href: "/auditoria", label: "Auditoría", short: "Auditoría", icon: ScrollText },
-  { id: "ajustes", href: "/ajustes", label: "Ajustes", short: "Ajustes", icon: Settings },
+  { id: "panel", href: "/panel", label: "Panel del día", short: "Panel", icon: LayoutDashboard, group: "Día a día" },
+  { id: "pos", href: "/pos", label: "Punto de venta", short: "Vender", icon: ShoppingCart, group: "Día a día" },
+  { id: "caja", href: "/caja", label: "Caja", short: "Caja", icon: Wallet, group: "Día a día" },
+  { id: "clientes", href: "/clientes", label: "Clientes", short: "Clientes", icon: Users, group: "Día a día" },
+  { id: "inventario", href: "/inventario", label: "Inventario", short: "Stock", icon: Package, group: "Productos" },
+  { id: "vencimientos", href: "/vencimientos", label: "Vencimientos", short: "Venc.", icon: CalendarClock, group: "Productos" },
+  { id: "traslados", href: "/traslados", label: "Traslados", short: "Traslados", icon: ArrowLeftRight, group: "Productos" },
+  { id: "compras", href: "/compras", label: "Compras", short: "Compras", icon: Truck, group: "Productos" },
+  { id: "comprobantes", href: "/comprobantes", label: "Comprobantes", short: "SUNAT", icon: FileText, group: "Gestión" },
+  { id: "reportes", href: "/reportes", label: "Reportes", short: "Reportes", icon: ChartColumn, group: "Gestión" },
+  { id: "asistencia", href: "/asistencia", label: "Asistencia", short: "Asistencia", icon: Clock, group: "Gestión" },
+  { id: "auditoria", href: "/auditoria", label: "Auditoría", short: "Auditoría", icon: ScrollText, group: "Gestión" },
+  { id: "ajustes", href: "/ajustes", label: "Ajustes", short: "Ajustes", icon: Settings, group: "Gestión" },
 ];
 
 /** Módulos del rol que además incluye el plan. Sin datos de cuenta (`modules` indefinido) se muestran todos los del rol. */
