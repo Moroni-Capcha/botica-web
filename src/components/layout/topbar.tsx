@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Building2, Fingerprint, LogOut, MapPin } from "lucide-react";
+import { Building2, Fingerprint, LogOut, MapPin, Search } from "lucide-react";
+import { OPEN_PALETTE_EVENT } from "./command-palette";
 import type { User } from "@/lib/api/types";
 import { useConfig } from "@/lib/queries";
 import { useOperatingBranch, useSessionStore } from "@/lib/auth/session-store";
@@ -80,6 +81,19 @@ export function Topbar({ title, user, onLogout }: { title: string; user: User; o
           {branches.find((b) => b.id === user.branchId)?.name ?? user.branchId}
         </span>
       )}
+      <button
+        type="button"
+        onClick={() => window.dispatchEvent(new Event(OPEN_PALETTE_EVENT))}
+        className="flex min-h-10 min-w-10 items-center justify-center gap-2 rounded-lg p-2 text-sm font-medium text-fg-2 transition hover:bg-sunken"
+        title="Ir a otra pantalla (Ctrl+K)"
+        aria-label="Ir a otra pantalla"
+      >
+        <Search className="h-4 w-4 text-brand" />
+        <span className="hidden items-center gap-2 xl:flex">
+          Ir a…
+          <kbd className="rounded-md border border-line bg-sunken px-1.5 py-0.5 text-[11px] font-semibold text-muted">Ctrl K</kbd>
+        </span>
+      </button>
       <button type="button" onClick={() => setKiosk(true)} className="flex min-h-10 min-w-10 items-center justify-center gap-1.5 rounded-lg p-2 text-sm font-medium text-fg-2 transition hover:bg-sunken" title="Marcar asistencia del personal">
         <Fingerprint className="h-4 w-4 text-brand" />
         <span className="hidden 2xl:inline">Asistencia</span>
