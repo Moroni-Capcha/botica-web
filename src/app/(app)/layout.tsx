@@ -11,6 +11,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { CommandPalette } from "@/components/layout/command-palette";
+import { AppLoading } from "@/components/layout/app-loading";
 import { NAV } from "@/lib/nav";
 import { AccountBanner } from "@/features/account/account-banner";
 import { OfflineSyncManager } from "@/features/offline/sync-manager";
@@ -40,7 +41,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   );
 
   if (!hydrated || !session) {
-    return <div className="grid min-h-dvh place-items-center text-sm text-muted">Cargando…</div>;
+    return <AppLoading />;
   }
 
   const logout = async () => {

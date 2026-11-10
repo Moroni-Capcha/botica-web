@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { platformTokenStore } from "@/lib/api/token";
 import { usePlatformSession } from "@/lib/auth/platform-session-store";
 import { notify } from "@/components/ui/toast";
+import { AppLoading } from "@/components/layout/app-loading";
 import { ConsoleScreen } from "./console-screen";
 import { PlatformLogin } from "./platform-login";
 
@@ -27,6 +28,6 @@ export function ConsoleApp() {
     [signOut],
   );
 
-  if (!hydrated) return <div className="grid min-h-dvh place-items-center text-sm text-muted">Cargando…</div>;
+  if (!hydrated) return <AppLoading />;
   return session ? <ConsoleScreen session={session} onLogout={signOut} /> : <PlatformLogin />;
 }
