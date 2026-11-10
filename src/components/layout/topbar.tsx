@@ -22,7 +22,10 @@ function Clock() {
   return <span className="hidden rounded-lg bg-sunken px-2.5 py-1 text-sm font-medium tabular-nums text-fg-2 xl:inline">{now.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })}</span>;
 }
 
-const Divider = () => <span aria-hidden className="hidden h-6 w-px shrink-0 bg-line sm:block" />;
+/** Abre el marcador de asistencia (en el celular el botón vive en "Más"). */
+export const OPEN_KIOSK_EVENT = "bh:open-kiosk";
+
+const Divider =() => <span aria-hidden className="hidden h-6 w-px shrink-0 bg-line sm:block" />;
 
 export function Topbar({ title, section, user, onLogout }: { title: string; section?: string; user: User; onLogout: () => void }) {
   const { data: config } = useConfig();
@@ -30,6 +33,11 @@ export function Topbar({ title, section, user, onLogout }: { title: string; sect
   const setAdminBranch = useSessionStore((s) => s.setAdminBranch);
   const branches = config?.branches ?? [];
   const [kiosk, setKiosk] = useState(false);
+  useEffect(() => {
+    const open = () => setKiosk(true);
+    window.addEventListener(OPEN_KIOSK_EVENT, open);
+    return () => window.removeEventListener(OPEN_KIOSK_EVENT, open);
+  }, []);
   const today = new Date().toLocaleDateString("es-PE", { weekday: "short", day: "numeric", month: "short" });
 
   return (
@@ -97,7 +105,7 @@ export function Topbar({ title, section, user, onLogout }: { title: string; sect
           <kbd className="rounded-md border border-line bg-sunken px-1.5 py-0.5 text-[11px] font-semibold text-muted">Ctrl K</kbd>
         </span>
       </button>
-      <button type="button" onClick={() => setKiosk(true)} className="flex min-h-10 min-w-10 items-center justify-center gap-1.5 rounded-lg p-2 text-sm font-medium text-fg-2 transition hover:bg-sunken" title="Marcar asistencia del personal">
+      <button type="button" onClick={() => setKiosk(true)} className="hidden min-h-10 min-w-10 items-center justify-center gap-1.5 rounded-lg p-2 sm:flex text-sm font-medium text-fg-2 transition hover:bg-sunken" title="Marcar asistencia del personal">
         <Fingerprint className="h-4 w-4 text-brand" />
         <span className="hidden 2xl:inline">Asistencia</span>
       </button>
