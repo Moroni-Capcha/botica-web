@@ -22,13 +22,15 @@ function Clock() {
   return <span className="hidden rounded-lg bg-sunken px-2.5 py-1 text-sm font-medium tabular-nums text-fg-2 xl:inline">{now.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })}</span>;
 }
 
-export function Topbar({ title, user, onLogout }: { title: string; user: User; onLogout: () => void }) {
+const Divider = () => <span aria-hidden className="hidden h-6 w-px shrink-0 bg-line sm:block" />;
+
+export function Topbar({ title, section, user, onLogout }: { title: string; section?: string; user: User; onLogout: () => void }) {
   const { data: config } = useConfig();
   const adminBranch = useOperatingBranch();
   const setAdminBranch = useSessionStore((s) => s.setAdminBranch);
   const branches = config?.branches ?? [];
   const [kiosk, setKiosk] = useState(false);
-  const today = new Date().toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const today = new Date().toLocaleDateString("es-PE", { weekday: "short", day: "numeric", month: "short" });
 
   return (
     <header className="flex h-16 shrink-0 items-center gap-1.5 border-b border-line bg-surface px-3 sm:gap-3 sm:px-6">
@@ -36,8 +38,8 @@ export function Topbar({ title, user, onLogout }: { title: string; user: User; o
         <BrandMark size={30} />
       </div>
       <div className="min-w-0 flex-1">
+        {section && <p className="hidden truncate text-[11px] font-semibold uppercase leading-none tracking-[0.14em] text-muted sm:block">{section}</p>}
         <h1 className="truncate text-lg font-semibold tracking-tight">{title}</h1>
-        <p className="hidden text-xs text-muted first-letter:uppercase lg:block">{today}</p>
       </div>
       {user.role === "admin" && branches.length > 3 ? (
         <label className="flex items-center gap-1.5 rounded-xl bg-sunken py-1 pl-2.5 pr-1">
@@ -81,6 +83,7 @@ export function Topbar({ title, user, onLogout }: { title: string; user: User; o
           {branches.find((b) => b.id === user.branchId)?.name ?? user.branchId}
         </span>
       )}
+      <Divider />
       <button
         type="button"
         onClick={() => window.dispatchEvent(new Event(OPEN_PALETTE_EVENT))}
@@ -98,7 +101,9 @@ export function Topbar({ title, user, onLogout }: { title: string; user: User; o
         <Fingerprint className="h-4 w-4 text-brand" />
         <span className="hidden 2xl:inline">Asistencia</span>
       </button>
+      <Divider />
       <ConnectionStatus />
+      <span className="hidden text-xs font-medium text-muted first-letter:uppercase lg:block">{today}</span>
       <div className="hidden sm:block">
         <Clock />
       </div>

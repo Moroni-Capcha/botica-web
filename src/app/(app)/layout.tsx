@@ -55,7 +55,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     <div className="flex h-dvh w-full overflow-hidden bg-canvas text-fg">
       <Sidebar user={session.user} onLogout={logout} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar title={current?.label ?? ""} user={session.user} onLogout={logout} />
+        <Topbar title={current?.label ?? ""} section={current?.group} user={session.user} onLogout={logout} />
         <AccountBanner />
         <main className="min-h-0 flex-1 overflow-y-auto pb-20 md:pb-0">{children}</main>
       </div>

@@ -2,7 +2,7 @@
 
 import { NavLink } from "./nav-link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { LogOut, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import type { User } from "@/lib/api/types";
 import { navFor, type NavItem } from "@/lib/nav";
@@ -40,15 +40,30 @@ export function Sidebar({ user, onLogout }: { user: User; onLogout: () => void }
     }
   }, []);
 
-  const toggle = () =>
-    setCollapsed((c) => {
-      try {
-        localStorage.setItem(KEY, c ? "0" : "1");
-      } catch {
-        /* no se recuerda la preferencia */
+  const toggle = useCallback(
+    () =>
+      setCollapsed((c) => {
+        try {
+          localStorage.setItem(KEY, c ? "0" : "1");
+        } catch {
+          /* no se recuerda la preferencia */
+        }
+        return !c;
+      }),
+    [],
+  );
+
+  /* Ctrl+B (o ⌘B) minimiza o expande el menú */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        toggle();
       }
-      return !c;
-    });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggle]);
 
   const place = user.branchId ? config?.branches.find((b) => b.id === user.branchId)?.name : "Todos los locales";
   const items = navFor(user, modules);
@@ -108,8 +123,9 @@ export function Sidebar({ user, onLogout }: { user: User; onLogout: () => void }
       <button
         type="button"
         onClick={toggle}
-        title={collapsed ? "Expandir menú" : "Minimizar menú"}
+        title={`${collapsed ? "Expandir menú" : "Minimizar menú"} (Ctrl+B)`}
         aria-label={collapsed ? "Expandir menú" : "Minimizar menú"}
+        aria-keyshortcuts="Control+B"
         aria-expanded={!collapsed}
         className={cn("mx-3 mb-2 flex items-center rounded-xl py-2.5 text-sm text-white/50 transition hover:bg-white/5 hover:text-white", collapsed ? "justify-center" : "gap-3 px-3")}
       >
