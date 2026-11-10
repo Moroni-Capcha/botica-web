@@ -13,6 +13,8 @@ import { useFlipList } from "@/lib/use-flip-list";
 import { TONE } from "@/components/ui/badges";
 import { LotCard, LotRow, PriorityCard, PriorityRow, TONE_ICON, type ExpShared } from "./expiry-rows";
 import { groupByTone } from "./expiry-view";
+import { useIncrementalList } from "@/lib/use-incremental-list";
+import { ListMore } from "@/components/ui/list-more";
 
 interface Item {
   key: string;
@@ -34,6 +36,9 @@ function useExitingRows(rows: LotRisk[]) {
   return { ordered, bodyRef, listRef };
 }
 
+/** Identifica el conjunto mostrado: al filtrar o cambiar de vista, la lista vuelve a la primera tanda (no al refrescar los mismos datos). */
+const listKey = (rows: LotRisk[], wide: boolean) => `${wide}|${rows.length}|${rows[0]?.lot.id}|${rows[rows.length - 1]?.lot.id}`;
+
 interface ListProps {
   rows: LotRisk[];
   wide: boolean;
@@ -44,11 +49,20 @@ interface ListProps {
 /** Lista de "Prioridad de venta": de mayor a menor pérdida, con casilla para aplicar descuento a varios lotes. */
 export function PriorityList({ rows, wide, shared, stagIds, selected, allSelected, onToggleAll }: ListProps & { selected: ReadonlySet<number>; allSelected: boolean; onToggleAll: () => void }) {
   const { ordered, bodyRef, listRef } = useExitingRows(rows);
+  const list = useIncrementalList(ordered.length, listKey(rows, wide));
   const render = ({ key, item, exiting }: AnimatedRow<Item>) => {
     const props = { row: item.row, exiting, stag: exiting ? -1 : (stagIds.get(item.row.lot.id) ?? -1), checked: selected.has(item.row.lot.id), ...shared };
     return wide ? <PriorityRow key={key} {...props} /> : <PriorityCard key={key} {...props} />;
   };
-  if (!wide) return <ul ref={listRef} className="grid gap-2 p-3">{ordered.map(render)}</ul>;
+  const shown = ordered.slice(0, list.limit);
+  if (!wide) {
+    return (
+      <ul ref={listRef} className="grid gap-2 p-3">
+        {shown.map(render)}
+        {list.more && <ListMore as="item" sentinel={list.sentinel} shown={list.limit} total={ordered.length} noun="lotes" />}
+      </ul>
+    );
+  }
   return (
     <Table
       bodyRef={bodyRef}
@@ -67,7 +81,8 @@ export function PriorityList({ rows, wide, shared, stagIds, selected, allSelecte
         { label: <span className="sr-only">Acciones</span> },
       ]}
     >
-      {ordered.map(render)}
+      {shown.map(render)}
+      {list.more && <ListMore as="row" sentinel={list.sentinel} shown={list.limit} total={ordered.length} noun="lotes" />}
     </Table>
   );
 }
@@ -98,12 +113,15 @@ function GroupHeader({ tone, rows, as }: { tone: LotRisk["tone"]; rows: LotRisk[
 /** "Todos los lotes", del que vence antes al que vence después, con un encabezado por grupo del semáforo. */
 export function LotList({ rows, wide, shared, stagIds }: ListProps) {
   const { ordered, bodyRef, listRef } = useExitingRows(rows);
+  const list = useIncrementalList(ordered.length, listKey(rows, wide));
   /* Los encabezados de grupo salen de las filas que siguen en la lista (no de las que se están yendo). */
   const live = useMemo(() => ordered.filter((r) => !r.exiting).map((r) => r.item.row), [ordered]);
   const groupRows = useMemo(() => new Map(groupByTone(live).map((g) => [g.tone, g.rows])), [live]);
   const out: ReactNode[] = [];
   let prev: string | null = null;
+  let count = 0;
   for (const { key, item, exiting } of ordered) {
+    if (count++ >= list.limit) break;
     const r = item.row;
     if (r.tone !== prev) {
       prev = r.tone;
@@ -113,6 +131,7 @@ export function LotList({ rows, wide, shared, stagIds }: ListProps) {
     const props = { row: r, exiting, stag: exiting ? -1 : (stagIds.get(r.lot.id) ?? -1), checked: false, ...shared };
     out.push(wide ? <LotRow key={key} {...props} /> : <LotCard key={key} {...props} />);
   }
+  if (list.more) out.push(<ListMore key="more" as={wide ? "row" : "item"} sentinel={list.sentinel} shown={list.limit} total={ordered.length} noun="lotes" />);
   if (!wide) return <ul ref={listRef} className="grid gap-2 p-3">{out}</ul>;
   return (
     <Table bodyRef={bodyRef} maxHeight={640} minWidth={1060} head={["Producto", "Lote", "Vencimiento", { label: "Cantidad", align: "right" }, { label: "Valor costo", align: "right" }, "Proveedor", "Ingreso", { label: <span className="sr-only">Acciones</span> }]}>

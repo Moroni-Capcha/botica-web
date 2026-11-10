@@ -23,6 +23,9 @@ import { soles } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { animateIn, POP_KEYFRAMES } from "@/lib/motion";
 import { useStableCallback } from "@/lib/use-stable-callback";
+import { useIncrementalList } from "@/lib/use-incremental-list";
+import { ListMore } from "@/components/ui/list-more";
+import { buildSearchIndex, compareText, matchesSearch } from "@/lib/domain/product-search";
 import { useBranchCart, useCartStore } from "./cart-store";
 import { ProductCard } from "./product-card";
 import { CartPanel } from "./cart-panel";
@@ -81,7 +84,7 @@ export function PosScreen() {
   const lotList: Lot[] = useMemo(() => applyReserved(rawLots, reservedUnits(queue, branchId), now), [rawLots, queue, branchId, now]);
   const productMap = useMemo(() => new Map(productList.map((p) => [p.id, p])), [productList]);
   const categories = useMemo(() => ["Todos", ...new Set(productList.map((p) => p.category))], [productList]);
-  const labs = useMemo(() => [...new Set(productList.map((p) => p.lab))].sort((a, b) => a.localeCompare(b)), [productList]);
+  const labs = useMemo(() => [...new Set(productList.map((p) => p.lab))].sort(compareText), [productList]);
   const branches = config.data?.branches ?? [];
 
   /** Por producto: stock vigente, lote que sale primero y si solo queda stock vencido. */
@@ -114,15 +117,17 @@ export function PosScreen() {
     return m;
   }, [otherStock, branches, branchId]);
 
+  const searchIndex = useMemo(() => buildSearchIndex(productList), [productList]);
   const results = useMemo(() => {
     const s = q.trim().toLowerCase();
     return productList.filter((p) => {
       if (category !== "Todos" && p.category !== category) return false;
       if (lab !== "Todos" && p.lab !== lab) return false;
-      if (!s) return true;
-      return [p.name, p.active, p.lab, p.barcode, p.conc].some((f) => f.toLowerCase().includes(s));
+      return matchesSearch(searchIndex, p.id, s);
     });
-  }, [productList, q, category, lab]);
+  }, [productList, q, category, lab, searchIndex]);
+  /* Con miles de productos, pintarlos todos congela equipos modestos: se pintan por tandas mientras se baja. */
+  const list = useIncrementalList(results.length, `${q.trim()}|${category}|${lab}`);
   if (intro === null && !products.isLoading && !lots.isLoading && results.length > 0) setIntro(new Map(results.slice(0, 8).map((p, i) => [p.id, i])));
   useEffect(() => {
     if (!(intro instanceof Map)) return;
@@ -391,7 +396,7 @@ export function PosScreen() {
 
         <div className="grid grid-cols-1 gap-2.5 p-4 sm:p-6 xl:grid-cols-2">
           {(products.isLoading || lots.isLoading) && Array.from({ length: 6 }, (_, i) => <div key={i} className="h-40 animate-pulse rounded-2xl bg-surface" />)}
-          {results.map((p) => {
+          {results.slice(0, list.limit).map((p) => {
             const info = stockInfo.get(p.id);
             const next = info?.next;
             const days = next ? daysUntil(next.expiresOn, now) : null;
@@ -411,6 +416,7 @@ export function PosScreen() {
               />
             );
           })}
+          {list.more && <ListMore sentinel={list.sentinel} shown={list.limit} total={results.length} className="xl:col-span-2" />}
           {!products.isLoading && results.length === 0 && (
             <div className="xl:col-span-2">
               <Empty icon={Search} title="Sin resultados">
