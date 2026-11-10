@@ -87,7 +87,7 @@ export function Sidebar({ user, onLogout }: { user: User; onLogout: () => void }
             {collapsed ? (
               <div className="mx-3 mb-1 h-px bg-white/10" aria-hidden />
             ) : (
-              <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/40">{g.name}</p>
+              <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/65">{g.name}</p>
             )}
             {g.items.map((n) => {
               const active = pathname.startsWith(n.href);
@@ -127,7 +127,7 @@ export function Sidebar({ user, onLogout }: { user: User; onLogout: () => void }
         aria-label={collapsed ? "Expandir menú" : "Minimizar menú"}
         aria-keyshortcuts="Control+B"
         aria-expanded={!collapsed}
-        className={cn("mx-3 mb-2 flex items-center rounded-xl py-2.5 text-sm text-white/50 transition hover:bg-white/5 hover:text-white", collapsed ? "justify-center" : "gap-3 px-3")}
+        className={cn("mx-3 mb-2 flex items-center rounded-xl py-2.5 text-sm text-white/65 transition hover:bg-white/5 hover:text-white", collapsed ? "justify-center" : "gap-3 px-3")}
       >
         {collapsed ? <PanelLeftOpen className="h-[18px] w-[18px]" /> : <PanelLeftClose className="h-[18px] w-[18px]" />}
         {!collapsed && "Minimizar"}
@@ -139,7 +139,7 @@ export function Sidebar({ user, onLogout }: { user: User; onLogout: () => void }
         {!collapsed && (
           <div className="min-w-0 flex-1 leading-tight">
             <p className="truncate text-sm font-medium">{user.name}</p>
-            <p className="truncate text-xs text-white/50">{place}</p>
+            <p className="truncate text-xs text-white/65">{place}</p>
           </div>
         )}
         <button type="button" onClick={onLogout} className="grid h-10 w-10 place-items-center rounded-lg text-white/60 transition hover:bg-white/10 hover:text-white" aria-label="Cerrar turno" title="Cerrar turno">
