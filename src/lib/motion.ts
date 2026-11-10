@@ -1,9 +1,13 @@
 /** Curva de salida de los tokens de movimiento (`--ease-out` en globals.css), para animaciones hechas desde JavaScript. */
 export const EASE_OUT = "cubic-bezier(0.16, 1, 0.3, 1)";
 
-/** ¿La persona pidió menos movimiento? Seguro en el servidor (ahí no hay animaciones, así que devuelve false). */
+/**
+ * ¿Hay que evitar las animaciones? Sí si la persona pidió menos movimiento o si el equipo es modesto
+ * (modo ligero: `data-perf="lite"` en el <html>, ver `lib/perf-mode.ts`). Seguro en el servidor (ahí no hay animaciones: false).
+ */
 export function prefersReducedMotion(): boolean {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+  if (typeof document !== "undefined" && document.documentElement.getAttribute("data-perf") === "lite") return true;
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
