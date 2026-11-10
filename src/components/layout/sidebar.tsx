@@ -10,6 +10,8 @@ import { useAccount, useConfig } from "@/lib/queries";
 import { BrandMark, DigiSeal } from "@/components/brand-mark";
 import { cn } from "@/lib/cn";
 import { initials } from "@/lib/format";
+import { useNavBadges } from "./use-nav-badges";
+import { BadgeCount, BadgeDot } from "./nav-badge";
 
 const KEY = "bh.sidebar.collapsed";
 
@@ -49,7 +51,9 @@ export function Sidebar({ user, onLogout }: { user: User; onLogout: () => void }
     });
 
   const place = user.branchId ? config?.branches.find((b) => b.id === user.branchId)?.name : "Todos los locales";
-  const groups = groupItems(navFor(user, modules));
+  const items = navFor(user, modules);
+  const groups = groupItems(items);
+  const badges = useNavBadges(user, items.map((n) => n.id));
 
   return (
     <aside className={cn("hidden shrink-0 flex-col bg-brand text-white transition-[width] duration-200 md:flex", collapsed ? "w-[72px]" : "w-60")}>
@@ -73,12 +77,14 @@ export function Sidebar({ user, onLogout }: { user: User; onLogout: () => void }
             {g.items.map((n) => {
               const active = pathname.startsWith(n.href);
               const Icon = n.icon;
+              const badge = badges[n.id];
+              const hint = badge ? `${n.label}: ${badge.label}` : n.label;
               return (
                 <NavLink
                   key={n.id}
                   href={n.href}
-                  title={collapsed ? n.label : undefined}
-                  aria-label={collapsed ? n.label : undefined}
+                  title={collapsed || badge ? hint : undefined}
+                  aria-label={collapsed || badge ? hint : undefined}
                   aria-current={active ? "page" : undefined}
                   className={cn(
                     "relative flex items-center rounded-xl py-2.5 text-sm font-medium transition",
@@ -87,8 +93,12 @@ export function Sidebar({ user, onLogout }: { user: User; onLogout: () => void }
                   )}
                 >
                   <span className={cn("absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-accent transition-opacity", active ? "opacity-100" : "opacity-0")} />
-                  <Icon className={cn("h-[18px] w-[18px] shrink-0", active && "text-accent")} />
+                  <span className="relative shrink-0">
+                    <Icon className={cn("h-[18px] w-[18px]", active && "text-accent")} />
+                    {collapsed && badge && <BadgeDot tone={badge.tone} className="absolute -right-1 -top-1" />}
+                  </span>
                   {!collapsed && <span className="truncate">{n.label}</span>}
+                  {!collapsed && badge && (badge.count !== undefined ? <BadgeCount count={badge.count} tone={badge.tone} /> : <BadgeDot tone={badge.tone} className="ml-auto mr-1" />)}
                 </NavLink>
               );
             })}
