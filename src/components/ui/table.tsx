@@ -35,4 +35,4 @@ export const td = "px-3 py-3 align-middle first:pl-4 last:pr-4 sm:first:pl-5 sm:
 
 /** Clases de una fila que se abre al hacer clic o con Enter (lleva `tabIndex={0}`): resalta al pasar y muestra el foco por dentro. */
 export const rowButtonClass =
-  "cursor-pointer transition-colors duration-[var(--dur-fast)] hover:bg-subtle focus-visible:bg-subtle focus-visible:shadow-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand";
+  "cursor-pointer transition-colors duration-[var(--dur-fast)] hover:bg-subtle focus-visible:bg-subtle focus-visible:shadow-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-ink";

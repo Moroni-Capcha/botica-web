@@ -205,7 +205,7 @@ export function ColumnChart({ data, series, height = 220, format, formatTick = f
           )}
           {!empty && hover !== null && data[hover] && width > 0 && (
             <div
-              className={cn("pointer-events-none absolute z-10 min-w-[150px] whitespace-nowrap rounded-xl bg-fg px-3 py-2 text-caption text-white shadow-overlay", flipTooltip(hover) && "-translate-x-full")}
+              className={cn("pointer-events-none absolute z-10 min-w-[150px] whitespace-nowrap rounded-xl bg-fg px-3 py-2 text-caption text-surface shadow-overlay", flipTooltip(hover) && "-translate-x-full")}
               /* Al costado de la columna (no encima) para no tapar el dato; cerca del borde derecho se pasa al otro lado */
               style={{ left: PAD.left + band * hover + band / 2 + (flipTooltip(hover) ? -(barW / 2 + 8) : barW / 2 + 8), top: Math.min(Math.max(0, y(totals[hover] ?? 0) - 8), height - 110) }}
               role="status"
@@ -213,7 +213,7 @@ export function ColumnChart({ data, series, height = 220, format, formatTick = f
               <p className="font-semibold">{data[hover].title}</p>
               {series.map((s) => (
                 <p key={s.key} className="mt-0.5 flex items-center justify-between gap-3 tabular-nums">
-                  <span className="inline-flex items-center gap-1.5 text-white/70">
+                  <span className="inline-flex items-center gap-1.5 text-surface/70">
                     <span className="h-2 w-2 rounded-sm" style={{ background: s.color }} />
                     {s.label}
                   </span>

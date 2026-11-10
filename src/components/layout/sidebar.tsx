@@ -133,7 +133,7 @@ export function Sidebar({ user, onLogout }: { user: User; onLogout: () => void }
         {!collapsed && "Minimizar"}
       </button>
       <div className={cn("m-3 mt-0 flex rounded-xl bg-white/5 p-3", collapsed ? "flex-col items-center gap-2" : "items-center gap-3")}>
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-accent text-xs font-bold text-fg" title={collapsed ? `${user.name} · ${place}` : undefined}>
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-accent text-xs font-bold text-on-accent" title={collapsed ? `${user.name} · ${place}` : undefined}>
           {initials(user.name)}
         </span>
         {!collapsed && (

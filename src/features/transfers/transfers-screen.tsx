@@ -152,7 +152,7 @@ export function TransfersScreen() {
           { icon: PackageCheck, t: "3. Recibir", d: "El destino confirma y el stock entra con el mismo lote. Todo queda en el kardex de ambos." },
         ].map(({ icon: Icon, t, d }) => (
           <li key={t} className="flex gap-3">
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand/10 text-brand">
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand/10 text-brand-ink">
               <Icon className="h-4 w-4" aria-hidden />
             </span>
             <div>

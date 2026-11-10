@@ -14,10 +14,10 @@ import { cn } from "@/lib/cn";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "←"];
 const MARK_UI: Record<MarkType, { icon: LucideIcon; tone: string }> = {
-  entrada: { icon: LogIn, tone: "bg-success" },
-  ref_ini: { icon: Coffee, tone: "bg-warning" },
-  ref_fin: { icon: Coffee, tone: "bg-warning" },
-  salida: { icon: LogOut, tone: "bg-fg" },
+  entrada: { icon: LogIn, tone: "bg-success text-white" },
+  ref_ini: { icon: Coffee, tone: "bg-warning text-white" },
+  ref_fin: { icon: Coffee, tone: "bg-warning text-white" },
+  salida: { icon: LogOut, tone: "bg-fg text-surface" },
 };
 const MOCK_PINS: Record<string, string> = { w1: "4101", w2: "4102", w3: "4103", w4: "4104", w5: "4201", w6: "4202", w7: "4203" };
 
@@ -111,7 +111,7 @@ export function KioskDialog({ branches, fixedBranch, onClose }: { branches: Bran
     <Dialog title="Marcar asistencia" description={done ? undefined : sel ? `${sel.name} · horario ${sel.schedule.start} a ${sel.schedule.end}` : "Elige tu nombre e ingresa tu PIN personal."} onClose={onClose}>
       {done ? (
         <div className="grid place-items-center py-6 text-center" aria-live="polite">
-          <span className={cn("grid h-16 w-16 animate-pop place-items-center rounded-full text-white", MARK_UI[done.type].tone)}>
+          <span className={cn("grid h-16 w-16 animate-pop place-items-center rounded-full", MARK_UI[done.type].tone)}>
             {(() => {
               const Icon = MARK_UI[done.type].icon;
               return <Icon className="h-8 w-8" aria-hidden />;
@@ -180,7 +180,7 @@ export function KioskDialog({ branches, fixedBranch, onClose }: { branches: Bran
       ) : (
         <div className="grid gap-4">
           <div className="flex items-center gap-3 rounded-2xl bg-sunken p-3">
-            <span className="grid h-10 w-10 place-items-center rounded-full bg-accent text-sm font-bold text-fg" aria-hidden>{initials(sel.name)}</span>
+            <span className="grid h-10 w-10 place-items-center rounded-full bg-accent text-sm font-bold text-on-accent" aria-hidden>{initials(sel.name)}</span>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold">{sel.name}</p>
               <p className="truncate text-xs text-muted">{sel.role} · hoy: {sel.today.length ? sel.today.map((m) => `${MARK_LABEL[m.type].split(" ")[0]} ${timeShort(m.at)}`).join(" · ") : "sin marcas"}</p>
@@ -226,7 +226,7 @@ export function KioskDialog({ branches, fixedBranch, onClose }: { branches: Bran
                       type="button"
                       disabled={!ok || clock.isPending}
                       onClick={() => mark(type)}
-                      className={cn("flex h-20 flex-col items-center justify-center gap-1.5 rounded-2xl text-sm font-semibold transition active:scale-[0.98] disabled:cursor-not-allowed", ok ? `${MARK_UI[type].tone} text-white` : "bg-sunken text-muted opacity-60")}
+                      className={cn("flex h-20 flex-col items-center justify-center gap-1.5 rounded-2xl text-sm font-semibold transition active:scale-[0.98] disabled:cursor-not-allowed", ok ? MARK_UI[type].tone : "bg-sunken text-muted opacity-60")}
                     >
                       <Icon className="h-5 w-5" aria-hidden /> {MARK_LABEL[type]}
                     </button>

@@ -6,7 +6,10 @@
   --accent: #3ddc97;
   --canvas: #f6f7f7;
 
-  /* Anillo de foco: 2 px de --brand con un espacio blanco. Sobre fondo oscuro se ve el espacio, sobre claro el aro. */
+  /* Color de marca para texto, aros y bordes sobre las superficies (en modo oscuro se aclara para que se lea). */
+  --brand-ink: var(--brand);
+
+  /* Anillo de foco: 2 px de --brand-ink con un espacio del color de la superficie. */
   --focus-gap: #ffffff;
 
   /* Movimiento */
@@ -17,8 +20,12 @@
   --dur-slow: 320ms;
 }
 
+/* Variante `dark:` de Tailwind: la pone el atributo data-theme del <html> (lo fija un script antes del primer pintado). */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 @theme inline {
   --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
   --color-accent: var(--accent);
   --color-canvas: var(--canvas);
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
@@ -29,6 +36,8 @@
   --color-fg: #18181b;
   --color-fg-2: #52525b;
   --color-muted: #6b6b74;
+  /* Texto sobre el color de acento (que es claro en cualquier tema): siempre oscuro. */
+  --color-on-accent: #18181b;
 
   /* Superficies y bordes (bordes con opacidad baja para que funcionen sobre cualquier fondo) */
   --color-surface: #ffffff;
@@ -101,6 +110,48 @@
   --animate-bar-grow: bar-grow var(--dur-base) var(--ease-out) backwards;
 }
 
+/* Tema oscuro: solo se redefinen los tokens; los componentes no cambian. Contrastes calculados (WCAG): texto >= 4.5:1, íconos >= 3:1. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas: #0e1011;
+  --brand-ink: color-mix(in oklab, var(--brand) 45%, white);
+  --focus-gap: #17191b;
+
+  --color-fg: #f4f4f5;
+  --color-fg-2: #b9b9c1;
+  --color-muted: #9d9da6;
+
+  --color-surface: #17191b;
+  --color-subtle: #1c1f21;
+  --color-sunken: #202326;
+  --color-sunken-strong: #2f3337;
+  --color-line: rgb(255 255 255 / 0.12);
+  --color-line-soft: rgb(255 255 255 / 0.07);
+  --color-line-strong: rgb(255 255 255 / 0.24);
+  --color-scrim: rgb(0 0 0 / 0.6);
+
+  /* Los colores sólidos (success, danger, warning, info) se quedan como en el modo claro: llevan texto blanco encima. Solo se aclaran los textos (-fg). */
+  --color-success-fg: #34d399;
+  --color-success-bg: rgb(16 185 129 / 0.16);
+  --color-success-border: rgb(16 185 129 / 0.4);
+  --color-danger-fg: #fb7185;
+  --color-danger-bg: rgb(244 63 94 / 0.16);
+  --color-danger-border: rgb(244 63 94 / 0.4);
+  --color-warning-fg: #fbbf24;
+  --color-warning-bg: rgb(245 158 11 / 0.16);
+  --color-warning-border: rgb(245 158 11 / 0.4);
+  --color-info-fg: #38bdf8;
+  --color-info-bg: rgb(14 165 233 / 0.16);
+  --color-info-border: rgb(14 165 233 / 0.4);
+  --color-special: #8b5cf6;
+  --color-special-fg: #a78bfa;
+  --color-special-bg: rgb(139 92 246 / 0.16);
+  --color-special-border: rgb(139 92 246 / 0.4);
+
+  --shadow-subtle: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-overlay: 0 10px 28px -6px rgb(0 0 0 / 0.6), 0 2px 6px rgb(0 0 0 / 0.4);
+}
+
 html,
 body {
   height: 100%;
@@ -115,7 +166,7 @@ body {
 /* Foco visible en todo lo que se puede usar con teclado. Va en la capa base: cualquier clase de Tailwind lo puede afinar. */
 @layer base {
   :where(button, a, input, select, textarea, summary, [role="radio"], [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
-    outline: 2px solid var(--brand);
+    outline: 2px solid var(--brand-ink);
     outline-offset: 2px;
     box-shadow: 0 0 0 2px var(--focus-gap);
   }
@@ -204,7 +255,8 @@ body {
   font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   font-size: 11px;
   line-height: 1.35;
-  color: var(--color-fg);
+  /* El ticket es papel: siempre oscuro sobre blanco, también con el tema oscuro. */
+  color: #18181b;
   background: #fff;
 }
 .ticket-title {

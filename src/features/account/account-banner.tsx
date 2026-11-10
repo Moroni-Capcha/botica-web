@@ -8,9 +8,9 @@ import { accountNotice, limaDay } from "@/lib/domain/account";
 import { cn } from "@/lib/cn";
 
 const TONE = {
-  info: { box: "bg-sky-50 text-sky-900 border-sky-100", icon: Info },
-  warn: { box: "bg-amber-50 text-amber-900 border-amber-100", icon: CircleAlert },
-  error: { box: "bg-rose-50 text-rose-900 border-rose-100", icon: Lock },
+  info: { box: "bg-info-bg text-info-fg border-info-border", icon: Info },
+  warn: { box: "bg-warning-bg text-warning-fg border-warning-border", icon: CircleAlert },
+  error: { box: "bg-danger-bg text-danger-fg border-danger-border", icon: Lock },
 } as const;
 
 /** Aviso del estado de la cuenta (prueba, vencida, suspendida). Solo el administrador ve el enlace al plan. */

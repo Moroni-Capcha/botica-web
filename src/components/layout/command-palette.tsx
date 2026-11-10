@@ -66,7 +66,7 @@ function PaletteDialog({ user, onClose }: { user: User; onClose: () => void }) {
 
   return (
     <Dialog title="Ir a…" description="Escribe el nombre de la pantalla. Flechas para elegir, Enter para entrar." onClose={onClose}>
-      <div className="flex items-center gap-2 rounded-xl bg-sunken px-3 focus-within:outline-2 focus-within:outline-offset-0 focus-within:outline-brand">
+      <div className="flex items-center gap-2 rounded-xl bg-sunken px-3 focus-within:outline-2 focus-within:outline-offset-0 focus-within:outline-brand-ink">
         <Search className="h-4 w-4 shrink-0 text-muted" aria-hidden />
         <input
           data-autofocus

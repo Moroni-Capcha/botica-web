@@ -10,7 +10,7 @@ const DOT: Record<BadgeTone, string> = {
 
 /** Punto de estado; el significado lo lleva el texto del enlace, no el color. */
 export function BadgeDot({ tone, className }: { tone: BadgeTone; className?: string }) {
-  return <span aria-hidden className={cn("h-2 w-2 shrink-0 rounded-full ring-2 ring-brand", DOT[tone], className)} />;
+  return <span aria-hidden className={cn("h-2 w-2 shrink-0 rounded-full ring-2 ring-brand-ink", DOT[tone], className)} />;
 }
 
 /** Número en una píldora (99+ si pasa de 99). */

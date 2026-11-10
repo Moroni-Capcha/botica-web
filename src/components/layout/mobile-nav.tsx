@@ -10,6 +10,7 @@ import { useAccount } from "@/lib/queries";
 import { cn } from "@/lib/cn";
 import { useNavBadges } from "./use-nav-badges";
 import { BadgeCount, BadgeDot } from "./nav-badge";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { OPEN_KIOSK_EVENT } from "./topbar";
 
 const MAX = 5;
@@ -50,6 +51,7 @@ export function MobileNav({ user }: { user: User }) {
               );
             })}
             <div className="mx-3 my-1 h-px bg-white/10" aria-hidden />
+            <ThemeToggle variant="row" />
             <button
               type="button"
               onClick={() => {

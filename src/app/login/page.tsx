@@ -166,7 +166,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={changeBotica}
-                  className="-mr-2 inline-flex min-h-11 shrink-0 items-center rounded-lg px-2 text-small font-semibold text-brand underline underline-offset-2 transition-opacity duration-[var(--dur-fast)] hover:opacity-80"
+                  className="-mr-2 inline-flex min-h-11 shrink-0 items-center rounded-lg px-2 text-small font-semibold text-brand-ink underline underline-offset-2 transition-opacity duration-[var(--dur-fast)] hover:opacity-80"
                 >
                   Cambiar botica
                 </button>
@@ -222,13 +222,13 @@ export default function LoginPage() {
 
           <p className="mt-8 text-center text-small text-fg-2">
             ¿Aún no tienes botica?{" "}
-            <Link href="/registro" className="inline-flex min-h-11 items-center font-semibold text-brand underline underline-offset-2">
+            <Link href="/registro" className="inline-flex min-h-11 items-center font-semibold text-brand-ink underline underline-offset-2">
               Crear mi botica
             </Link>
           </p>
 
           <Button onClick={() => setKiosk(true)} className="mt-2 w-full">
-            <Fingerprint className="h-4 w-4 text-brand" aria-hidden /> Marcar asistencia del personal
+            <Fingerprint className="h-4 w-4 text-brand-ink" aria-hidden /> Marcar asistencia del personal
           </Button>
 
           <div className="mt-8 flex flex-col items-center gap-1.5 border-t border-line-soft pt-6">

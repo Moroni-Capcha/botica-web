@@ -362,7 +362,7 @@ function Accounts({ branches, closed }: { branches: Branch[]; closed: Branch[] }
           <h2 className="text-sm font-semibold text-fg">Cuentas para ingresar</h2>
           <p className="mt-0.5 max-w-xl text-xs text-muted">
             El administrador ve todos los locales y los reportes; cada cuenta de local vende, cobra y recibe solo en el suyo. El PIN para marcar asistencia de cada trabajador se cambia en{" "}
-            <Link href="/asistencia" className="font-semibold text-brand underline">Asistencia</Link>.
+            <Link href="/asistencia" className="font-semibold text-brand-ink underline">Asistencia</Link>.
           </p>
         </div>
         <Button variant="primary" onClick={() => setEditing("new")}>

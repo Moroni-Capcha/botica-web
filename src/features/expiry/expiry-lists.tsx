@@ -55,7 +55,7 @@ export function PriorityList({ rows, wide, shared, stagIds, selected, allSelecte
       maxHeight={640}
       minWidth={1100}
       head={[
-        { label: <input type="checkbox" checked={allSelected} onChange={onToggleAll} className="h-4 w-4 accent-brand" aria-label="Elegir todos los lotes" /> },
+        { label: <input type="checkbox" checked={allSelected} onChange={onToggleAll} className="h-4 w-4 accent-brand-ink" aria-label="Elegir todos los lotes" /> },
         "Producto",
         "Lote",
         "Vence",

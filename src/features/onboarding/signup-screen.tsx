@@ -84,7 +84,7 @@ export function SignupScreen() {
         <header className="flex items-center justify-between gap-3">
           <DigiHmeLogo height={30} />
           {step < 2 && (
-            <Link href="/login" className="text-sm font-semibold text-brand underline underline-offset-2">
+            <Link href="/login" className="text-sm font-semibold text-brand-ink underline underline-offset-2">
               Ya tengo una botica
             </Link>
           )}
@@ -93,7 +93,7 @@ export function SignupScreen() {
         <ol className="mt-8 flex items-center gap-2" aria-label="Pasos del registro">
           {STEPS.map((label, i) => (
             <li key={label} className="flex flex-1 items-center gap-2" aria-current={i === step ? "step" : undefined}>
-              <span className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-semibold", i <= step ? "bg-brand text-white" : "bg-sunken text-muted", i === step && "ring-4 ring-brand/15")}>
+              <span className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-semibold", i <= step ? "bg-brand text-white" : "bg-sunken text-muted", i === step && "ring-4 ring-brand-ink/15")}>
                 {i < step ? <Check className="h-4 w-4" /> : i + 1}
               </span>
               <span className={cn("text-sm", i === step ? "font-semibold text-fg" : "text-muted")}>{label}</span>
@@ -216,7 +216,7 @@ function PlanCard({ plan, selected, onSelect }: { plan: PlanOffer; selected: boo
       role="radio"
       aria-checked={selected}
       onClick={onSelect}
-      className={cn("flex flex-col rounded-2xl border p-4 text-left transition active:scale-[0.99]", selected ? "border-brand bg-brand/5 ring-2 ring-brand" : "border-line bg-surface hover:border-line-strong")}
+      className={cn("flex flex-col rounded-2xl border p-4 text-left transition active:scale-[0.99]", selected ? "border-brand-ink bg-brand/5 ring-2 ring-brand-ink" : "border-line bg-surface hover:border-line-strong")}
     >
       <span className="text-sm font-semibold text-fg">{plan.name}</span>
       <span className="mt-2 text-2xl font-semibold tabular-nums text-fg">{soles(plan.priceMonthly)}</span>

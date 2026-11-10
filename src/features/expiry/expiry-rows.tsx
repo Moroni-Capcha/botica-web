@@ -75,7 +75,7 @@ function LotTitle({ row, branch, detail }: { row: LotRisk; branch: string | null
       </p>
       <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-caption text-muted">
         {branch && (
-          <Chip tone="neutral" className="bg-brand/10 text-brand">
+          <Chip tone="neutral" className="bg-brand/10 text-brand-ink">
             {branch}
           </Chip>
         )}
@@ -88,7 +88,7 @@ function LotTitle({ row, branch, detail }: { row: LotRisk; branch: string | null
 function PickBox({ checked, label, onChange }: { checked: boolean; label: string; onChange: () => void }) {
   return (
     <label className={hitBox}>
-      <input type="checkbox" checked={checked} onChange={onChange} className="h-4 w-4 accent-brand" aria-label={label} />
+      <input type="checkbox" checked={checked} onChange={onChange} className="h-4 w-4 accent-brand-ink" aria-label={label} />
     </label>
   );
 }

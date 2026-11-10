@@ -52,7 +52,7 @@ export function SetupChecklist() {
           const done = data.done.includes(step);
           const current = step === next;
           return (
-            <li key={step} className={cn("flex flex-wrap items-center gap-3 rounded-xl border p-3", current ? "border-brand/40 bg-brand/5" : "border-line-soft")}>
+            <li key={step} className={cn("flex flex-wrap items-center gap-3 rounded-xl border p-3", current ? "border-brand-ink/40 bg-brand/5" : "border-line-soft")}>
               <span className={cn("grid h-6 w-6 shrink-0 place-items-center rounded-full", done ? "bg-success text-white" : "border border-line-strong text-transparent")} aria-hidden>
                 <Check className="h-3.5 w-3.5" />
               </span>
