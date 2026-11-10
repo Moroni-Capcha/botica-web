@@ -105,7 +105,7 @@ export const TodayRow = memo(function TodayRow({ s, now, multi, branchName }: Wo
       <td className={td}>
         <p className="font-medium text-fg">{s.worker.name}</p>
         <p className="text-caption text-muted">
-          {multi && <span className="mr-1.5 rounded bg-brand/10 px-1.5 py-px text-micro font-semibold text-brand">{branchName(s.worker.branchId)}</span>}
+          {multi && <span className="mr-1.5 rounded bg-brand/10 px-1.5 py-px text-micro font-semibold text-brand-ink">{branchName(s.worker.branchId)}</span>}
           {s.worker.role}
         </p>
       </td>

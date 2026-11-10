@@ -140,7 +140,7 @@ export function CreditNoteDialog({ voucher, products, onClose, onDone }: { vouch
 
         {reason.stock && (
           <label className="flex items-start gap-2 text-sm">
-            <input type="checkbox" checked={returnStock} onChange={(e) => setReturnStock(e.target.checked)} className="mt-0.5 h-4 w-4 accent-brand" />
+            <input type="checkbox" checked={returnStock} onChange={(e) => setReturnStock(e.target.checked)} className="mt-0.5 h-4 w-4 accent-brand-ink" />
             <span>
               La mercadería vuelve al stock
               <span className="block text-caption text-muted">Entra al kardex como devolución, en los lotes de la venta. Quita la marca si el producto no se puede volver a vender.</span>

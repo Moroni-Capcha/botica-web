@@ -21,12 +21,12 @@ export function DigiHmeIcon({ size = 24, className }: { size?: number; className
   return <img src={src} width={size} height={size} alt="" aria-hidden className={className} />;
 }
 
-/** Logo completo de Digi!HME. Solo sobre fondo claro: las letras son azul oscuro. */
+/** Logo completo de Digi!HME. Las letras son azul oscuro: con el tema oscuro va sobre una placa blanca. */
 export function DigiHmeLogo({ height = 28, className }: { height?: number; className?: string }) {
   // eslint-disable-next-line @next/next/no-img-element
   // El original mide 1200 px; en pantalla se usa a 26-34 px de alto y reducirlo tanto en el navegador lo deja áspero.
   const src = height <= 60 ? "/brand/digihme-logo-480.png" : "/brand/digihme-logo.png";
-  return <img src={src} width={Math.round(height * 4.1)} height={height} style={{ height, width: "auto" }} alt="Digi!HME" className={className} />;
+  return <img src={src} width={Math.round(height * 4.1)} height={height} style={{ height, width: "auto" }} alt="Digi!HME" className={`dark:box-content dark:rounded-lg dark:bg-white dark:p-1.5 ${className ?? ""}`} />;
 }
 
 /** Nombre escrito con el "!" en cian. Sobre fondo oscuro va en blanco. */

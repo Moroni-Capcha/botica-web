@@ -65,7 +65,7 @@ interface ActiveProps {
 export const ActiveTransfer = memo(function ActiveTransfer({ transfer: t, acts, busy, productById, stock, branchName, onRun, onCancel }: ActiveProps) {
   const lines = t.items.length ? t.items.map((it) => ({ productId: it.productId, units: it.units, lot: it })) : (t.requested ?? []).map((r) => ({ productId: r.productId, units: r.units, lot: null }));
   return (
-    <Card as="section" padding="none" className={cn("min-w-0", (acts.dispatch || acts.receive) && "border-brand/40 ring-1 ring-brand/20")} aria-label={`Traslado ${t.code}`}>
+    <Card as="section" padding="none" className={cn("min-w-0", (acts.dispatch || acts.receive) && "border-brand-ink/40 ring-1 ring-brand-ink/20")} aria-label={`Traslado ${t.code}`}>
       <header className="flex flex-wrap items-center gap-2 border-b border-line-soft px-4 py-3 sm:px-5">
         <span className="text-sm font-semibold tabular-nums">{t.code}</span>
         <TransferStatus status={t.status} />

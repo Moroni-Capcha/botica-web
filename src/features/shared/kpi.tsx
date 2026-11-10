@@ -13,7 +13,7 @@ export function Kpi({ icon: Icon, label, value, hint, strong, valueClass, iconCl
       <p className={cn("flex items-center gap-2 text-caption font-semibold", strong ? "text-white/85" : "text-muted")}>
         <Icon className={cn("h-4 w-4 shrink-0", strong ? "text-accent" : "text-muted", iconClass)} aria-hidden />
         <span className="min-w-0 flex-1 truncate">{label}</span>
-        {active && <ListFilter className="h-3.5 w-3.5 shrink-0 text-brand" aria-hidden />}
+        {active && <ListFilter className="h-3.5 w-3.5 shrink-0 text-brand-ink" aria-hidden />}
       </p>
       {loading ? (
         <div className={cn("mt-2 animate-pulse rounded bg-sunken", strong ? "h-9 w-32 bg-white/20" : "h-6 w-20")} />
@@ -32,7 +32,7 @@ export function Kpi({ icon: Icon, label, value, hint, strong, valueClass, iconCl
         type="button"
         onClick={onClick}
         aria-pressed={!!active}
-        className={cn(base, "border-line bg-surface transition-colors duration-[var(--dur-fast)] hover:bg-subtle", active && "border-brand ring-1 ring-brand")}
+        className={cn(base, "border-line bg-surface transition-colors duration-[var(--dur-fast)] hover:bg-subtle", active && "border-brand-ink ring-1 ring-brand-ink")}
       >
         {body}
       </button>

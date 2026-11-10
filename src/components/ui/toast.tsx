@@ -41,11 +41,11 @@ export function Toaster() {
         <div
           key={t.id}
           onAnimationEnd={onAnimationEnd}
-          className={cn("pointer-events-auto flex max-w-[92vw] items-center gap-3 rounded-2xl bg-fg px-4 py-3 text-sm text-white shadow-overlay", closing ? "animate-toast-out" : "animate-pop")}
+          className={cn("pointer-events-auto flex max-w-[92vw] items-center gap-3 rounded-2xl bg-fg px-4 py-3 text-sm text-surface shadow-overlay", closing ? "animate-toast-out" : "animate-pop")}
         >
           {t.tone === "warn" ? <TriangleAlert className="h-4 w-4 shrink-0 text-warning-border" aria-hidden /> : <CircleCheck className="h-4 w-4 shrink-0 text-success-border" aria-hidden />}
           <span>{t.message}</span>
-          <IconButton size="xs" onClick={hide} className="text-white/70 hover:bg-white/10 hover:text-white" aria-label="Cerrar aviso">
+          <IconButton size="xs" onClick={hide} className="text-surface/70 hover:bg-surface/10 hover:text-surface" aria-label="Cerrar aviso">
             <X className="h-3.5 w-3.5" aria-hidden />
           </IconButton>
         </div>

@@ -6,7 +6,7 @@ import { Chip } from "./chip";
 import { TONE_CLASS } from "./tone";
 
 export const TONE: Record<ExpiryTone, { label: string; className: string; dot: string }> = {
-  vencido: { label: "Vencido", className: TONE_CLASS.neutral.solid, dot: "bg-white" },
+  vencido: { label: "Vencido", className: TONE_CLASS.neutral.solid, dot: "bg-surface" },
   critico: { label: "Crítico", className: TONE_CLASS.danger.soft, dot: TONE_CLASS.danger.dot },
   por_vencer: { label: "Por vencer", className: TONE_CLASS.warning.soft, dot: TONE_CLASS.warning.dot },
   vigente: { label: "Vigente", className: TONE_CLASS.success.soft, dot: TONE_CLASS.success.dot },

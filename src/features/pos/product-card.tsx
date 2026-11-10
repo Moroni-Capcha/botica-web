@@ -87,8 +87,8 @@ export const ProductCard = memo(function ProductCard({ product: p, stock, minSto
                 "flex flex-col items-start justify-center rounded-xl border text-left transition-[transform,opacity,border-color,background-color] duration-[var(--dur-fast)] ease-[var(--ease-out)] active:scale-[0.97]",
                 "disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100",
                 primary
-                  ? "min-h-14 min-w-[9rem] flex-[2_1_9rem] border-brand/25 bg-brand/5 px-3.5 py-2 enabled:hover:border-brand/60 enabled:hover:bg-brand/10"
-                  : "min-h-12 min-w-24 flex-1 self-end border-line px-3 py-1.5 enabled:hover:border-brand/40 enabled:hover:bg-subtle",
+                  ? "min-h-14 min-w-[9rem] flex-[2_1_9rem] border-brand-ink/25 bg-brand/5 px-3.5 py-2 enabled:hover:border-brand-ink/60 enabled:hover:bg-brand/10"
+                  : "min-h-12 min-w-24 flex-1 self-end border-line px-3 py-1.5 enabled:hover:border-brand-ink/40 enabled:hover:bg-subtle",
               )}
               aria-label={blocked ? `${ps.label} de ${p.name}: ${why}` : `Agregar ${ps.label} de ${p.name} a ${soles(ps.price)}`}
             >

@@ -76,7 +76,7 @@ export function UserList({ staff, loading, failed, onRetry, selectedId, onSelect
             onKeyDown={(e) => onKeyDown(e, i)}
             className={cn(
               "flex min-h-16 items-center gap-3 rounded-2xl border p-3 text-left transition-[transform,background-color,border-color,box-shadow] duration-[var(--dur-fast)] ease-[var(--ease-out)] active:scale-[0.98]",
-              active ? "border-brand bg-surface ring-2 ring-brand" : "border-line bg-surface hover:border-line-strong hover:bg-subtle",
+              active ? "border-brand-ink bg-surface ring-2 ring-brand-ink" : "border-line bg-surface hover:border-line-strong hover:bg-subtle",
             )}
           >
             <span className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-full text-small font-semibold", active ? "bg-accent text-fg" : "bg-sunken text-fg-2")}>{initials(u.name)}</span>

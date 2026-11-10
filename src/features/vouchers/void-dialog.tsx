@@ -61,7 +61,7 @@ export function VoidDialog({ voucher, onClose, onDone }: { voucher: Voucher; onC
           <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ej.: se emitió al cliente equivocado" maxLength={160} data-autofocus />
         </Field>
         <label className="flex items-start gap-2 text-sm">
-          <input type="checkbox" checked={returnStock} onChange={(e) => setReturnStock(e.target.checked)} className="mt-0.5 h-4 w-4 accent-brand" />
+          <input type="checkbox" checked={returnStock} onChange={(e) => setReturnStock(e.target.checked)} className="mt-0.5 h-4 w-4 accent-brand-ink" />
           <span>
             La mercadería vuelve al stock
             <span className="block text-caption text-muted">Entra al kardex como devolución, en los mismos lotes de la venta. Quita la marca si el cliente se la llevó.</span>

@@ -2,7 +2,7 @@ import { forwardRef, type InputHTMLAttributes, type ReactNode, type SelectHTMLAt
 import { cn } from "@/lib/cn";
 
 export const inputClass =
-  "h-10 rounded-xl border border-line-strong bg-surface px-3 text-sm transition-colors duration-[var(--dur-fast)] placeholder:text-muted focus:border-brand aria-[invalid=true]:border-danger aria-[invalid=true]:focus:border-danger";
+  "h-10 rounded-xl border border-line-strong bg-surface px-3 text-sm transition-colors duration-[var(--dur-fast)] placeholder:text-muted focus:border-brand-ink aria-[invalid=true]:border-danger aria-[invalid=true]:focus:border-danger";
 
 export function Field({ label, hint, error, children, className }: { label: string; hint?: string; error?: string; children: ReactNode; className?: string }) {
   return (

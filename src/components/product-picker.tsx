@@ -53,7 +53,7 @@ export function ProductPicker({ products, value, onChange, invalid, autoFocus, a
 
   return (
     <div className="relative">
-      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
       <input
         ref={inputRef}
         role="combobox"
@@ -81,8 +81,8 @@ export function ProductPicker({ products, value, onChange, invalid, autoFocus, a
         className={cn(inputClass, "w-full pl-9", selected && !open && "font-medium")}
       />
       {open && (
-        <ul id={listId} role="listbox" className="absolute inset-x-0 top-full z-20 mt-1 max-h-72 overflow-y-auto rounded-xl border border-zinc-200 bg-white p-1 shadow-xl">
-          {results.length === 0 && <li className="px-3 py-2 text-sm text-zinc-500">Sin resultados. Créalo en Inventario o impórtalo desde Excel.</li>}
+        <ul id={listId} role="listbox" className="absolute inset-x-0 top-full z-20 mt-1 max-h-72 overflow-y-auto rounded-xl border border-line bg-surface p-1 shadow-overlay">
+          {results.length === 0 && <li className="px-3 py-2 text-sm text-muted">Sin resultados. Créalo en Inventario o impórtalo desde Excel.</li>}
           {results.map((p, i) => (
             <li
               key={p.id}
@@ -92,10 +92,10 @@ export function ProductPicker({ products, value, onChange, invalid, autoFocus, a
               onMouseDown={(e) => e.preventDefault()}
               onMouseEnter={() => setActive(i)}
               onClick={() => choose(p)}
-              className={cn("cursor-pointer rounded-lg px-3 py-2 text-sm", i === active ? "bg-zinc-100" : "")}
+              className={cn("cursor-pointer rounded-lg px-3 py-2 text-sm", i === active ? "bg-sunken" : "")}
             >
-              <span className="font-medium">{p.name}</span> <span className="text-zinc-500">{p.conc}</span>
-              <span className="block text-xs text-zinc-500">
+              <span className="font-medium">{p.name}</span> <span className="text-muted">{p.conc}</span>
+              <span className="block text-xs text-muted">
                 {p.lab} · {p.form}
                 {p.unitsPerBox > 1 ? ` · caja x${p.unitsPerBox}` : ""}
               </span>

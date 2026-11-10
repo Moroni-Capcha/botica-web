@@ -76,7 +76,7 @@ export const SuggestionRow = memo(function SuggestionRow({ suggestion: s, checke
 export const SuggestionCard = memo(function SuggestionCard({ suggestion: s, checked, multi, branchName, onToggle }: SuggestionShared) {
   return (
     <li>
-      <Card padding="sm" className={cn(checked && "border-brand/40 bg-subtle")}>
+      <Card padding="sm" className={cn(checked && "border-brand-ink/40 bg-subtle")}>
         <label className="flex min-h-10 cursor-pointer items-start gap-3">
           <input type="checkbox" checked={checked} onChange={onToggle} className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--brand)]" aria-label={`Elegir ${s.product.name} ${s.product.conc}`} />
           <span className="min-w-0 flex-1">
@@ -160,7 +160,7 @@ export const PurchaseCard = memo(function PurchaseCard({ purchase: p, multi, bra
             onOpen(p);
           }
         }}
-        className="cursor-pointer transition-colors duration-[var(--dur-fast)] hover:bg-subtle focus-visible:outline-2 focus-visible:outline-brand"
+        className="cursor-pointer transition-colors duration-[var(--dur-fast)] hover:bg-subtle focus-visible:outline-2 focus-visible:outline-brand-ink"
       >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
@@ -195,7 +195,7 @@ export const SupplierCard = memo(function SupplierCard({ supplier: s, purchases:
   return (
     <Card as="article" className={cn("grid gap-3", !s.active && "opacity-60")}>
       <header className="flex items-start gap-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand/10 text-brand">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand/10 text-brand-ink">
           <Truck className="h-5 w-5" aria-hidden />
         </span>
         <div className="min-w-0 flex-1">

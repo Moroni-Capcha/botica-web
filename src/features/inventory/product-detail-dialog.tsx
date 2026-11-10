@@ -202,7 +202,7 @@ export function ProductDetailDialog({ product: p, lots, branchIds, branches, sco
                       <Chip tone={r.delta > 0 ? "success" : r.type === "venta" ? "neutral" : "danger"}>{MOVE_LABEL[r.type]}</Chip>
                     </td>
                     <td className={cn(td, "text-caption")}>
-                      {multi && <span className="mr-1.5 rounded bg-brand/10 px-1.5 py-px text-micro font-semibold text-brand">{name(r.branchId)}</span>}
+                      {multi && <span className="mr-1.5 rounded bg-brand/10 px-1.5 py-px text-micro font-semibold text-brand-ink">{name(r.branchId)}</span>}
                       {r.reference}
                       <span className="block text-micro text-muted">{r.userName}</span>
                     </td>

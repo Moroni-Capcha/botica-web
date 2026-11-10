@@ -153,7 +153,7 @@ export const CustomerCard = memo(function CustomerCard({ customer: c, productNam
         aria-label={`Abrir ficha de ${c.name}`}
         onClick={() => onOpen(c)}
         onKeyDown={(e) => onRowKey(e, () => onOpen(c))}
-        className={cn("cursor-pointer transition-colors duration-[var(--dur-fast)] hover:bg-subtle focus-visible:outline-2 focus-visible:outline-brand", stag >= 0 && "animate-stagger-in")}
+        className={cn("cursor-pointer transition-colors duration-[var(--dur-fast)] hover:bg-subtle focus-visible:outline-2 focus-visible:outline-brand-ink", stag >= 0 && "animate-stagger-in")}
         style={stag >= 0 ? stagger(stag) : undefined}
       >
         <div className="flex items-start justify-between gap-2">

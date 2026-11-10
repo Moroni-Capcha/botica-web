@@ -116,7 +116,7 @@ export function CustomerDialog({ customer, customers, products, branches, onClos
               <Input inputMode="tel" value={f.phone} onChange={(e) => set("phone", e.target.value)} placeholder="987 654 321" className="tabular-nums" aria-invalid={!!err("phone")} />
             </Field>
             <label className="flex items-start gap-2.5 rounded-xl border border-line bg-subtle p-3 text-sm sm:col-span-2">
-              <input type="checkbox" checked={f.contactConsent} onChange={(e) => set("contactConsent", e.target.checked)} className="mt-0.5 h-4 w-4 accent-brand" aria-invalid={!!err("contactConsent")} />
+              <input type="checkbox" checked={f.contactConsent} onChange={(e) => set("contactConsent", e.target.checked)} className="mt-0.5 h-4 w-4 accent-brand-ink" aria-invalid={!!err("contactConsent")} />
               <span className="min-w-0 flex-1">
                 <span className="flex flex-wrap items-center gap-2">
                   <span className="font-medium">El cliente acepta recibir recordatorios por WhatsApp o llamada</span>
@@ -181,7 +181,7 @@ export function CustomerDialog({ customer, customers, products, branches, onClos
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <span className="font-medium tabular-nums">{dateShort(s.at)}</span>
                 <span className="text-caption tabular-nums text-muted">{s.number}</span>
-                <Chip className="bg-brand/10 text-brand">{branchName(s.branchId)}</Chip>
+                <Chip className="bg-brand/10 text-brand-ink">{branchName(s.branchId)}</Chip>
                 <span className="ml-auto font-semibold tabular-nums">{soles(s.total)}</span>
               </div>
               {s.returned ? <p className="mt-0.5 text-caption text-danger-fg">Devolvió {soles(s.returned)} con nota de crédito; el total ya lo descuenta.</p> : null}
