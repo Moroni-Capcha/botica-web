@@ -28,4 +28,6 @@ Direct inline: mapping already done in this session, one writer, tasks are tight
 - typecheck clean; 465 tests pass (4 new in theme.test.ts, incl. the head script matching resolveTheme).
 - Contrast of every dark pair computed with the WCAG formula (text >= 4.5:1, icons >= 3:1); brand-ink >= 5:1 even for a black brand at 45 % mix.
 - Browser (admin, mock): login, panel and POS in dark on desktop; Vencimientos, Comprobantes, Reportes and the More menu in dark at 390 px; the toggle cycles Automatico, Claro, Oscuro and stores the choice; console clean.
-- Not checked: every remaining screen and dialog in dark, a custom brand color other than the default, printing the ticket from the dark theme.
+- Contrast scanner run in the browser over 12 screens in dark and in light (about 3,400 visible texts each) plus the command palette and the attendance kiosk dialog: only real finding was the avatar initials on the accent color, fixed with the new on-accent token. Brand colors black, dark blue and maroon checked in dark. Ticket stays black on white in dark.
+- Scanner flags seen and discarded: the logo exclamation mark (4.47:1, same in light, it is the logo) and a value fading in on data refresh (opacity, not color).
+- Not checked: printing the ticket on paper, Excel exports (unaffected), screens other than the 12 listed, and keyboard/screen-reader use in dark.

@@ -79,7 +79,7 @@ export function UserList({ staff, loading, failed, onRetry, selectedId, onSelect
               active ? "border-brand-ink bg-surface ring-2 ring-brand-ink" : "border-line bg-surface hover:border-line-strong hover:bg-subtle",
             )}
           >
-            <span className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-full text-small font-semibold", active ? "bg-accent text-fg" : "bg-sunken text-fg-2")}>{initials(u.name)}</span>
+            <span className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-full text-small font-semibold", active ? "bg-accent text-on-accent" : "bg-sunken text-fg-2")}>{initials(u.name)}</span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-semibold text-fg">{u.name}</span>
               <span className="block truncate text-caption text-fg-2">{u.role === "admin" ? `Administrador general · ${branchName(u.branchId)}` : `Cuenta ${branchName(u.branchId)}`}</span>

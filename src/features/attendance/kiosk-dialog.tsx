@@ -180,7 +180,7 @@ export function KioskDialog({ branches, fixedBranch, onClose }: { branches: Bran
       ) : (
         <div className="grid gap-4">
           <div className="flex items-center gap-3 rounded-2xl bg-sunken p-3">
-            <span className="grid h-10 w-10 place-items-center rounded-full bg-accent text-sm font-bold text-fg" aria-hidden>{initials(sel.name)}</span>
+            <span className="grid h-10 w-10 place-items-center rounded-full bg-accent text-sm font-bold text-on-accent" aria-hidden>{initials(sel.name)}</span>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold">{sel.name}</p>
               <p className="truncate text-xs text-muted">{sel.role} · hoy: {sel.today.length ? sel.today.map((m) => `${MARK_LABEL[m.type].split(" ")[0]} ${timeShort(m.at)}`).join(" · ") : "sin marcas"}</p>

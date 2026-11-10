@@ -36,6 +36,8 @@
   --color-fg: #18181b;
   --color-fg-2: #52525b;
   --color-muted: #6b6b74;
+  /* Texto sobre el color de acento (que es claro en cualquier tema): siempre oscuro. */
+  --color-on-accent: #18181b;
 
   /* Superficies y bordes (bordes con opacidad baja para que funcionen sobre cualquier fondo) */
   --color-surface: #ffffff;
