@@ -189,7 +189,7 @@ export function AuditScreen() {
                 );
               })}
             </ul>
-            <Table className="hidden md:block" minWidth={880} head={["Fecha", "Persona", "Acción", "Detalle"]}>
+            <Table className="hidden md:block" maxHeight={640} minWidth={880} head={["Fecha", "Persona", "Acción", "Detalle"]}>
               {rows.map((e) => {
                 const detail = changeSummary(e.before, e.after, { branchName });
                 return (

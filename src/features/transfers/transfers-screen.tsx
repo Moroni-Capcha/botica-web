@@ -229,7 +229,7 @@ export function TransfersScreen() {
           ) : history.length === 0 ? (
             <Empty icon={ArrowLeftRight} title={`Sin traslados cerrados en ${days} días`} />
           ) : wide ? (
-            <Table minWidth={900} head={["N.º", "Fecha", "Ruta", "Productos", { label: "Unidades", align: "right" }, { label: "Valor", align: "right" }, "Estado", "Cierre"]}>
+            <Table maxHeight={640} minWidth={900} head={["N.º", "Fecha", "Ruta", "Productos", { label: "Unidades", align: "right" }, { label: "Valor", align: "right" }, "Estado", "Cierre"]}>
               {history.map((t) => (
                 <HistoryRow key={t.id} transfer={t} productById={productById} branchName={branchName} />
               ))}

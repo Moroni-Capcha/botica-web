@@ -95,7 +95,7 @@ export function GroupTable({ rows, first, wide }: { rows: GroupRow[]; first: str
   }
   return (
     <div className="max-h-[560px] overflow-y-auto">
-      <Table minWidth={940} head={[first, { label: "Unidades", align: "right" }, { label: "Comprob.", align: "right" }, { label: "Devuelto", align: "right" }, { label: "Venta neta", align: "right" }, { label: "Utilidad", align: "right" }, { label: "Margen", align: "right" }, "Participación"]}>
+      <Table maxHeight={640} minWidth={940} head={[first, { label: "Unidades", align: "right" }, { label: "Comprob.", align: "right" }, { label: "Devuelto", align: "right" }, { label: "Venta neta", align: "right" }, { label: "Utilidad", align: "right" }, { label: "Margen", align: "right" }, "Participación"]}>
         {rows.map((r) => (
           <tr key={r.key}>
             <td className={cn(td, "font-medium text-fg")}>{r.label}</td>
@@ -128,7 +128,7 @@ export function DeadStockTable({ rows, multi, branchName, wide }: { rows: DeadRo
       </p>
       {wide ? (
         <div className="max-h-[560px] overflow-y-auto">
-          <Table minWidth={760} head={["Producto", ...(multi ? ["Local"] : []), "Tipo", { label: "Stock", align: "right" }, { label: "Valor a costo", align: "right" }, { label: "Días en stock", align: "right" }]}>
+          <Table maxHeight={640} minWidth={760} head={["Producto", ...(multi ? ["Local"] : []), "Tipo", { label: "Stock", align: "right" }, { label: "Valor a costo", align: "right" }, { label: "Días en stock", align: "right" }]}>
             {rows.map((r) => (
               <tr key={`${r.branchId}-${r.product.id}`}>
                 <td className={td}>
@@ -195,7 +195,7 @@ export function PrescriptionTable({ entries, pm, multi, branchName, wide }: { en
       <p className="px-4 pt-3 text-caption text-muted sm:px-5">Registro de dispensación con receta para la inspección de DIGEMID. Los controlados van marcados.</p>
       {wide ? (
         <div className="max-h-[560px] overflow-y-auto">
-          <Table minWidth={900} head={["Fecha", ...(multi ? ["Local"] : []), "Comprobante", "Receta", "Médico (CMP)", "Productos", "Dispensó"]}>
+          <Table maxHeight={640} minWidth={900} head={["Fecha", ...(multi ? ["Local"] : []), "Comprobante", "Receta", "Médico (CMP)", "Productos", "Dispensó"]}>
             {entries.map((e) => (
               <tr key={e.saleId}>
                 <td className={cn(td, "whitespace-nowrap text-caption tabular-nums text-fg-2")}>

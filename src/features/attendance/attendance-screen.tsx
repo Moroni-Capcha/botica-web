@@ -196,7 +196,7 @@ export function AttendanceScreen() {
           ) : !rows.length ? (
             <Empty icon={Clock3} title="Sin marcas en el periodo" />
           ) : wide ? (
-            <Table minWidth={1000} head={["Fecha", "Trabajador", "Entrada", "Refrigerio", "Salida", { label: "Horas", align: "right" }, { label: "Tardanza", align: "right" }, { label: "Extra", align: "right" }, "Estado", { label: <span className="sr-only">Corregir</span> }]}>
+            <Table maxHeight={640} minWidth={1000} head={["Fecha", "Trabajador", "Entrada", "Refrigerio", "Salida", { label: "Horas", align: "right" }, { label: "Tardanza", align: "right" }, { label: "Extra", align: "right" }, "Estado", { label: <span className="sr-only">Corregir</span> }]}>
               {rows.map((s) => (
                 <HistoryRow key={`${s.worker.id}-${s.day}`} s={s} multi={multi} branchName={branchName} onFix={setManual} />
               ))}
