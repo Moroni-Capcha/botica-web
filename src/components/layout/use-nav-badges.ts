@@ -13,6 +13,7 @@ import { limaDay } from "@/lib/domain/account";
 const dayOf = (t: number) => limaDay(t);
 const DAY = 86_400_000;
 const VOUCHER_DAYS = 7;
+const BACKGROUND_MS = 5 * 60_000;
 
 /**
  * Avisos por módulo para el menú, por id de `NAV`. Solo consulta lo que el usuario puede ver
@@ -26,9 +27,10 @@ export function useNavBadges(user: User, visible: readonly string[]): Partial<Re
   const sees = (id: string) => visible.includes(id);
 
   const branchIds = useMemo(() => (isAdmin ? (config.data?.branches.map((b) => b.id) ?? [operating]) : [operating]), [isAdmin, config.data, operating]);
-  const lots = useBranchLots(sees("vencimientos") ? branchIds : []);
+  /* El menú está en todas las pantallas: sus consultas de fondo se espacian (5 min) para no gastar red ni procesador. Las pantallas de cada módulo siguen refrescando a su ritmo. */
+  const lots = useBranchLots(sees("vencimientos") ? branchIds : [], BACKGROUND_MS);
   const cash = useCash(operating, sees("caja"));
-  const vouchers = useVouchers(dayOf(now - (VOUCHER_DAYS - 1) * DAY), dayOf(now), isAdmin ? null : operating, sees("comprobantes"));
+  const vouchers = useVouchers(dayOf(now - (VOUCHER_DAYS - 1) * DAY), dayOf(now), isAdmin ? null : operating, sees("comprobantes"), BACKGROUND_MS);
 
   return useMemo(() => {
     const out: Partial<Record<string, NavBadge>> = {};

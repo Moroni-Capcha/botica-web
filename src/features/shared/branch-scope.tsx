@@ -68,10 +68,10 @@ const combineLots = (results: UseQueryResult<Lot[]>[]) => ({
   refetch: () => Promise.all(results.map((r) => r.refetch())),
 });
 
-/** Lotes de los locales pedidos (comparte la caché con el punto de venta). */
-export function useBranchLots(branchIds: BranchId[]) {
+/** Lotes de los locales pedidos (comparte la caché con el punto de venta). `staleTime` más largo para quien solo los consulta de fondo. */
+export function useBranchLots(branchIds: BranchId[], staleTime = 30_000) {
   return useQueries({
-    queries: branchIds.map((b) => ({ queryKey: qk.lots(b), queryFn: () => api.listLots(b), staleTime: 30_000 })),
+    queries: branchIds.map((b) => ({ queryKey: qk.lots(b), queryFn: () => api.listLots(b), staleTime })),
     combine: combineLots,
   });
 }

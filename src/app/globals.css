@@ -248,6 +248,23 @@ body {
   .animate-bar-grow { animation: none; }
 }
 
+/* Modo ligero (equipos de pocos recursos, ver lib/perf-mode.ts): sin transiciones ni animaciones decorativas ni desenfoques.
+   Las animaciones duran 0,01 ms en vez de quitarse: así `animationend` sigue disparándose y lo que sale se desmonta igual. */
+:root[data-perf="lite"] *,
+:root[data-perf="lite"] *::before,
+:root[data-perf="lite"] *::after {
+  transition-duration: 0.01ms !important;
+  animation-duration: 0.01ms !important;
+  animation-delay: 0ms !important;
+}
+:root[data-perf="lite"] .animate-stagger-in,
+:root[data-perf="lite"] .animate-bar-grow {
+  animation: none;
+}
+:root[data-perf="lite"] [class*="backdrop-blur"] {
+  backdrop-filter: none;
+}
+
 /* Ticket de 80 mm (impresora térmica). Se imprime solo el contenido de .print-root; el resto de la pantalla se oculta. */
 .ticket {
   width: 80mm;

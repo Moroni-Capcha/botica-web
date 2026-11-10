@@ -18,6 +18,9 @@ import { soles } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { useStableCallback } from "@/lib/use-stable-callback";
+import { useIncrementalList } from "@/lib/use-incremental-list";
+import { ListMore } from "@/components/ui/list-more";
+import { buildSearchIndex, compareText, matchesSearch } from "@/lib/domain/product-search";
 import { ScopeToggle, useBranchLots, useBranchScope } from "@/features/shared/branch-scope";
 import { exportInventory } from "./export";
 import { Kpi, ProductCard, ProductRow, type RowShared } from "./inventory-rows";
@@ -55,27 +58,28 @@ export function InventoryScreen() {
   const productList = useMemo(() => products.data ?? [], [products.data]);
   const all = useMemo(() => inventoryRows(productList, lotsQ.lots, branchIds, now), [productList, lotsQ.lots, branchIds, now]);
   const options = useMemo(() => {
-    const uniq = (f: (p: Product) => string) => [...new Set(productList.map(f))].sort((a, b) => a.localeCompare(b));
+    const uniq = (f: (p: Product) => string) => [...new Set(productList.map(f))].sort(compareText);
     return { labs: uniq((p) => p.lab), categories: uniq((p) => p.category), forms: uniq((p) => p.form) };
   }, [productList]);
   const names = useMemo(() => Object.fromEntries(allBranches.map((b) => [b.id, b.name])), [allBranches]);
 
   /* Laboratorio, tipo, forma y búsqueda filtran todo (tarjetas, tabla y Excel) */
+  const searchIndex = useMemo(() => buildSearchIndex(productList), [productList]);
   const base = useMemo(() => {
     const s = q.trim().toLowerCase();
     return all.filter(({ product: p }) => {
       if (lab !== "Todos" && p.lab !== lab) return false;
       if (category !== "Todos" && p.category !== category) return false;
       if (form !== "Todos" && p.form !== form) return false;
-      return !s || [p.name, p.active, p.lab, p.barcode, p.conc].some((f) => f.toLowerCase().includes(s));
+      return matchesSearch(searchIndex, p.id, s);
     });
-  }, [all, q, lab, category, form]);
+  }, [all, q, lab, category, form, searchIndex]);
 
   const rows = useMemo(
     () =>
       base
         .filter((r) => (status === "todos" ? true : status === "bajo" ? r.status === "bajo" : status === "agotado" ? r.status === "agotado" : status === "vencido" ? r.expired > 0 : r.product.rx !== "libre"))
-        .sort((a, b) => a.product.name.localeCompare(b.product.name) || a.product.conc.localeCompare(b.product.conc)),
+        .sort((a, b) => compareText(a.product.name, b.product.name) || compareText(a.product.conc, b.product.conc)),
     [base, status],
   );
   const groups = useMemo(() => (groupBy === "producto" ? [] : groupInventory(base, groupBy, branchIds)), [base, groupBy, branchIds]);
@@ -97,6 +101,9 @@ export function InventoryScreen() {
       count: (f: StatusFilter) => (f === "bajo" ? base.filter((r) => r.status === "bajo").length : f === "agotado" ? base.filter((r) => r.status === "agotado").length : f === "vencido" ? base.filter((r) => r.expired > 0).length : f === "receta" ? base.filter((r) => r.product.rx !== "libre").length : base.length),
     };
   }, [base, branchIds]);
+
+  /* Con miles de productos, pintarlos todos congela equipos modestos: se pintan por tandas mientras se baja. */
+  const list = useIncrementalList(rows.length, `${groupBy}|${rows.length}|${rows[0]?.product.id}|${rows[rows.length - 1]?.product.id}`);
 
   const isLoading = products.isLoading || lotsQ.isLoading;
   const error = products.error ?? lotsQ.error;
@@ -322,15 +329,17 @@ export function InventoryScreen() {
                 { label: <span className="sr-only">Acciones</span> },
               ]}
             >
-              {rows.map((r) => (
+              {rows.slice(0, list.limit).map((r) => (
                 <ProductRow key={r.product.id} row={r} stag={stagFor(r.product.id)} {...shared} />
               ))}
+              {list.more && <ListMore as="row" sentinel={list.sentinel} shown={list.limit} total={rows.length} />}
             </Table>
           ) : (
             <ul className="grid gap-2 p-3">
-              {rows.map((r) => (
+              {rows.slice(0, list.limit).map((r) => (
                 <ProductCard key={r.product.id} row={r} stag={stagFor(r.product.id)} {...shared} />
               ))}
+              {list.more && <ListMore as="item" sentinel={list.sentinel} shown={list.limit} total={rows.length} />}
             </ul>
           )
         ) : groups.length === 0 ? (

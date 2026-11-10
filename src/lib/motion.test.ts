@@ -19,6 +19,13 @@ describe("prefersReducedMotion", () => {
     stubMedia(false);
     expect(prefersReducedMotion()).toBe(false);
   });
+  it("el modo ligero (equipo modesto) cuenta igual aunque el sistema no pida menos movimiento", () => {
+    stubMedia(false);
+    vi.stubGlobal("document", { documentElement: { getAttribute: (n: string) => (n === "data-perf" ? "lite" : null) } });
+    expect(prefersReducedMotion()).toBe(true);
+    vi.stubGlobal("document", { documentElement: { getAttribute: () => null } });
+    expect(prefersReducedMotion()).toBe(false);
+  });
 });
 
 describe("animateIn", () => {

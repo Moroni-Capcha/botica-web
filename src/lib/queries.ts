@@ -305,8 +305,9 @@ export function useLogContact() {
 
 /* ------------------------------ Comprobantes (SUNAT) ------------------------------ */
 
-export const useVouchers = (from: string, to: string, branchId: BranchId | null, enabled = true) =>
-  useQuery({ queryKey: qk.vouchers(from, to, branchId), queryFn: () => api.listVouchers({ from, to, branchId: branchId ?? undefined }), staleTime: 20_000, refetchInterval: 60_000, enabled, placeholderData: (prev) => prev });
+/** `pollMs`: cada cuánto se refresca solo. La pantalla de comprobantes usa 1 minuto; el aviso del menú, que está en todas las pantallas, uno mucho más largo. */
+export const useVouchers = (from: string, to: string, branchId: BranchId | null, enabled = true, pollMs = 60_000) =>
+  useQuery({ queryKey: qk.vouchers(from, to, branchId), queryFn: () => api.listVouchers({ from, to, branchId: branchId ?? undefined }), staleTime: Math.min(20_000, pollMs), refetchInterval: pollMs, enabled, placeholderData: (prev) => prev });
 export const useCreditNotes = (from: string, to: string, branchId: BranchId | null, enabled = true) =>
   useQuery({ queryKey: qk.creditNotes(from, to, branchId), queryFn: () => api.listCreditNotes({ from, to, branchId: branchId ?? undefined }), staleTime: 20_000, refetchInterval: 60_000, enabled, placeholderData: (prev) => prev });
 
