@@ -180,6 +180,7 @@ export function PurchasesScreen() {
             </Empty>
           ) : wide ? (
             <Table
+              maxHeight={640}
               minWidth={multi ? 1000 : 920}
               head={[
                 { label: <span className="sr-only">Elegir</span> },
@@ -240,7 +241,7 @@ export function PurchasesScreen() {
           ) : purchaseList.length === 0 ? (
             <Empty icon={Receipt} title={`Sin ingresos en ${days} días`} />
           ) : wide ? (
-            <Table minWidth={820} head={["Fecha", ...(multi ? ["Local"] : []), "Proveedor", "Documento", { label: "Lotes", align: "right" }, { label: "Total", align: "right" }, "Recibió", { label: <span className="sr-only">Ver</span> }]}>
+            <Table maxHeight={640} minWidth={820} head={["Fecha", ...(multi ? ["Local"] : []), "Proveedor", "Documento", { label: "Lotes", align: "right" }, { label: "Total", align: "right" }, "Recibió", { label: <span className="sr-only">Ver</span> }]}>
               {purchaseList.map((p) => (
                 <PurchaseRow key={p.id} purchase={p} multi={multi} branchName={branchName} onOpen={setDetail} />
               ))}
