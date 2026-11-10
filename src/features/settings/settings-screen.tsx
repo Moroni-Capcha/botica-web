@@ -374,8 +374,13 @@ function Accounts({ branches, closed }: { branches: Branch[]; closed: Branch[] }
       ) : wide ? (
         <Table head={["Nombre", "Rol", "Local", "Estado", { label: <span className="sr-only">Acciones</span>, align: "right" }]} minWidth={560}>
           {accounts.isLoading && (
-            <tr>
-              <td colSpan={5} className={cn(td, "text-muted")}>Cargando…</td>
+            <tr aria-busy="true">
+              <td colSpan={5} className={td}>
+                <span className="sr-only">Cargando cuentas…</span>
+                <div className="grid gap-2" aria-hidden>
+                  {Array.from({ length: 3 }, (_, i) => <div key={i} className="h-9 animate-pulse rounded-lg bg-sunken" />)}
+                </div>
+              </td>
             </tr>
           )}
           {list.map((a) => (
@@ -401,7 +406,14 @@ function Accounts({ branches, closed }: { branches: Branch[]; closed: Branch[] }
         </Table>
       ) : (
         <ul className="grid gap-2 px-3 pb-3" aria-busy={accounts.isLoading}>
-          {accounts.isLoading && <li className="px-1 text-sm text-muted">Cargando…</li>}
+          {accounts.isLoading && (
+            <li>
+              <span className="sr-only">Cargando cuentas…</span>
+              <div className="grid gap-2" aria-hidden>
+                {Array.from({ length: 3 }, (_, i) => <div key={i} className="h-16 animate-pulse rounded-2xl bg-sunken" />)}
+              </div>
+            </li>
+          )}
           {list.map((a) => (
             <li key={a.id}>
               <Card padding="sm" className={cn(!a.active && "text-muted")}>
