@@ -16,6 +16,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { Table, td } from "@/components/ui/table";
 import { dateShort } from "@/lib/format";
 import { cn } from "@/lib/cn";
+import { ThemeSwitch } from "@/components/theme-toggle";
 import { MetricsPanel } from "./metrics-panel";
 import { TenantActionDialog } from "./tenant-action-dialog";
 import { TenantDetailDialog } from "./tenant-detail-dialog";
@@ -59,8 +60,9 @@ export function ConsoleScreen({ session, onLogout }: { session: PlatformSession;
             <ShieldCheck className="h-3.5 w-3.5" /> Consola interna
           </span>
           {apiMode === "mock" && <span className="rounded-full bg-warning-bg px-2.5 py-1 text-[11px] font-semibold text-warning-fg">Datos de prueba</span>}
-          <div className="ml-auto flex items-center gap-3">
-            <div className="hidden text-right leading-tight sm:block">
+          <div className="ml-auto flex items-center gap-1 sm:gap-2">
+            <ThemeSwitch />
+            <div className="ml-1 hidden text-right leading-tight sm:block">
               <p className="text-sm font-medium">{session.operator.name}</p>
               <p className="text-xs text-muted">{session.operator.email}</p>
             </div>
