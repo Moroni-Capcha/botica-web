@@ -1,12 +1,12 @@
 /*
  * Service worker de Digi!HME (escrito a mano, sin dependencias).
  * Objetivo: que el punto de venta abra sin internet.
- *  - Páginas: primero la red (con tiempo límite); si falla, la última copia guardada.
+ *  - Páginas: primero la red; si la red tarda, la copia de ESA misma página; sin internet, ver networkFirstPage.
  *  - Archivos de la app (/_next/static, /brand, íconos): se guardan al usarse y se sirven desde el equipo.
  *  - Nunca toca la API ni nada que no sea GET del mismo sitio: las ventas sin conexión las maneja la app (cola local).
  * Para publicar una versión nueva de este archivo, cambiar VERSION.
  */
-const VERSION = "v1";
+const VERSION = "v2";
 const PAGES = `digihme-pages-${VERSION}`;
 const ASSETS = `digihme-assets-${VERSION}`;
 const PRECACHE = ["/", "/login", "/pos", "/manifest.webmanifest", "/brand/digihme-icon.png", "/brand/digihme-icon-72.png", "/brand/digihme-logo.png", "/brand/digihme-logo-480.png"];
@@ -53,16 +53,30 @@ async function cacheFirst(request) {
   return res;
 }
 
+/*
+ * Regla: nunca se muestra OTRA pantalla en lugar de la pedida porque el servidor tarde.
+ *  - Con la red al día: la página pedida.
+ *  - Red lenta y hay copia de ESA página: su copia (así abre rápido); si no hay copia, se espera a la red.
+ *  - Sin internet de verdad (la petición falla): la copia de esa página; si no la hay, el punto de venta,
+ *    que es la pantalla que funciona sin conexión.
+ * Antes, una espera de más de 4 s servía el punto de venta para cualquier ruta; con un servidor lento
+ * (p. ej. `npm run dev` compilando una pantalla) parecía que el menú solo abría el punto de venta.
+ */
 async function networkFirstPage(request) {
   const cache = await caches.open(PAGES);
   const url = new URL(request.url);
-  try {
-    const res = await Promise.race([fetch(request), new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), NAV_TIMEOUT_MS))]);
+  const network = fetch(request).then((res) => {
     // Una respuesta con redirección no se puede servir después como página; se guarda solo la directa.
     if (res.ok && !res.redirected) cache.put(url.pathname, res.clone());
     return res;
+  });
+  network.catch(() => undefined); // si la copia gana la carrera y la red falla después, no es un error pendiente
+  const own = await cache.match(url.pathname);
+  try {
+    if (!own) return await network;
+    return await Promise.race([network, new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), NAV_TIMEOUT_MS))]);
   } catch {
-    return (await cache.match(url.pathname)) || (await cache.match("/pos")) || (await cache.match("/")) || Response.error();
+    return own || (await cache.match("/pos")) || (await cache.match("/")) || Response.error();
   }
 }
 
