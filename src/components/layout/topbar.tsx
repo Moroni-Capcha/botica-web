@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Building2, Fingerprint, LogOut, MapPin, Search } from "lucide-react";
 import { OPEN_PALETTE_EVENT } from "./command-palette";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { PerfToggle } from "@/components/perf-toggle";
 import type { User } from "@/lib/api/types";
 import { useConfig } from "@/lib/queries";
 import { useOperatingBranch, useSessionStore } from "@/lib/auth/session-store";
@@ -113,6 +114,7 @@ export function Topbar({ title, section, user, onLogout }: { title: string; sect
       <Divider />
       <ConnectionStatus />
       <ThemeToggle className="hidden sm:flex" />
+      <PerfToggle className="hidden sm:flex" />
       <span className="hidden text-xs font-medium text-muted first-letter:uppercase lg:block">{today}</span>
       <div className="hidden sm:block">
         <Clock />
