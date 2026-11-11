@@ -12,6 +12,7 @@ import { Topbar } from "@/components/layout/topbar";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { CommandPalette } from "@/components/layout/command-palette";
 import { AppLoading } from "@/components/layout/app-loading";
+import { PerfWatch } from "@/components/perf-watch";
 import { NAV } from "@/lib/nav";
 import { AccountBanner } from "@/features/account/account-banner";
 import { OfflineSyncManager } from "@/features/offline/sync-manager";
@@ -62,6 +63,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       </div>
       <MobileNav user={session.user} />
       <CommandPalette user={session.user} />
+      <PerfWatch />
       <OfflineSyncManager />
     </div>
   );

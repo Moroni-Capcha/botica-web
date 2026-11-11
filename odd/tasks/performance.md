@@ -26,6 +26,8 @@ Measure first. Production build (`next start`) with the mock catalog inflated to
 - [x] P3 Background queries of the menu alerts spaced to 5 minutes outside their own screens.
 - [x] P4 Lite mode for modest machines: auto-detected (<= 2 cores or <= 2 GB), forced with `localStorage["bh.lite"] = "1"` or disabled with "0". Switches off animations and backdrop blur; shares the reduced-motion path in `motion.ts`.
 
+- [x] P5 Adapt to the machine at run time. `PerfWatch` measures this device while it is used: load blocking >= 1.5 s (long tasks in the first 15 s) or 3 interactions slower than 250 ms (Event Timing) turns lite mode on by itself, remembers it (`bh.lite.learned`) and tells the person once. A three-state button (Automatic / Light / Full) in the topbar and in the mobile "Más" menu; the person's choice always wins over what was learned or detected.
+
 ## Route per task
 Direct inline: measurement, then small coupled edits already understood in this session.
 
@@ -42,6 +44,14 @@ Direct inline: measurement, then small coupled edits already understood in this 
 
 ## Not done / needs a person
 - Measurement on a real low-end machine (here: 16 cores). Numbers above are on a fast machine; expect several times slower on modest hardware.
-- No UI to switch lite mode on or off from the app (only automatic detection or the localStorage key).
+- The thresholds of P5 (1.5 s of load blocking, 3 slow interactions of 250 ms) were chosen from this fast machine (a heavy screen blocks 0.6 s here) and from the INP guidance, not from real low-end hardware: tune them after measuring a modest machine. Event Timing and long tasks exist in Chromium only; elsewhere only the static hints (cores, memory) apply.
 - Mock mode re-parses the whole localStorage database on each call; it does not exist in production (`NEXT_PUBLIC_API_MODE=http`) so it was left alone.
 - The real backend must paginate or filter large lists; the front still receives the whole catalog in one response.
+
+## Evidence (P5, production build, browser)
+- Simulated slow machine (5 tasks of 400 ms after mount): lite mode on, learned flag stored, notice shown; before it, no data-perf attribute.
+- Reload: the head script applies lite mode from the learned flag before first paint; the button reads "Automatico (ligero)".
+- Button cycle Automatic -> Light -> Full -> Automatic: Full removes the attribute even with the learned flag set; Automatic returns to light.
+- Healthy machine: POS with 3,036 products blocks 628 ms on load (limit 1,500 ms), nothing learned.
+- Three real clicks slowed to 350 ms each turned lite mode on and stored it.
+- typecheck clean; 489 tests pass.
