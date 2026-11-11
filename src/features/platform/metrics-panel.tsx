@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Building2, Clock, TriangleAlert, WalletCards, type LucideIcon } from "lucide-react";
+import { Building2, CircleCheck, Clock, TriangleAlert, WalletCards, type LucideIcon } from "lucide-react";
 import type { TenantSummary } from "@/lib/api/types";
 import { errorMessage } from "@/lib/api";
 import { useMetrics } from "@/lib/queries";
@@ -36,12 +36,21 @@ function Tile({ icon: Icon, label, value, hint, tone }: { icon: LucideIcon; labe
 
 function ListCard({ title, hint, empty, children, count }: { title: string; hint: string; empty: string; children: ReactNode; count: number }) {
   return (
-    <section className="min-w-0 rounded-2xl border border-line bg-surface" aria-label={title}>
+    <section className="flex min-w-0 flex-col rounded-2xl border border-line bg-surface" aria-label={title}>
       <div className="px-4 pt-4">
         <h2 className="text-sm font-semibold">{title}</h2>
         <p className="text-xs text-muted">{hint}</p>
       </div>
-      {count === 0 ? <p className="px-4 py-6 text-sm text-muted">{empty}</p> : <ul className="mt-2 pb-2">{children}</ul>}
+      {count === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-2.5 px-4 py-8 text-center">
+          <span className="grid h-10 w-10 place-items-center rounded-full bg-success-bg text-success-fg">
+            <CircleCheck className="h-5 w-5" aria-hidden />
+          </span>
+          <p className="max-w-[26ch] text-sm text-muted">{empty}</p>
+        </div>
+      ) : (
+        <ul className="mt-2 pb-2">{children}</ul>
+      )}
     </section>
   );
 }
@@ -111,7 +120,7 @@ export function MetricsPanel({ now, today, onOpen }: { now: number; today: strin
         <section className="min-w-0 rounded-2xl border border-line bg-surface p-4 lg:col-span-1" aria-label="Boticas nuevas por mes">
           <h2 className="text-sm font-semibold">Boticas nuevas por mes</h2>
           <p className="mb-2 text-xs text-muted">{newTotal === 0 ? "Ninguna en los últimos 6 meses" : `${newTotal} en los últimos 6 meses`}</p>
-          <ColumnChart data={data} series={SERIES} height={190} format={(n) => String(n)} ariaLabel="Boticas nuevas por mes, últimos 6 meses" emptyText="Aún no hay altas" />
+          <ColumnChart data={data} series={SERIES} height={190} format={(n) => String(n)} integer ariaLabel="Boticas nuevas por mes, últimos 6 meses" emptyText="Aún no hay altas" />
         </section>
 
         <ListCard title="Sin actividad" hint="Activas o en prueba, 14 días o más sin usar el sistema" empty="Todas las boticas usaron el sistema en los últimos 14 días." count={m.inactive.length}>

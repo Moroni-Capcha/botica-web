@@ -5,6 +5,7 @@ import { Table2, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Empty } from "@/components/ui/empty";
 import { hitArea } from "@/components/ui/icon-button";
+import { niceTicks } from "@/lib/domain/chart-scale";
 
 export interface ChartSeries {
   key: string;
@@ -37,22 +38,14 @@ interface Props {
   emptyText?: string;
   /** Las columnas crecen desde la base al aparecer (solo la primera vez que se dibujan; no con "reducir movimiento"). */
   grow?: boolean;
+  /** El eje marca solo números enteros: para conteos (boticas, ventas), donde 0,25 no existe. */
+  integer?: boolean;
 }
 
 const PAD = { top: 12, right: 8, bottom: 24, left: 44 };
 const GAP = 2; // separación entre segmentos apilados
 const RADIUS = 4;
 
-/** Escala "bonita" para el eje: 0 y 3 a 4 marcas redondas. */
-function niceTicks(max: number): number[] {
-  if (max <= 0) return [0];
-  const raw = max / 4;
-  const pow = 10 ** Math.floor(Math.log10(raw));
-  const step = [1, 2, 2.5, 5, 10].map((m) => m * pow).find((s) => s >= raw) ?? raw;
-  const top = Math.ceil(max / step) * step;
-  return Array.from({ length: Math.round(top / step) + 1 }, (_, i) => round(i * step));
-}
-const round = (n: number) => Math.round(n * 100) / 100;
 
 /** Rectángulo con esquinas redondeadas solo arriba (extremo del dato); la base queda recta sobre el eje. */
 function topRounded(x: number, y: number, w: number, h: number, r: number) {
@@ -77,7 +70,7 @@ function useWidth<T extends HTMLElement>() {
  * Columnas (apiladas si hay varias series) con tooltip al pasar el mouse o enfocar con el teclado,
  * leyenda cuando hay 2 o más series y una vista de tabla con los mismos números.
  */
-export function ColumnChart({ data, series, height = 220, format, formatTick = format, highlightKey, labelEvery = 1, ariaLabel, emptyText = "Sin datos", grow }: Props) {
+export function ColumnChart({ data, series, height = 220, format, formatTick = format, highlightKey, labelEvery = 1, ariaLabel, emptyText = "Sin datos", grow, integer }: Props) {
   const [wrapRef, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
   const [asTable, setAsTable] = useState(false);
@@ -85,7 +78,7 @@ export function ColumnChart({ data, series, height = 220, format, formatTick = f
 
   const totals = useMemo(() => data.map((d) => series.reduce((s, x) => s + (d.values[x.key] ?? 0), 0)), [data, series]);
   const max = Math.max(0, ...totals);
-  const ticks = niceTicks(max);
+  const ticks = niceTicks(max, integer);
   const top = ticks[ticks.length - 1] || 1;
   const innerW = Math.max(0, width - PAD.left - PAD.right);
   const innerH = height - PAD.top - PAD.bottom;
