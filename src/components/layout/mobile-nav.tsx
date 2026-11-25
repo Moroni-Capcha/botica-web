@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Ellipsis, Fingerprint } from "lucide-react";
 import type { User } from "@/lib/api/types";
 import { navFor } from "@/lib/nav";
+import { hasModule } from "@/lib/domain/account";
 import { useAccount } from "@/lib/queries";
 import { cn } from "@/lib/cn";
 import { useNavBadges } from "./use-nav-badges";
@@ -19,7 +20,9 @@ const MAX = 5;
 export function MobileNav({ user }: { user: User }) {
   const pathname = usePathname();
   const [more, setMore] = useState(false);
-  const nav = navFor(user, useAccount().data?.modules);
+  const { data: account } = useAccount();
+  const nav = navFor(user, account?.modules);
+  const hasAttendance = hasModule(account?.modules, "asistencia");
   const badges = useNavBadges(user, nav.map((n) => n.id));
   /* "Más" siempre existe: además de los módulos que no caben, trae el marcador de asistencia (que no cabe en la barra superior). */
   const primary = nav.slice(0, MAX - 1);
@@ -54,6 +57,7 @@ export function MobileNav({ user }: { user: User }) {
             <div className="mx-3 my-1 h-px bg-white/10" aria-hidden />
             <ThemeToggle variant="row" />
             <PerfToggle variant="row" />
+            {hasAttendance && (
             <button
               type="button"
               onClick={() => {
@@ -65,6 +69,7 @@ export function MobileNav({ user }: { user: User }) {
               <Fingerprint className="h-[18px] w-[18px] shrink-0" />
               Marcar asistencia
             </button>
+            )}
           </div>
         </div>
       )}

@@ -2,8 +2,10 @@
 
 import { AlarmClock, Check, CircleCheck, Clock, Lock, Minus, Receipt, type LucideIcon } from "lucide-react";
 import type { PublicConfig } from "@/lib/api";
-import { useAccount } from "@/lib/queries";
+import { useAccount, usePlans } from "@/lib/queries";
 import { ALL_MODULES, STATUS_LABEL, daysLeft, effectiveStatus, limaDay } from "@/lib/domain/account";
+import { priceForPlanName } from "@/lib/domain/plans";
+import { soles } from "@/lib/format";
 import { planUsage } from "@/lib/domain/settings";
 import { NAV } from "@/lib/nav";
 import { cn } from "@/lib/cn";
@@ -24,6 +26,7 @@ const fmtDay = (d: string) => new Intl.DateTimeFormat("es-PE", { day: "numeric",
 /** Pestaña "Plan y facturación": plan, uso de locales, estado de la cuenta y módulos incluidos. */
 export function PlanBilling({ config }: { config: PublicConfig }) {
   const { data: account, isLoading, isError } = useAccount();
+  const price = priceForPlanName(usePlans().data, config.plan.name);
   const plan = planUsage([...config.branches, ...config.closedBranches], config.plan.maxBranches);
   const today = limaDay(Date.now());
 
@@ -53,6 +56,7 @@ export function PlanBilling({ config }: { config: PublicConfig }) {
         <div>
           <p className="text-xs font-medium text-muted">Plan</p>
           <p className="mt-1 text-lg font-semibold text-fg">{config.plan.name}</p>
+          {price !== undefined && <p className="text-sm tabular-nums text-fg-2">{soles(price)} al mes (con IGV)</p>}
         </div>
         <div>
           <p className="text-xs font-medium text-muted">Locales</p>

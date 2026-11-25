@@ -6,7 +6,7 @@ import { OPEN_PALETTE_EVENT } from "./command-palette";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { PerfToggle } from "@/components/perf-toggle";
 import type { User } from "@/lib/api/types";
-import { useConfig } from "@/lib/queries";
+import { useConfig, usePlanModule } from "@/lib/queries";
 import { useOperatingBranch, useSessionStore } from "@/lib/auth/session-store";
 import { BrandMark } from "@/components/brand-mark";
 import { cn } from "@/lib/cn";
@@ -35,6 +35,7 @@ export function Topbar({ title, section, user, onLogout }: { title: string; sect
   const setAdminBranch = useSessionStore((s) => s.setAdminBranch);
   const branches = config?.branches ?? [];
   const [kiosk, setKiosk] = useState(false);
+  const { included: hasAttendance } = usePlanModule("asistencia");
   useEffect(() => {
     const open = () => setKiosk(true);
     window.addEventListener(OPEN_KIOSK_EVENT, open);
@@ -107,10 +108,12 @@ export function Topbar({ title, section, user, onLogout }: { title: string; sect
           <kbd className="rounded-md border border-line bg-sunken px-1.5 py-0.5 text-[11px] font-semibold text-muted">Ctrl K</kbd>
         </span>
       </button>
+      {hasAttendance && (
       <button type="button" onClick={() => setKiosk(true)} className="hidden min-h-10 min-w-10 items-center justify-center gap-1.5 rounded-lg p-2 sm:flex text-sm font-medium text-fg-2 transition hover:bg-sunken" title="Marcar asistencia del personal">
         <Fingerprint className="h-4 w-4 text-brand-ink" />
         <span className="hidden 2xl:inline">Asistencia</span>
       </button>
+      )}
       <Divider />
       <ConnectionStatus />
       <ThemeToggle className="hidden sm:flex" />
@@ -122,7 +125,7 @@ export function Topbar({ title, section, user, onLogout }: { title: string; sect
       <button type="button" onClick={onLogout} className="grid h-10 w-10 place-items-center rounded-lg text-muted transition hover:bg-sunken md:hidden" aria-label="Cerrar turno">
         <LogOut className="h-4 w-4" />
       </button>
-      {kiosk && <KioskDialog branches={branches} fixedBranch={user.role === "admin" ? null : user.branchId} onClose={() => setKiosk(false)} />}
+      {kiosk && hasAttendance && <KioskDialog branches={branches} fixedBranch={user.role === "admin" ? null : user.branchId} onClose={() => setKiosk(false)} />}
     </header>
   );
 }
