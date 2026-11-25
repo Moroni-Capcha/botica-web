@@ -9,6 +9,7 @@ import { api, apiMode, errorMessage, type BoticaPublic, type Session } from "@/l
 import { tenantStore } from "@/lib/api/tenant";
 import { useSessionStore } from "@/lib/auth/session-store";
 import { useConfig, useStaff } from "@/lib/queries";
+import { hasModule } from "@/lib/domain/account";
 import { homeFor } from "@/lib/nav";
 import { DigiHmeLogo } from "@/components/brand-mark";
 import { Button } from "@/components/ui/button";
@@ -227,9 +228,11 @@ export default function LoginPage() {
             </Link>
           </p>
 
-          <Button onClick={() => setKiosk(true)} className="mt-2 w-full">
-            <Fingerprint className="h-4 w-4 text-brand-ink" aria-hidden /> Marcar asistencia del personal
-          </Button>
+          {botica && hasModule(config?.plan.modules, "asistencia") && (
+            <Button onClick={() => setKiosk(true)} className="mt-2 w-full">
+              <Fingerprint className="h-4 w-4 text-brand-ink" aria-hidden /> Marcar asistencia del personal
+            </Button>
+          )}
 
           <div className="mt-8 flex flex-col items-center gap-1.5 border-t border-line-soft pt-6">
             <DigiHmeLogo height={36} />

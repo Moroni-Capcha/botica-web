@@ -1001,7 +1001,7 @@ export function createMockClient(): ApiClient {
     async getPublicConfig() {
       await wait(80);
       const d = get();
-      return { pharmacy: d.pharmacy, branches: activeBranches(d), closedBranches: d.branches.filter((b) => !b.active), plan: d.plan, expiry: d.expiry, purchasing: d.purchasing, attendance: d.attendanceSettings };
+      return { pharmacy: d.pharmacy, branches: activeBranches(d), closedBranches: d.branches.filter((b) => !b.active), plan: { ...d.plan, modules: [...d.account.modules] }, expiry: d.expiry, purchasing: d.purchasing, attendance: d.attendanceSettings };
     },
     async updatePharmacy(input) {
       await wait(200);

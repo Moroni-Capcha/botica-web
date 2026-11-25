@@ -88,7 +88,7 @@ El backend valida el local en cada endpoint que recibe `branchId`; el front tamb
 
 ### Públicos (sin token)
 
-`GET /public/config` → `{ pharmacy: Pharmacy, branches: Branch[], expiry: { red: 30, yellow: 90 } }`. `expiry` son los días del semáforo de vencimientos (crítico hasta `red`, por vencer hasta `yellow`). También trae `attendance: { toleranceMinutes: 10, breakMinutes: 60, overtimeAfterMinutes: 15 }` y `purchasing: { coverDays: 15, minShelfDays: 180 }`: días que cubre el pedido sugerido y vida útil mínima al recibir (menos días = advertencia). Ambos se editarán en Ajustes. `pharmacy.legalName` (razón social) y `pharmacy.fiscalAddress` (dirección fiscal) pueden venir vacíos: significa "aún no configurado".
+`GET /public/config` → `{ pharmacy: Pharmacy, branches: Branch[], expiry: { red: 30, yellow: 90 } }`. `expiry` son los días del semáforo de vencimientos (crítico hasta `red`, por vencer hasta `yellow`). También trae `attendance: { toleranceMinutes: 10, breakMinutes: 60, overtimeAfterMinutes: 15 }` y `purchasing: { coverDays: 15, minShelfDays: 180 }`: días que cubre el pedido sugerido y vida útil mínima al recibir (menos días = advertencia). Ambos se editarán en Ajustes. `plan: { name, maxBranches, modules? }`: `modules` son los ids de módulo que incluye el plan de la botica (los mismos de `account.modules`; solo ids, sin precios ni conteos). Es aditivo y opcional: si falta, el front lo toma como "no se sabe" y no oculta nada; el ingreso oculta "Marcar asistencia del personal" cuando `modules` viene y no incluye `asistencia`. `pharmacy.legalName` (razón social) y `pharmacy.fiscalAddress` (dirección fiscal) pueden venir vacíos: significa "aún no configurado".
 
 `GET /auth/staff` → `StaffSummary[]`. Solo nombre, rol y local, nunca el PIN.
 
@@ -141,7 +141,7 @@ En el mock, el dueño de ejemplo es `dueno@botica-huanuco.pe` con contraseña `C
 - `trialEndsAt` (solo `trial`) y `renewsAt` (solo `active`): días locales `YYYY-MM-DD` (America/Lima).
 - `modules`: ids de módulo del plan (los de `src/lib/nav.ts`). El front muestra solo los que están aquí y además en `user.permissions` (`allowedModules`). El backend debe rechazar también los endpoints de un módulo que el plan no incluye.
 - El backend devuelve el estado ya calculado: una prueba cuyo `trialEndsAt` quedó atrás llega como `overdue` (`effectiveStatus` en `src/lib/domain/account.ts`). El front aplica la misma regla por si el dato llega viejo.
-- Vive en un endpoint propio y no dentro de `PublicConfig.plan`, porque cambia con la facturación (no con la configuración) y no debe ser público.
+- Vive en un endpoint propio porque el estado y las fechas cambian con la facturación y no deben ser públicos. Solo los ids de módulo se repiten en `PublicConfig.plan.modules`, para que el ingreso (sin sesión) sepa si mostrar la marcación de asistencia.
 - **Solo lectura:** con `suspended`, todo `POST`, `PUT`, `PATCH` y `DELETE` responde `403 CUENTA_SUSPENDIDA`, excepto `/auth/login`, `/auth/owner-login` y `/auth/logout`. Los `GET` siguen funcionando.
 - Para probar en el mock: `setMockAccount({ status: "suspended" })` (exportada desde `src/lib/api/mock/client.ts`) o editar `account` dentro de `bh.mock.v1` en localStorage.
 
@@ -528,7 +528,7 @@ Todo es solo para el administrador (`403 SIN_PERMISO`). Los datos de la botica, 
 
 `PUT /settings/pharmacy` con `Pharmacy` → `Pharmacy`. `Pharmacy` trae `legalName` (razón social, hasta 100 caracteres) y `fiscalAddress` (dirección fiscal, hasta 120); ambos son opcionales y vacío significa "aún no configurado": el ticket de 80 mm imprime entonces `name` y la dirección del local. Nombre de 3 a 40 caracteres, lema hasta 60, RUC de 11 dígitos que empiece en 10 o 20, colores `#RRGGBB` (se guardan en mayúsculas). El color principal debe tener contraste de al menos 4,5 con texto blanco (fórmula WCAG), porque va de fondo en botones y barra lateral.
 
-**Locales.** `GET /public/config` trae `branches` (solo activos: donde se vende, se traslada y se elige), `closedBranches` (desactivados, solo para nombrarlos en el historial) y `plan`: `{ "name": "Plan Crece", "maxBranches": 3 }`, que define Digi!HME según lo contratado. Cada `Branch` lleva `active`.
+**Locales.** `GET /public/config` trae `branches` (solo activos: donde se vende, se traslada y se elige), `closedBranches` (desactivados, solo para nombrarlos en el historial) y `plan`: `{ "name": "Plan Crece", "maxBranches": 3, "modules": ["panel", "pos"] }`, que define Digi!HME según lo contratado. Cada `Branch` lleva `active`.
 
 `POST /settings/branches` con `BranchCreateInput` → `{ branch, account }` (201):
 

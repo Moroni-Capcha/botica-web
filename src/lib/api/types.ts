@@ -26,6 +26,11 @@ export interface Plan {
   name: string;
   /** Locales activos que se pueden tener a la vez. */
   maxBranches: number;
+  /**
+   * Ids de módulo que incluye el plan de la botica (público, sin sesión). Opcional: si falta
+   * (backend anterior) significa "no se sabe" y el front no oculta nada.
+   */
+  modules?: string[];
 }
 
 /** Lo mínimo que la pantalla de login necesita para listar usuarios (sin PIN). */
