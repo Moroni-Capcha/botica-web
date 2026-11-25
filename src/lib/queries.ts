@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { api, platformApi } from "@/lib/api";
-import { effectiveStatus, isReadOnly, limaDay } from "@/lib/domain/account";
+import { effectiveStatus, hasModule, isReadOnly, limaDay } from "@/lib/domain/account";
 import type { SetupStep, ClockRequest, ContactRequest, CustomerInput, ManualMarkRequest, WorkerInput } from "@/lib/api";
 import type { CreditNote, CreditNoteRequest, Voucher, VoidRequest } from "@/lib/api";
 import type { BranchId, CashCloseRequest, CashMovementRequest, Lot, Product, ProductInput, PurchaseRequest, SaleRequest, Supplier, SupplierInput, Transfer, TransferAskRequest, TransferSendRequest, WriteOffRequest } from "@/lib/api";
@@ -53,6 +53,12 @@ export const useStaff = (enabled = true) => useQuery({ queryKey: qk.staff, query
 /** Estado de la cuenta y módulos del plan. Se vuelve a leer al volver a la pestaña. Solo con sesión iniciada. */
 export const useAccount = (enabled = true) => useQuery({ queryKey: qk.account, queryFn: api.getAccount, staleTime: 60_000, refetchOnWindowFocus: true, enabled });
 
+/** ¿El plan incluye el módulo? Mientras la cuenta no llega se asume que sí (como el menú). `known` dice si ya llegó. */
+export function usePlanModule(id: string): { included: boolean; known: boolean } {
+  const modules = useAccount().data?.modules;
+  return { included: hasModule(modules, id), known: modules !== undefined };
+}
+
 /** Planes que se pueden contratar (público: no necesita sesión). */
 export const usePlans = () => useQuery({ queryKey: qk.plans, queryFn: api.listPlans, staleTime: 10 * 60_000 });
 
@@ -81,7 +87,7 @@ export const useKardex = (productId: number, branchId: BranchId | null, days = 3
     staleTime: 30_000,
     placeholderData: page ? (prev) => prev : undefined,
   });
-export const useTransfers = (days: number) => useQuery({ queryKey: qk.transfers(days), queryFn: () => api.listTransfers(days), staleTime: 20_000, refetchInterval: 60_000 });
+export const useTransfers = (days: number, enabled = true) => useQuery({ queryKey: qk.transfers(days), queryFn: () => api.listTransfers(days), staleTime: 20_000, refetchInterval: 60_000, enabled });
 export const useCashSummary = (branchId: BranchId) => useQuery({ queryKey: qk.cashSummary(branchId), queryFn: () => api.getCashSummary(branchId), refetchInterval: 60_000 });
 export const useCashClosings = (branchId: BranchId | null, days: number) =>
   useQuery({ queryKey: qk.closings(branchId, days), queryFn: () => api.listCashClosings({ branchId: branchId ?? undefined, days }), staleTime: 30_000 });

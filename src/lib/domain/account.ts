@@ -32,6 +32,12 @@ export function effectiveStatus(account: Pick<Account, "status" | "trialEndsAt">
 /** Módulos que puede ver el usuario: los de su rol que además incluye el plan. */
 export const allowedModules = (planModules: readonly string[], rolePermissions: readonly string[]): string[] => rolePermissions.filter((m) => planModules.includes(m));
 
+/**
+ * ¿El plan incluye este módulo? Sin datos de cuenta (`modules` indefinido) se asume que sí, igual que el menú.
+ * Para decidir si se pide algo al servidor usa `modules !== undefined && hasModule(...)`.
+ */
+export const hasModule = (modules: readonly string[] | undefined, id: string): boolean => !modules || modules.includes(id);
+
 export const STATUS_LABEL: Record<AccountStatus, string> = { trial: "En prueba", active: "Activa", overdue: "Vencida", suspended: "Suspendida" };
 
 export interface AccountNotice {

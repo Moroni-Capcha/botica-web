@@ -7,7 +7,7 @@ import { ArrowRight, Banknote, CircleAlert, CircleCheck, Info, Receipt, Shopping
 import type { CashSummary } from "@/lib/api/types";
 import { api, errorMessage } from "@/lib/api";
 import { useSessionStore } from "@/lib/auth/session-store";
-import { qk, useCustomers, useDashboard, useMarks, useProducts, useRefills, useTransfers, useWorkers } from "@/lib/queries";
+import { qk, useCustomers, useDashboard, useMarks, useProducts, usePlanModule, useRefills, useTransfers, useWorkers } from "@/lib/queries";
 import { refillRows, toNotify } from "@/lib/domain/customers";
 import { buildAlerts, dailyTotals, greeting, isoLocal, sameDayLastWeek, averageDay } from "@/lib/domain/dashboard";
 import { alertLook, goalProgress, type AlertShape } from "@/lib/domain/panel";
@@ -47,10 +47,15 @@ export function PanelScreen() {
   const dashboard = useDashboard(SERIES_DAYS);
   const products = useProducts();
   const expiry = useExpiryData(ids);
-  const transfers = useTransfers(30);
+  /* Nada se pide ni se muestra de un módulo que el plan no incluye (el servidor respondería 403). */
+  const transfersPlan = usePlanModule("traslados");
+  const attendancePlan = usePlanModule("asistencia");
+  const withTransfers = transfersPlan.known && transfersPlan.included;
+  const withAttendance = isAdmin && attendancePlan.known && attendancePlan.included;
+  const transfers = useTransfers(30, withTransfers);
   const cashQ = useQueries({ queries: ids.map((b) => ({ queryKey: qk.cashSummary(b), queryFn: () => api.getCashSummary(b), refetchInterval: 60_000 })) });
-  const workers = useWorkers(isAdmin);
-  const marks = useMarks(today, today, isAdmin);
+  const workers = useWorkers(withAttendance);
+  const marks = useMarks(today, today, withAttendance);
   const customers = useCustomers();
   const refills = useRefills();
 
@@ -68,8 +73,8 @@ export function PanelScreen() {
 
   const inv = useMemo(() => inventoryRows(products.data ?? [], expiry.rows.map((r) => r.lot), ids, now), [products.data, expiry.rows, ids, now]);
   const attendanceToday = useMemo(
-    () => (isAdmin && workers.data && marks.data ? workers.data.filter((w) => w.active && ids.includes(w.branchId)).map((w) => daySummary(w, now, marks.data, now, DEFAULT_ATTENDANCE)) : undefined),
-    [isAdmin, workers.data, marks.data, ids, now],
+    () => (withAttendance && workers.data && marks.data ? workers.data.filter((w) => w.active && ids.includes(w.branchId)).map((w) => daySummary(w, now, marks.data, now, DEFAULT_ATTENDANCE)) : undefined),
+    [withAttendance, workers.data, marks.data, ids, now],
   );
   const onShift = attendanceToday?.filter((s) => s.status === "en_turno" || s.status === "refrigerio").length ?? 0;
   const scheduled = attendanceToday?.filter((s) => s.scheduled).length ?? 0;
@@ -114,7 +119,7 @@ export function PanelScreen() {
   const maxTop = Math.max(1, ...topProducts.map((p) => p.total));
 
   const loading = dashboard.isLoading;
-  const alertsLoading = expiry.isLoading || transfers.isLoading;
+  const alertsLoading = expiry.isLoading || (withTransfers && transfers.isLoading);
   const firstName = user?.name.replace(/^Q\.F\.\s*/, "").split(" ")[0] ?? "";
   const vsWeek = lastWeek ? round2(totalToday - lastWeek.total) : null;
   const lastWeekDow = lastWeek ? DOW[new Date(`${lastWeek.date}T12:00:00`).getDay()] : "";
@@ -181,7 +186,7 @@ export function PanelScreen() {
         />
         <Kpi index={1} icon={Receipt} label="Comprobantes" value={String(ticketsToday)} loading={loading} hint={ticketsToday ? `Ticket promedio ${soles(totalToday / ticketsToday)}` : "Aún no hay ventas hoy"} />
         <Kpi index={2} icon={Banknote} label="Efectivo en caja" value={soles(cashExpected)} loading={cashQ.some((q) => q.isLoading)} hint={`Yape/Plin ${sol0(digital.yape)} · Tarjeta ${sol0(digital.tarjeta)}`} />
-        {isAdmin ? (
+        {isAdmin && attendancePlan.included ? (
           <Kpi index={3} wide icon={UserCheck} label="Personal en turno" value={attendanceToday ? `${onShift} de ${scheduled}` : "—"} loading={workers.isLoading || marks.isLoading} hint={attendanceToday ? `${attendanceToday.filter((s) => s.late > 0).length} tardanzas hoy` : ""} href="/asistencia" />
         ) : (
           <Kpi index={3} wide icon={CircleAlert} label="Pendientes" value={String(alerts.length)} loading={expiry.isLoading} hint={critical ? `${critical} urgentes` : "Nada urgente"} />

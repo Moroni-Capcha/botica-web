@@ -31,4 +31,8 @@ export const priceWithIgv = (basePrice: number): number => round2(basePrice * (1
 export const listPlanOffers = (): PlanOffer[] =>
   PLAN_CATALOG.map((p) => ({ id: p.id, name: p.name, priceMonthly: priceWithIgv(p.basePrice), maxBranches: p.maxBranches, modules: [...p.modules] }));
 
+/** Precio mensual con IGV del plan con ese nombre, o `undefined` si el catálogo aún no llegó o no lo trae. */
+export const priceForPlanName = (offers: readonly Pick<PlanOffer, "name" | "priceMonthly">[] | undefined, name: string): number | undefined =>
+  offers?.find((o) => o.name === name)?.priceMonthly;
+
 export const findPlan = (id: string): PlanDef | undefined => PLAN_CATALOG.find((p) => p.id === id);

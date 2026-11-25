@@ -5,7 +5,7 @@ import { CircleAlert, CircleCheck, Plus, Power } from "lucide-react";
 import type { Branch, BranchInput } from "@/lib/api/types";
 import { errorMessage } from "@/lib/api";
 import { accountErrors, branchErrors, deactivateBlockers, hasErrors, nextSeries } from "@/lib/domain/settings";
-import { useAccounts, useBranchStock, useCash, useCreateBranch, useSetBranchActive, useTransfers, useWorkers } from "@/lib/queries";
+import { useAccounts, useBranchStock, useCash, useCreateBranch, usePlanModule, useSetBranchActive, useTransfers, useWorkers } from "@/lib/queries";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/field";
@@ -114,9 +114,12 @@ export function CloseBranchDialog({ branch, activeCount, onClose }: { branch: Br
   const [reason, setReason] = useState("");
   const stock = useBranchStock();
   const cash = useCash(branch.id);
-  const transfers = useTransfers(180);
+  /* Solo se consulta lo que el plan incluye (si no, el servidor responde 403). */
+  const transfersPlan = usePlanModule("traslados");
+  const attendancePlan = usePlanModule("asistencia");
+  const transfers = useTransfers(180, transfersPlan.known && transfersPlan.included);
   const accounts = useAccounts();
-  const workers = useWorkers();
+  const workers = useWorkers(attendancePlan.known && attendancePlan.included);
   const setActive = useSetBranchActive();
 
   const loading = stock.isLoading || cash.isLoading || transfers.isLoading;

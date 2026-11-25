@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ALL_MODULES } from "./account";
-import { findPlan, listPlanOffers, priceWithIgv } from "./plans";
+import { findPlan, listPlanOffers, priceForPlanName, priceWithIgv } from "./plans";
 
 describe("planes", () => {
   it("el precio sale con IGV y 2 decimales", () => {
@@ -22,5 +22,16 @@ describe("planes", () => {
   it("busca un plan por id", () => {
     expect(findPlan("crece")?.name).toBe("Plan Crece");
     expect(findPlan("nada")).toBeUndefined();
+  });
+});
+
+describe("precio del plan por nombre", () => {
+  const offers = listPlanOffers();
+  it("devuelve el precio con IGV del plan", () => {
+    expect(priceForPlanName(offers, "Plan Crece")).toBe(129.8);
+  });
+  it("no inventa nada si falta el catálogo o el plan", () => {
+    expect(priceForPlanName(undefined, "Plan Crece")).toBeUndefined();
+    expect(priceForPlanName(offers, "Plan Desconocido")).toBeUndefined();
   });
 });

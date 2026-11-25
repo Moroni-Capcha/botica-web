@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accountNotice, allowedModules, daysLeft, effectiveStatus, isReadOnly, limaDay } from "./account";
+import { accountNotice, allowedModules, hasModule, daysLeft, effectiveStatus, isReadOnly, limaDay } from "./account";
 
 describe("cuenta", () => {
   it("solo la suspendida es de solo lectura", () => {
@@ -48,5 +48,17 @@ describe("aviso de cuenta", () => {
   });
   it("suspendida es error de solo lectura", () => {
     expect(accountNotice({ status: "suspended" }, today)).toMatchObject({ tone: "error" });
+  });
+});
+
+describe("módulos del plan", () => {
+  it("dice si el plan incluye el módulo", () => {
+    expect(hasModule(["panel", "pos"], "pos")).toBe(true);
+    expect(hasModule(["panel", "pos"], "asistencia")).toBe(false);
+    expect(hasModule([], "panel")).toBe(false);
+  });
+
+  it("sin datos de cuenta asume que sí, como el menú", () => {
+    expect(hasModule(undefined, "asistencia")).toBe(true);
   });
 });
