@@ -249,7 +249,7 @@ Leyenda de **Fase** (sección 6): **F0**–**F2** = obligatorio para arrancar; *
 | Método | Ruta | Quién | Qué hace | API.md | Fase |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/public/botica/:code` | público | Marca de la botica antes de ingresar (`BoticaPublic`) | Públicos | F0 |
-| GET | `/public/config` | público | Botica, locales activos y cerrados, plan, reglas | Públicos, Ajustes | F0 |
+| GET | `/public/config` | público | Botica, locales activos y cerrados, plan (`name`, `maxBranches`, `modules`), reglas | Públicos, Ajustes | F0 |
 | GET | `/auth/staff` | público | Lista de usuarios para el ingreso (sin PIN) | Públicos | F0 |
 | POST | `/auth/login` | público | Ingreso con `userId` y PIN; bloqueo 5 min tras 5 fallos | Públicos | F0 |
 | POST | `/auth/owner-login` | público | Ingreso del dueño con correo y contraseña | Públicos | F0 |
@@ -505,7 +505,7 @@ Cosas que no se pudieron confirmar con el código ni con `API.md`. Cada una trae
 2. **Códigos de error fuera de la tabla de `API.md`** (`CODIGO_EN_USO`, `CORREO_EN_USO`, `LIMITE_DEL_PLAN`, `LOCAL_NO_SE_PUEDE_CERRAR`, `LOCAL_INACTIVO`, `CUENTA_PROTEGIDA`, `SERIE_NO_AUTORIZADA`, `LOCAL_NO_EXISTE`, `CUENTA_NO_EXISTE`, `VENTA_VACIA`): hay que sumarlos a la tabla con su HTTP status. El texto de `API.md` y el mock dan 409/404/400 como en la sección 3.2.
 3. **`SaleRequest.approverPin`** existe en `types.ts` ("PIN de un Q.F. cuando quien cobra no puede dispensar controlados") pero no está en `API.md` ni lo usa el mock (el mock da por hecho que todas las cuentas de local son Q.F.). ¿Se usa? ¿Cómo se valida?
 4. **Plazo de DNI:** `API.md` y `CLAUDE.md` dicen "obligatorio desde S/ 700", pero `documentIsValid` exige DNI solo cuando `total > 700` (exactamente S/ 700 no lo pide). ¿Cuál vale? La norma habla de montos mayores a 700.
-5. **Módulos del plan inicio:** el ejemplo de `GET /public/plans` en `API.md` muestra `["panel","pos","caja"]`, pero `plans.ts` da otra lista (9 módulos). Vale `plans.ts`. Además `asistencia` solo está en `cadena`: ¿los endpoints públicos de marcación (`/public/attendance/*`) también se bloquean en los planes que no la incluyen?
+5. **Módulos del plan inicio:** el ejemplo de `GET /public/plans` en `API.md` muestra `["panel","pos","caja"]`, pero `plans.ts` da otra lista (9 módulos). Vale `plans.ts`. Además `asistencia` solo está en `cadena`: los endpoints públicos de marcación (`/public/attendance/*`) se bloquean en los planes que no la incluyen, y el ingreso oculta el botón leyendo `plan.modules` de `GET /public/config`.
 6. **Código HTTP al usar un módulo fuera del plan:** `API.md` no lo dice. Propuesta: `403 SIN_PERMISO` con mensaje "Tu plan no incluye este módulo". ¿O un código nuevo (`MODULO_NO_INCLUIDO`)?
 7. **Permisos por endpoint no especificados:** ¿quién puede `PATCH /lots/discount` y `POST /lots/:id/write-off` (solo su local, entendido), `POST /customers`, `PUT /customers/:id` y `POST /purchases`? Y la lista exacta de `user.permissions` por rol (el mock tiene una; `API.md` dice "los define el backend"). Además `GET /reports/sales` acepta encargado, pero el mock no le da el módulo `reportes`.
 8. **Venta offline que llega con la caja cerrada:** hoy es rechazo definitivo (`CAJA_CERRADA`). ¿El servidor debe aceptarla por `soldAt` (hora real del cobro) y asignarla al turno que estaba abierto entonces?

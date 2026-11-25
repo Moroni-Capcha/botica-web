@@ -146,7 +146,7 @@ describe("mock: consola interna de Digi!HME", () => {
       const t = await run(platform.updateTenant("botica-huanuco", { action: "change_plan", planId: "cadena", reason }));
       expect(t).toMatchObject({ planName: "Plan Cadena", maxBranches: 10, planId: "cadena" });
       expect((await run(api.getAccount())).modules).toEqual([...ALL_MODULES]);
-      expect((await run(api.getPublicConfig())).plan).toEqual({ name: "Plan Cadena", maxBranches: 10 });
+      expect((await run(api.getPublicConfig())).plan).toEqual({ name: "Plan Cadena", maxBranches: 10, modules: [...ALL_MODULES] });
       const log = await run(api.listAudit({ ...recent(), action: "plan_cambiado" }));
       expect(log.items[0]!.before).toEqual({ plan: "Plan Crece", maxBranches: 3 });
       expect(log.items[0]!.after).toMatchObject({ plan: "Plan Cadena", maxBranches: 10, reason });
