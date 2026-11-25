@@ -228,7 +228,7 @@ export default function LoginPage() {
             </Link>
           </p>
 
-          {hasModule(config?.plan.modules, "asistencia") && (
+          {botica && hasModule(config?.plan.modules, "asistencia") && (
             <Button onClick={() => setKiosk(true)} className="mt-2 w-full">
               <Fingerprint className="h-4 w-4 text-brand-ink" aria-hidden /> Marcar asistencia del personal
             </Button>
